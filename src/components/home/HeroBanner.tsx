@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import React from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from 'react-native-paper';
 import { colors } from '../../theme';
 
 interface HeroBannerProps {
@@ -15,16 +15,16 @@ export const HeroBanner = ({ itemCount, onMenuPress, onNotificationPress }: Hero
     {/* Top Header Bar */}
     <View style={styles.headerBar}>
       <TouchableOpacity onPress={onMenuPress} style={styles.menuBtn}>
-        <MaterialCommunityIcons name="menu" size={22} color={colors.primary} />
+        <MaterialCommunityIcons name="menu" size={24} color="#FFFFFF" />
       </TouchableOpacity>
       <TouchableOpacity style={styles.langSelector}>
-        <MaterialCommunityIcons name="web" size={18} color="#9CA3AF" />
+        <MaterialCommunityIcons name="web" size={18} color="#FFFFFF" />
         <Text variant="labelMedium" style={styles.langText}>
-          GB <Text style={styles.langBold}>English</Text>
+          GB English
         </Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={onNotificationPress} style={styles.bellBtn}>
-        <MaterialCommunityIcons name="bell-outline" size={22} color="#9CA3AF" />
+        <MaterialCommunityIcons name="bell-outline" size={24} color="#FFFFFF" />
       </TouchableOpacity>
     </View>
 
@@ -72,12 +72,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
-    paddingTop: 12,
+    paddingTop: 48,
     paddingBottom: 8,
   },
   menuBtn: {
     width: 40,
     height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#374151',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -87,11 +90,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   langText: {
-    color: '#9CA3AF',
-  },
-  langBold: {
-    fontWeight: '700',
-    color: '#D1D5DB',
+    color: '#FFFFFF',
   },
   bellBtn: {
     width: 40,

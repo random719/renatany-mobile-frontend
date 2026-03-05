@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     maxWidth: 430,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1F2937',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.15,
