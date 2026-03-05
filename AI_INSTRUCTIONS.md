@@ -53,7 +53,7 @@ export const getListings = async () => {
 1. **Read README.md first** -- every time, for every task
 2. **Follow the exact folder structure** in README.md
 3. **TypeScript only** -- `.ts` and `.tsx`. No `.js`. No `any` type
-4. **NativeBase for all UI** -- `Box` not `View`, `Text` not RN `Text`, `Pressable` not `TouchableOpacity`
+4. **React Native Paper for UI components** -- use Paper's `Text`, `Button`, `TextInput`, `Card`, `ActivityIndicator`, `Snackbar`, `Dialog`, `FAB`, etc. Use RN `View`/`ScrollView`/`FlatList` for layout. Use `MaterialCommunityIcons` for icons.
 5. **Zustand for state** -- one store per domain (auth, listing, booking, chat, favorite, dispute, notification, admin)
 6. **React Navigation v6** -- exact navigator structure from README.md
 7. **Match the web app design** -- dark primary (#1F2937), coral/emerald gradient accents, trust badges, "AI Powered" badge on recommendations, heart/like counts on listing cards
@@ -82,19 +82,23 @@ Screen -> Store (Zustand) -> Service (USE_API toggle) -> Backend API / Mock Data
   - Utils/hooks: `camelCase.ts` (e.g., `useAuth.ts`)
   - Types: `camelCase.ts` (e.g., `listing.ts`)
   - Data: `camelCase.ts` (e.g., `listings.ts`)
-- **No inline styles** -- use NativeBase props or style objects
+- **No inline styles** -- use React Native Paper props or style objects
 - **No `any`** -- use types from `src/types/`
 - Keep components under 200 lines. Extract sub-components if needed
 - Use exact type definitions from README.md (User, Listing, Booking, Chat, Dispute, AdminStats, etc.)
 
-## NativeBase Usage
+## React Native Paper Usage
 
-- Root: `<NativeBaseProvider theme={customTheme}>`
-- Theme: `src/theme/index.ts` with colors from README.md
-- Color mode: `useColorMode()` for light/dark
-- Layout: `VStack`, `HStack`, `Box`, `Center`, `Flex`
-- Forms: `Input`, `Select`, `Checkbox`, `Radio`, `Switch`, `FormControl`
-- Feedback: `Toast`, `Alert`, `Spinner`
+- Root: `<PaperProvider theme={lightTheme}>` (from `react-native-paper`)
+- Theme: `src/theme/index.ts` extends `MD3LightTheme` / `MD3DarkTheme` with app colors
+- Layout: Use React Native `View`, `ScrollView`, `FlatList` with `StyleSheet`
+- Text: Use `Text` from `react-native-paper` (supports `variant` prop: `headlineLarge`, `bodyMedium`, etc.)
+- Forms: `TextInput`, `Checkbox`, `RadioButton`, `Switch` from `react-native-paper`
+- Buttons: `Button` from `react-native-paper` (modes: `contained`, `outlined`, `text`)
+- Cards: `Card`, `Card.Title`, `Card.Content`, `Card.Cover` from `react-native-paper`
+- Feedback: `ActivityIndicator`, `Snackbar`, `Banner`, `Dialog` from `react-native-paper`
+- Icons: `MaterialCommunityIcons` from `@expo/vector-icons`
+- FAB: `FAB` from `react-native-paper` for the center "+" list item tab button
 
 ## Navigation
 
@@ -141,7 +145,7 @@ Screen -> Store (Zustand) -> Service (USE_API toggle) -> Backend API / Mock Data
 ## Image Handling
 
 - Placeholder images from `https://picsum.photos/` in mock data
-- NativeBase `Image` with `alt` prop always set
+- React Native Paper `Image` with `alt` prop always set
 - `FlatList` for lazy loading in lists
 
 ## When Adding a New Feature
@@ -163,7 +167,7 @@ Screen -> Store (Zustand) -> Service (USE_API toggle) -> Backend API / Mock Data
 - Put business logic in components (use stores or utils)
 - Import mock data directly in screens (go through services -> stores)
 - Skip TypeScript types or use `any`
-- Hardcode colors (use NativeBase theme tokens)
+- Hardcode colors (use React Native Paper theme tokens)
 - Write service functions without the `USE_API` toggle pattern
 - Skip the API path in services -- both mock AND api paths must exist
 - Show admin screens to non-admin users

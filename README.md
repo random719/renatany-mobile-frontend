@@ -8,7 +8,7 @@ Mobile companion for [www.rentany.fr](https://www.rentany.fr) -- a peer-to-peer 
 
 - **Frontend:** React Native (Expo managed workflow)
 - **Navigation:** React Navigation v6 (Stack + Bottom Tabs)
-- **UI Library:** NativeBase
+- **UI Library:** React Native Paper (Material Design 3)
 - **State Management:** Zustand
 - **Language:** TypeScript
 - **Backend:** Node.js (API arriving in ~2 days -- wire as each flow is built)
@@ -629,7 +629,7 @@ Matching the web app design:
 - **Border Radius:** 12px (cards), 8px (buttons/inputs), full-round (avatars)
 - **Font:** System default
 - **Sidebar on web = Bottom tabs on mobile**
-- Light and dark mode via NativeBase color mode
+- Light and dark mode via React Native Paper `MD3LightTheme` / `MD3DarkTheme`
 
 ## Development Commands
 
