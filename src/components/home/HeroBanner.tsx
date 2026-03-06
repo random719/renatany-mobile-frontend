@@ -3,6 +3,7 @@ import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { colors } from '../../theme';
+import { GlobalHeader } from '../common/GlobalHeader';
 
 interface HeroBannerProps {
   itemCount: number;
@@ -12,21 +13,7 @@ interface HeroBannerProps {
 
 export const HeroBanner = ({ itemCount, onMenuPress, onNotificationPress }: HeroBannerProps) => (
   <View style={styles.container}>
-    {/* Top Header Bar */}
-    <View style={styles.headerBar}>
-      <TouchableOpacity onPress={onMenuPress} style={styles.menuBtn}>
-        <MaterialCommunityIcons name="menu" size={24} color={colors.textPrimary} />
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.langSelector}>
-        <MaterialCommunityIcons name="web" size={18} color={colors.textPrimary} />
-        <Text variant="labelMedium" style={styles.langText}>
-          GB English
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={onNotificationPress} style={styles.bellBtn}>
-        <MaterialCommunityIcons name="bell-outline" size={24} color={colors.textPrimary} />
-      </TouchableOpacity>
-    </View>
+    <GlobalHeader onMenuPress={onMenuPress} onNotificationPress={onNotificationPress} />
 
     {/* Hero Text Region */}
     <View style={styles.heroSection}>
@@ -85,39 +72,6 @@ export const HeroBanner = ({ itemCount, onMenuPress, onNotificationPress }: Hero
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.cardLight,
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 16,
-    backgroundColor: colors.cardLight, // White header
-  },
-  menuBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  langSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  langText: {
-    color: colors.textPrimary,
-    fontWeight: '600',
-  },
-  bellBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   heroSection: {
     backgroundColor: '#1E232F', // Darker blueish grey to match screenshot

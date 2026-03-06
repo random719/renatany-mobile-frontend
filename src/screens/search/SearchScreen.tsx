@@ -4,6 +4,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
+import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { ListingCard } from '../../components/listing/ListingCard';
 import { useListingStore } from '../../store/listingStore';
 import { colors } from '../../theme';
@@ -32,9 +33,8 @@ export const SearchScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Search Header Container */}
+      <GlobalHeader onMenuPress={() => { }} />
       <View style={styles.searchHeader}>
-        {/* Title & Save Search Row */}
         <View style={styles.headerTitleRow}>
           <Text variant="headlineSmall" style={styles.headerTitle}>
             Search & Filter
@@ -45,7 +45,6 @@ export const SearchScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Inputs */}
         <View style={styles.inputWrapper}>
           <MaterialCommunityIcons name="magnify" size={20} color="#9CA3AF" />
           <TextInput
@@ -69,13 +68,11 @@ export const SearchScreen = () => {
           />
         </View>
 
-        {/* Categories Dropdown Fake Button */}
         <TouchableOpacity style={styles.dropdownBtn}>
           <Text style={styles.dropdownText}>All Categories</Text>
           <MaterialCommunityIcons name="chevron-down" size={20} color="#6B7280" />
         </TouchableOpacity>
 
-        {/* Advanced Filters & Relevance Row */}
         <View style={styles.filtersRow}>
           <TouchableOpacity style={styles.actionBtnRow}>
             <MaterialCommunityIcons name="tune-variant" size={18} color={colors.textPrimary} />
@@ -89,7 +86,6 @@ export const SearchScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* View Toggle */}
         <View style={styles.viewToggleGroup}>
           <TouchableOpacity
             style={[styles.viewToggleBtn, viewMode === 'grid' && styles.viewToggleBtnActive]}
@@ -114,7 +110,6 @@ export const SearchScreen = () => {
         </View>
       </View>
 
-      {/* Grid Content */}
       <View style={styles.contentWrapper}>
         {isLoading ? (
           <ActivityIndicator style={styles.loader} size="large" />
@@ -157,7 +152,7 @@ const styles = StyleSheet.create({
   },
   searchHeader: {
     paddingHorizontal: 20,
-    paddingTop: 48, // Header spacing
+    paddingTop: 16,
     paddingBottom: 24,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,

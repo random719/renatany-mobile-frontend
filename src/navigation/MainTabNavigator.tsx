@@ -1,27 +1,27 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
 import { FAB } from 'react-native-paper';
-import {
-  MainTabParamList,
-  HomeStackParamList,
-  SearchStackParamList,
-  FavoritesStackParamList,
-  ProfileStackParamList,
-} from '../types/navigation';
-import { HomeScreen } from '../screens/home/HomeScreen';
-import { SearchScreen } from '../screens/search/SearchScreen';
-import { FilterScreen } from '../screens/search/FilterScreen';
 import { CategoriesScreen } from '../screens/categories/CategoriesScreen';
 import { CategoryDetailScreen } from '../screens/categories/CategoryDetailScreen';
+import { HomeScreen } from '../screens/home/HomeScreen';
 import { ListingDetailScreen } from '../screens/listing/ListingDetailScreen';
+import { FilterScreen } from '../screens/search/FilterScreen';
+import { SearchScreen } from '../screens/search/SearchScreen';
 import { colors } from '../theme';
+import {
+  FavoritesStackParamList,
+  HomeStackParamList,
+  MainTabParamList,
+  ProfileStackParamList,
+  SearchStackParamList,
+} from '../types/navigation';
 
 // Placeholder screens for tabs not yet built (Flow 3)
 import { View as RNView } from 'react-native';
-import { Text, Button } from 'react-native-paper';
+import { Button, Text } from 'react-native-paper';
 import { useAuthStore } from '../store/authStore';
 
 const PlaceholderFavorites = () => (
@@ -60,7 +60,7 @@ const HomeStackNavigator = () => (
     <HomeStack.Screen
       name="ListingDetail"
       component={ListingDetailScreen}
-      options={{ title: 'Item Details' }}
+      options={{ headerShown: false }}
     />
     <HomeStack.Screen
       name="Categories"
@@ -82,7 +82,7 @@ const SearchStackNavigator = () => (
     <SearchStack.Screen
       name="Search"
       component={SearchScreen}
-      options={{ title: 'Search' }}
+      options={{ headerShown: false }}
     />
     <SearchStack.Screen
       name="Filter"
@@ -92,7 +92,7 @@ const SearchStackNavigator = () => (
     <SearchStack.Screen
       name="ListingDetail"
       component={ListingDetailScreen}
-      options={{ title: 'Item Details' }}
+      options={{ headerShown: false }}
     />
   </SearchStack.Navigator>
 );
