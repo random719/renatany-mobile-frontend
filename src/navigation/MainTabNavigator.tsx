@@ -6,6 +6,7 @@ import { StyleSheet, View } from 'react-native';
 import { FAB } from 'react-native-paper';
 import { CategoriesScreen } from '../screens/categories/CategoriesScreen';
 import { CategoryDetailScreen } from '../screens/categories/CategoryDetailScreen';
+import { FavoritesScreen } from '../screens/favorites/FavoritesScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { ListingDetailScreen } from '../screens/listing/ListingDetailScreen';
 import { FilterScreen } from '../screens/search/FilterScreen';
@@ -103,8 +104,13 @@ const FavoritesStackNavigator = () => (
   <FavoritesStack.Navigator>
     <FavoritesStack.Screen
       name="Favorites"
-      component={PlaceholderFavorites}
-      options={{ title: 'Favorites' }}
+      component={FavoritesScreen}
+      options={{ headerShown: false }}
+    />
+    <FavoritesStack.Screen
+      name="ListingDetail"
+      component={ListingDetailScreen}
+      options={{ headerShown: false }}
     />
   </FavoritesStack.Navigator>
 );

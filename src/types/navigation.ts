@@ -29,6 +29,7 @@ export type SearchStackParamList = {
 export type FavoritesStackParamList = {
   Favorites: undefined;
   SavedSearches: undefined;
+  ListingDetail: { listingId: string };
 };
 
 export type ProfileStackParamList = {

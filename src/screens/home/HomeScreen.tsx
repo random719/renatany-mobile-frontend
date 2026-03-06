@@ -61,25 +61,25 @@ export const HomeScreen = () => {
     navigation.navigate('Categories');
   };
 
-  const renderSection = (title: string, data: Listing[], badge?: string) => {
+  const renderSection = (title: string, data: Listing[], badge?: string, iconName?: keyof typeof MaterialCommunityIcons.glyphMap) => {
     if (data.length === 0) return null;
 
     // We expect the "Recommended" section to have the unique UI with the side icon
-    const isRecommended = title.includes('Recommended');
+    const isSpecial = title.includes('Recommended') || title.includes('Recently Viewed');
 
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          {isRecommended && (
-            <View style={styles.sectionIconBg}>
-              <MaterialCommunityIcons name="creation" size={24} color="#FFFFFF" />
+          {isSpecial && (
+            <View style={[styles.sectionIconBg, title.includes('Recently Viewed') && { backgroundColor: colors.accentBlue }]}>
+              <MaterialCommunityIcons name={iconName || "creation"} size={24} color="#FFFFFF" />
             </View>
           )}
           <View style={styles.sectionTitleContainer}>
             <Text variant="headlineSmall" style={styles.sectionTitle}>
               {title}
             </Text>
-            {isRecommended && (
+            {title.includes('Recommended') && (
               <Text variant="bodyMedium" style={styles.sectionSubtitleText}>
                 Based on your activity and preferences
               </Text>
@@ -164,7 +164,9 @@ export const HomeScreen = () => {
           <ActivityIndicator style={styles.loader} size="large" />
         ) : (
           <>
-            {renderSection('Recommended for You', recommended, 'AI Powered')}
+            {renderSection('Recently Viewed', recentlyViewed, undefined, 'history')}
+
+            {renderSection('Recommended for You', recommended, 'AI Powered', 'creation')}
 
             {/* Search & Filter Component */}
             <HomeSearchFilter onSearch={(query) => console.log('Searching:', query)} />

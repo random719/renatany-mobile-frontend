@@ -1,7 +1,7 @@
-import { api } from './api';
-import { mockListings } from '../data/listings';
 import { mockCategories } from '../data/categories';
-import { Listing, Category, ListingFilter } from '../types/listing';
+import { mockListings } from '../data/listings';
+import { Category, Listing, ListingFilter } from '../types/listing';
+import { api } from './api';
 
 const USE_API = false;
 
@@ -96,5 +96,5 @@ export const getRecommendedListings = async (): Promise<Listing[]> => {
 export const getRecentlyViewedListings = async (): Promise<Listing[]> => {
   if (USE_API) return api.get('/listings/recently-viewed').then((r) => r.data);
   await new Promise((r) => setTimeout(r, 300));
-  return mockListings.slice(0, 4);
+  return []; // Return empty by default, handled by store persistence
 };

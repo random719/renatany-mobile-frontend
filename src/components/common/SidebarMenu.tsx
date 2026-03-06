@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import React, { useEffect, useRef } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, Easing, ScrollView, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useUIStore } from '../../store/uiStore';
@@ -9,7 +10,28 @@ const { width, height } = Dimensions.get('window');
 const SIDEBAR_WIDTH = Math.min(width * 0.8, 320);
 
 export const SidebarMenu = () => {
+    const navigation = useNavigation<any>();
     const { isSidebarVisible: isVisible, closeSidebar: onClose } = useUIStore();
+    const [currentRouteName, setCurrentRouteName] = useState('');
+
+    // Safely get current route name when sidebar opens
+    useEffect(() => {
+        if (isVisible) {
+            try {
+                const state = navigation.getState();
+                if (state) {
+                    // Navigate through nested states if necessary
+                    let route = state.routes[state.index];
+                    while (route.state) {
+                        route = route.state.routes[route.state.index];
+                    }
+                    setCurrentRouteName(route.name);
+                }
+            } catch (e) {
+                console.log('Error getting navigation state:', e);
+            }
+        }
+    }, [isVisible, navigation]);
     const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const [isMounted, setIsMounted] = React.useState(isVisible);
@@ -53,8 +75,16 @@ export const SidebarMenu = () => {
         return null;
     }
 
-    const renderNavItem = (icon: any, label: string, isActive = false) => (
-        <TouchableOpacity style={[styles.navItem, isActive && styles.navItemActive]}>
+    const renderNavItem = (icon: any, label: string, onPress?: () => void, isActive = false) => (
+        <TouchableOpacity
+            style={[styles.navItem, isActive && styles.navItemActive]}
+            onPress={() => {
+                if (onPress) {
+                    onPress();
+                    onClose();
+                }
+            }}
+        >
             <MaterialCommunityIcons
                 name={icon}
                 size={22}
@@ -88,13 +118,44 @@ export const SidebarMenu = () => {
 
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                     <Text style={styles.sectionTitle}>NAVIGATE</Text>
-                    {renderNavItem('home-outline', 'Browse All', true)}
-                    {renderNavItem('heart-outline', 'Favorites')}
-                    {renderNavItem('bookmark-outline', 'Saved Searches')}
-                    {renderNavItem('clock-outline', 'Rental History')}
-                    {renderNavItem('plus', 'List Item')}
-                    {renderNavItem('square-edit-outline', 'Bulk Edit Items')}
-                    {renderNavItem('account-outline', 'My Profile')}
+                    {(() => {
+                        const isFavorites = ['Favorites', 'FavoritesTab', 'SavedSearches'].includes(currentRouteName);
+                        const isProfile = ['Profile', 'ProfileTab', 'EditProfile', 'Settings'].includes(currentRouteName);
+                        const isListItem = currentRouteName === 'ListItemTab';
+                        const isBrowseAll = !isFavorites && !isProfile && !isListItem;
+
+                        return (
+                            <>
+                                {renderNavItem(
+                                    'home-outline',
+                                    'Browse All',
+                                    () => navigation.navigate('HomeTab'),
+                                    isBrowseAll
+                                )}
+                                {renderNavItem(
+                                    'heart-outline',
+                                    'Favorites',
+                                    () => navigation.navigate('FavoritesTab'),
+                                    isFavorites
+                                )}
+                                {renderNavItem('bookmark-outline', 'Saved Searches')}
+                                {renderNavItem('clock-outline', 'Rental History')}
+                                {renderNavItem(
+                                    'plus',
+                                    'List Item',
+                                    () => navigation.navigate('ListItemTab'),
+                                    isListItem
+                                )}
+                                {renderNavItem('square-edit-outline', 'Bulk Edit Items')}
+                                {renderNavItem(
+                                    'account-outline',
+                                    'My Profile',
+                                    () => navigation.navigate('ProfileTab'),
+                                    isProfile
+                                )}
+                            </>
+                        );
+                    })()}
                     {renderNavItem('chat-outline', 'My Conversations')}
                     {renderNavItem('alert-outline', 'Disputes')}
 

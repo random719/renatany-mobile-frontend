@@ -15,11 +15,17 @@ export const ListingDetailScreen = () => {
   const route = useRoute<Route>();
   const navigation = useNavigation();
   const { listingId } = route.params;
-  const { selectedListing: listing, isLoading, fetchListingById } = useListingStore();
+  const { selectedListing: listing, isLoading, fetchListingById, addToRecentlyViewed } = useListingStore();
 
   useEffect(() => {
     fetchListingById(listingId);
   }, [listingId, fetchListingById]);
+
+  useEffect(() => {
+    if (listing) {
+      addToRecentlyViewed(listing);
+    }
+  }, [listing, addToRecentlyViewed]);
 
   if (isLoading || !listing) {
     return (
