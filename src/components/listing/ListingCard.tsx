@@ -1,48 +1,56 @@
-import React from 'react';
-import { View, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { Text, Chip } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import React from 'react';
+import { Image, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { Text } from 'react-native-paper';
+import { colors } from '../../theme';
 import { Listing } from '../../types/listing';
 import { FavoriteButton } from './FavoriteButton';
-import { colors } from '../../theme';
 
 interface ListingCardProps {
   listing: Listing;
   onPress: () => void;
   onToggleLike: () => void;
+  style?: ViewStyle;
 }
 
-export const ListingCard = ({ listing, onPress, onToggleLike }: ListingCardProps) => (
-  <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.8}>
+export const ListingCard = ({ listing, onPress, onToggleLike, style }: ListingCardProps) => (
+  <TouchableOpacity style={[styles.container, style]} onPress={onPress} activeOpacity={0.8}>
     <View style={styles.imageWrapper}>
       <Image source={{ uri: listing.images[0] }} style={styles.image} />
-      <Chip style={styles.categoryBadge} textStyle={styles.categoryText}>
-        {listing.category}
-      </Chip>
+
+      {/* Pink Category Badge */}
+      <View style={styles.categoryBadge}>
+        <Text style={styles.categoryText}>{listing.category}</Text>
+      </View>
+
       <View style={styles.favoriteWrapper}>
         <FavoriteButton isLiked={listing.isLiked} likes={listing.likes} onPress={onToggleLike} />
       </View>
     </View>
+
     <View style={styles.info}>
-      <Text variant="titleSmall" numberOfLines={1} style={styles.title}>
+      <Text variant="titleMedium" numberOfLines={1} style={styles.title}>
         {listing.title}
       </Text>
-      <View style={styles.row}>
-        <View style={styles.ratingRow}>
-          <MaterialCommunityIcons name="star" size={14} color={colors.warning} />
-          <Text variant="bodySmall" style={styles.rating}>
-            {listing.rating}
-          </Text>
-          <Text variant="bodySmall" style={styles.reviews}>
-            ({listing.totalReviews})
-          </Text>
-        </View>
-        <Text variant="titleSmall" style={styles.price}>
-          €{listing.pricePerDay}
-          <Text variant="bodySmall" style={styles.perDay}>
-            /day
-          </Text>
+
+      <View style={styles.locationRow}>
+        <MaterialCommunityIcons name="map-marker-outline" size={14} color={colors.textSecondary} />
+        <Text variant="bodySmall" style={styles.locationText}>
+          {listing.location?.address || 'Location Unavailable'}
         </Text>
+      </View>
+
+      <Text variant="titleMedium" style={styles.price}>
+        €{listing.pricePerDay}
+        <Text variant="bodySmall" style={styles.perDay}>
+          /day
+        </Text>
+      </Text>
+
+      {/* View Button */}
+      <View style={styles.viewButton}>
+        <MaterialCommunityIcons name="eye-outline" size={16} color="#FFFFFF" />
+        <Text style={styles.viewButtonText}>View</Text>
       </View>
     </View>
   </TouchableOpacity>
@@ -50,73 +58,93 @@ export const ListingCard = ({ listing, onPress, onToggleLike }: ListingCardProps
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.cardLight,
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     overflow: 'hidden',
-    width: 200,
-    elevation: 2,
+    width: '100%', // Use 100% width so it fits within flexible grid parents without overflowing
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F3F4F6', // Very subtle border
   },
   imageWrapper: {
     position: 'relative',
   },
   image: {
     width: '100%',
-    height: 140,
+    height: 280, // Taller image for the square apperance
     backgroundColor: '#E5E7EB',
   },
   categoryBadge: {
     position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: 'rgba(31, 41, 55, 0.85)',
-    height: 28,
+    top: 12,
+    left: 12,
+    backgroundColor: '#FCE7F3', // Light pink
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   categoryText: {
-    color: '#FFFFFF',
-    fontSize: 11,
+    color: '#BE185D', // Dark pink text
+    fontSize: 12,
+    fontWeight: '700',
   },
   favoriteWrapper: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    top: 12,
+    right: 12,
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    padding: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   info: {
-    padding: 10,
+    padding: 16,
   },
   title: {
-    color: colors.textPrimary,
-    marginBottom: 6,
+    color: '#111827',
+    fontWeight: '700',
+    marginBottom: 4,
   },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  ratingRow: {
+  locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 4,
+    marginBottom: 12,
   },
-  rating: {
-    color: colors.textPrimary,
-    fontWeight: '600',
-  },
-  reviews: {
+  locationText: {
     color: colors.textSecondary,
   },
   price: {
-    color: colors.accentBlue,
-    fontWeight: '700',
+    color: '#111827', // Darker text for price
+    fontWeight: '800',
+    marginBottom: 16,
   },
   perDay: {
-    color: colors.textSecondary,
+    color: '#6B7280',
     fontWeight: '400',
+    fontSize: 12,
+  },
+  viewButton: {
+    flexDirection: 'row',
+    backgroundColor: '#2A3441', // Dark slate blue
+    borderRadius: 8,
+    paddingVertical: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  viewButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
