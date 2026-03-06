@@ -31,7 +31,7 @@ export const ListingDetailScreen = () => {
 
   return (
     <View style={styles.mainContainer}>
-      <GlobalHeader onMenuPress={() => { }} />
+      <GlobalHeader />
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Secondary Header */}
         <View style={styles.secondaryHeader}>

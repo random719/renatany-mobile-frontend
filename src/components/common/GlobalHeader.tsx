@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
+import { useUIStore } from '../../store/uiStore';
 import { colors } from '../../theme';
 
 interface GlobalHeaderProps {
@@ -10,9 +11,14 @@ interface GlobalHeaderProps {
 }
 
 export const GlobalHeader = ({ onMenuPress, onNotificationPress }: GlobalHeaderProps) => {
+    const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+
     return (
         <View style={styles.topHeader}>
-            <TouchableOpacity style={styles.iconButton} onPress={onMenuPress}>
+            <TouchableOpacity
+                style={styles.iconButton}
+                onPress={onMenuPress || toggleSidebar}
+            >
                 <MaterialCommunityIcons name="menu" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
             <View style={styles.languageSelector}>

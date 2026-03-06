@@ -2,17 +2,14 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Dimensions, Easing, ScrollView, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Text } from 'react-native-paper';
+import { useUIStore } from '../../store/uiStore';
 import { colors } from '../../theme';
-
-interface SidebarMenuProps {
-    isVisible: boolean;
-    onClose: () => void;
-}
 
 const { width, height } = Dimensions.get('window');
 const SIDEBAR_WIDTH = Math.min(width * 0.8, 320);
 
-export const SidebarMenu = ({ isVisible, onClose }: SidebarMenuProps) => {
+export const SidebarMenu = () => {
+    const { isSidebarVisible: isVisible, closeSidebar: onClose } = useUIStore();
     const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const [isMounted, setIsMounted] = React.useState(isVisible);

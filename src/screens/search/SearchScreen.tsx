@@ -33,7 +33,7 @@ export const SearchScreen = () => {
 
   return (
     <View style={styles.container}>
-      <GlobalHeader onMenuPress={() => { }} />
+      <GlobalHeader />
       <View style={styles.searchHeader}>
         <View style={styles.headerTitleRow}>
           <Text variant="headlineSmall" style={styles.headerTitle}>

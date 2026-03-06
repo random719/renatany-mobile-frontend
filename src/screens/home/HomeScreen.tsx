@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { FlatList, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 import { TrustBadge } from '../../components/common/TrustBadge';
@@ -10,10 +10,10 @@ import { Footer } from '../../components/home/Footer';
 import { HeroBanner } from '../../components/home/HeroBanner';
 import { HomeSearchFilter } from '../../components/home/HomeSearchFilter';
 import { HowItWorks } from '../../components/home/HowItWorks';
-import { SidebarMenu } from '../../components/home/SidebarMenu';
 import { Testimonials } from '../../components/home/Testimonials';
 import { ListingCard } from '../../components/listing/ListingCard';
 import { useListingStore } from '../../store/listingStore';
+import { useUIStore } from '../../store/uiStore';
 import { colors } from '../../theme';
 import { Category, Listing } from '../../types/listing';
 import { HomeStackParamList } from '../../types/navigation';
@@ -24,7 +24,7 @@ type Nav = StackNavigationProp<ExtendedHomeStackParamList, 'Home'>;
 
 export const HomeScreen = () => {
   const navigation = useNavigation<Nav>();
-  const [isSidebarVisible, setIsSidebarVisible] = useState(false);
+  const openSidebar = useUIStore((s) => s.openSidebar);
   const {
     listings,
     recommended,
@@ -123,7 +123,7 @@ export const HomeScreen = () => {
       >
         <HeroBanner
           itemCount={listings.length}
-          onMenuPress={() => setIsSidebarVisible(true)}
+          onMenuPress={openSidebar}
         />
 
         {/* Trust Badges - Card Style Grid */}
@@ -224,11 +224,6 @@ export const HomeScreen = () => {
         {/* Footer Section */}
         <Footer />
       </ScrollView>
-
-      <SidebarMenu
-        isVisible={isSidebarVisible}
-        onClose={() => setIsSidebarVisible(false)}
-      />
     </View>
   );
 };
