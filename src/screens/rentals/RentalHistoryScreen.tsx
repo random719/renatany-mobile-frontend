@@ -1,11 +1,50 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import React from 'react';
-import { ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
+import { useAuthStore } from '../../store/authStore';
+import { getRentalRequests } from '../../services/rentalService';
+import { RentalRequest } from '../../types/models';
 
 export const RentalHistoryScreen = () => {
+    const { user } = useAuthStore();
+    const [rentals, setRentals] = useState<RentalRequest[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchRentals = async () => {
+            if (!user?.email) {
+                setIsLoading(false);
+                return;
+            }
+            try {
+                setIsLoading(true);
+                const [asRenter, asOwner] = await Promise.all([
+                    getRentalRequests({ renter_email: user.email }),
+                    getRentalRequests({ owner_email: user.email })
+                ]);
+                
+                const allRentals = [...asRenter, ...asOwner];
+                // Deduplicate by ID
+                const uniqueRentals = Array.from(new Map(allRentals.map(item => [item.id, item])).values());
+                // Filter for completed rentals
+                const completed = uniqueRentals.filter(r => r.status === 'completed');
+                // Sort by end_date descending
+                completed.sort((a, b) => new Date(b.end_date).getTime() - new Date(a.end_date).getTime());
+                
+                setRentals(completed);
+            } catch (error) {
+                console.error('Error fetching rental history:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchRentals();
+    }, [user?.email]);
+
     return (
         <View style={styles.container}>
             <GlobalHeader />
@@ -33,9 +72,32 @@ export const RentalHistoryScreen = () => {
                     </TouchableOpacity>
                 </View>
 
-                <View style={styles.emptyContainer}>
-                    <Text variant="bodyLarge" style={styles.emptyText}>No rental history found</Text>
-                </View>
+                {isLoading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={colors.primary} />
+                    </View>
+                ) : rentals.length === 0 ? (
+                    <View style={styles.emptyContainer}>
+                        <Text variant="bodyLarge" style={styles.emptyText}>No rental history found</Text>
+                    </View>
+                ) : (
+                    <View style={styles.listContainer}>
+                        {rentals.map((rental) => (
+                            <View key={rental.id} style={styles.rentalCard}>
+                                <View style={styles.rentalCardHeader}>
+                                    <Text style={styles.rentalDate}>
+                                        {new Date(rental.start_date).toLocaleDateString()} - {new Date(rental.end_date).toLocaleDateString()}
+                                    </Text>
+                                    <Text style={styles.rentalAmount}>${rental.total_amount?.toFixed(2)}</Text>
+                                </View>
+                                <Text style={styles.rentalItemId}>Item ID: {rental.item_id}</Text>
+                                <Text style={styles.rentalRole}>
+                                    {rental.renter_email === user?.email ? 'Rented from ' + rental.owner_email : 'Rented to ' + rental.renter_email}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
             </ScrollView>
         </View>
     );
@@ -80,7 +142,7 @@ const styles = StyleSheet.create({
     },
     searchInput: {
         flex: 1,
-        fontSize: 16,
+        fontSize: typography.tabLabel,
         color: '#1E293B',
     },
     filterDropdown: {
@@ -95,7 +157,7 @@ const styles = StyleSheet.create({
         height: 52,
     },
     filterText: {
-        fontSize: 16,
+        fontSize: typography.tabLabel,
         color: '#1E293B',
         fontWeight: '500',
     },
@@ -106,5 +168,52 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         color: '#94A3B8',
+    },
+    loadingContainer: {
+        marginTop: 80,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    listContainer: {
+        paddingHorizontal: 24,
+        paddingTop: 24,
+        gap: 16,
+    },
+    rentalCard: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 16,
+        padding: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    rentalCardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    rentalDate: {
+        fontSize: typography.body,
+        fontWeight: '600',
+        color: '#1E293B',
+    },
+    rentalAmount: {
+        fontSize: typography.tabLabel,
+        fontWeight: '700',
+        color: colors.primary,
+    },
+    rentalItemId: {
+        fontSize: typography.body,
+        color: '#64748B',
+        marginBottom: 4,
+    },
+    rentalRole: {
+        fontSize: typography.body,
+        color: '#64748B',
     },
 });

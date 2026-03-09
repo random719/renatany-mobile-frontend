@@ -19,6 +19,36 @@ export const colors = {
   borderDark: '#374151',
 };
 
+export const typography = {
+  micro: 10,
+  tiny: 11,
+  small: 12,
+  caption: 13,
+  body: 14,
+  bodyStrong: 14,
+  label: 15,
+  tabLabel: 16,
+  title: 22,
+  headline: 24,
+  display: 28,
+  displayXL: 32,
+  pageTitle: 34,
+  sectionTitle: 18,
+  cardTitle: 18,
+  valueXL: 40,
+  valueL: 32,
+  legend: 16,
+  axis: 10,
+};
+
+export const iconSize = {
+  sm: 16,
+  md: 18,
+  lg: 20,
+  xl: 24,
+  hero: 26,
+};
+
 export const lightTheme = {
   ...MD3LightTheme,
   colors: {

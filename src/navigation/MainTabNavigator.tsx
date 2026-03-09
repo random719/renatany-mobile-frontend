@@ -12,7 +12,7 @@ import { ListingDetailScreen } from '../screens/listing/ListingDetailScreen';
 import { FilterScreen } from '../screens/search/FilterScreen';
 import { SavedSearchesScreen } from '../screens/search/saved/SavedSearchesScreen';
 import { SearchScreen } from '../screens/search/SearchScreen';
-import { colors } from '../theme';
+import { colors, typography } from '../theme';
 import {
   FavoritesStackParamList,
   HomeStackParamList,
@@ -22,7 +22,7 @@ import {
 } from '../types/navigation';
 
 // Placeholder screens for tabs not yet built (Flow 3)
-import { View as RNView } from 'react-native';
+import { View as RNView, View, StyleSheet } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { useAuthStore } from '../store/authStore';
 

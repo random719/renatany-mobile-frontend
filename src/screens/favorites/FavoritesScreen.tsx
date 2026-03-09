@@ -8,7 +8,7 @@ import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { ListingCard } from '../../components/listing/ListingCard';
 import { useListingStore } from '../../store/listingStore';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 import { FavoritesStackParamList } from '../../types/navigation';
 
 type Nav = StackNavigationProp<FavoritesStackParamList, 'Favorites'>;
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     },
     backBtnText: {
         color: '#334155',
-        fontSize: 14,
+        fontSize: typography.body,
         fontWeight: '500',
     },
     titleRow: {
@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     heartIcon: {
-        fontSize: 32,
+        fontSize: typography.displayXL,
     },
     title: {
         fontWeight: '800',
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
     },
     countText: {
         color: '#64748B',
-        fontSize: 16,
+        fontSize: typography.tabLabel,
     },
     cardWrapper: {
         paddingHorizontal: 16,

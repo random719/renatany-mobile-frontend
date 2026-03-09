@@ -4,7 +4,7 @@ import { Text, Button, Chip, RadioButton } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { useListingStore } from '../../store/listingStore';
 import { ListingFilter } from '../../types/listing';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 
 const SORT_OPTIONS: { label: string; value: ListingFilter['sortBy'] }[] = [
   { label: 'Newest', value: 'newest' },

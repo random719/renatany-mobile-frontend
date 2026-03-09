@@ -6,7 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useListingStore } from '../../store/listingStore';
 import { HomeStackParamList } from '../../types/navigation';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 
 type Nav = StackNavigationProp<HomeStackParamList, 'Categories'>;
 

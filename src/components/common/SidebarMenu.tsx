@@ -1,309 +1,529 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, ScrollView, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
-import { Text } from 'react-native-paper';
-import { useUIStore } from '../../store/uiStore';
-import { colors } from '../../theme';
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { useClerk, useUser } from "@clerk/expo";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Dimensions,
+  Easing,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from "react-native";
+import { Text } from "react-native-paper";
+import { useAuthStore } from "../../store/authStore";
+import { useUIStore } from "../../store/uiStore";
+import { colors, typography } from "../../theme";
 
-const { width, height } = Dimensions.get('window');
+const { width, height } = Dimensions.get("window");
 const SIDEBAR_WIDTH = Math.min(width * 0.8, 320);
+const ADMIN_EMAILS = new Set(["collegeworks0910@gmail.com", "admin@rentany.fr"]);
 
 export const SidebarMenu = () => {
-    const navigation = useNavigation<any>();
-    const { isSidebarVisible: isVisible, closeSidebar: onClose } = useUIStore();
-    const [currentRouteName, setCurrentRouteName] = useState('HomeTab'); // Default to Browse All
+  const navigation = useNavigation<any>();
+  const { signOut } = useClerk();
+  const { user: clerkUser } = useUser();
+  const { isSidebarVisible: isVisible, closeSidebar: onClose } = useUIStore();
+  const { logout } = useAuthStore();
+  const [currentRouteName, setCurrentRouteName] = useState("HomeTab"); // Default to Browse All
+  const primaryEmail =
+    clerkUser?.primaryEmailAddress?.emailAddress?.toLowerCase() || "";
+  const metadataRole =
+    typeof clerkUser?.publicMetadata?.role === "string"
+      ? clerkUser.publicMetadata.role.toLowerCase()
+      : "";
+  const isAdmin = metadataRole === "admin" || ADMIN_EMAILS.has(primaryEmail);
+  const isAdminDashboard = currentRouteName === "AdminDashboard";
+  const derivedHandle =
+    clerkUser?.username ||
+    (primaryEmail.includes("@") ? primaryEmail.split("@")[0] : "");
 
-    // Safely get current route name when sidebar opens
-    useEffect(() => {
-        if (isVisible) {
-            try {
-                const state = navigation.getState();
-                if (state) {
-                    // Navigate through nested states if necessary
-                    let route = state.routes[state.index];
-                    while (route.state) {
-                        route = route.state.routes[route.state.index];
-                    }
-                    setCurrentRouteName(route.name);
-                }
-            } catch (e) {
-                console.log('Error getting navigation state:', e);
-            }
+  // Safely get current route name when sidebar opens
+  useEffect(() => {
+    if (isVisible) {
+      try {
+        const state = navigation.getState();
+        if (state) {
+          // Navigate through nested states if necessary
+          let route = state.routes[state.index];
+          while (route.state) {
+            route = route.state.routes[route.state.index];
+          }
+          setCurrentRouteName(route.name);
         }
-    }, [isVisible, navigation]);
-    const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const [isMounted, setIsMounted] = React.useState(isVisible);
-
-    useEffect(() => {
-        if (isVisible) {
-            setIsMounted(true);
-            Animated.parallel([
-                Animated.timing(slideAnim, {
-                    toValue: 0,
-                    duration: 300,
-                    easing: Easing.out(Easing.cubic),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(fadeAnim, {
-                    toValue: 1,
-                    duration: 300,
-                    useNativeDriver: true,
-                }),
-            ]).start();
-        } else {
-            Animated.parallel([
-                Animated.timing(slideAnim, {
-                    toValue: -SIDEBAR_WIDTH,
-                    duration: 250,
-                    easing: Easing.in(Easing.cubic),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(fadeAnim, {
-                    toValue: 0,
-                    duration: 250,
-                    useNativeDriver: true,
-                }),
-            ]).start(() => {
-                setIsMounted(false);
-            });
-        }
-    }, [isVisible, slideAnim, fadeAnim]);
-
-    if (!isMounted) {
-        return null;
+      } catch (e) {
+        console.log("Error getting navigation state:", e);
+      }
     }
+  }, [isVisible, navigation]);
+  const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [isMounted, setIsMounted] = React.useState(isVisible);
 
-    const renderNavItem = (icon: any, label: string, onPress?: () => void, isActive = false) => (
-        <TouchableOpacity
-            style={[styles.navItem, isActive && styles.navItemActive]}
-            onPress={() => {
-                if (onPress) {
-                    onPress();
-                    onClose();
-                }
-            }}
-        >
+  useEffect(() => {
+    if (isVisible) {
+      setIsMounted(true);
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: -SIDEBAR_WIDTH,
+          duration: 250,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setIsMounted(false);
+      });
+    }
+  }, [isVisible, slideAnim, fadeAnim]);
+
+  if (!isMounted) {
+    return null;
+  }
+
+  const renderNavItem = (
+    icon: any,
+    label: string,
+    onPress?: () => void,
+    isActive = false,
+  ) => (
+    <TouchableOpacity
+      style={[styles.navItem, isActive && styles.navItemActive]}
+      onPress={() => {
+        if (onPress) {
+          onPress();
+          onClose();
+        }
+      }}
+    >
+      <MaterialCommunityIcons
+        name={icon}
+        size={22}
+        color={isActive ? "#FFFFFF" : colors.textPrimary}
+      />
+      <Text style={[styles.navItemText, isActive && styles.navItemTextActive]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderAdminNavItem = (
+    icon: any,
+    label: string,
+    onPress?: () => void,
+    isActive = false,
+  ) => (
+    <TouchableOpacity
+      style={[styles.adminNavItem, isActive && styles.adminNavItemActive]}
+      onPress={() => {
+        if (onPress) {
+          onPress();
+          onClose();
+        }
+      }}
+    >
+      <MaterialCommunityIcons
+        name={icon}
+        size={22}
+        color={isActive ? "#FFFFFF" : "#DC2626"}
+      />
+      <Text
+        style={[
+          styles.adminNavItemText,
+          isActive && styles.adminNavItemTextActive,
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={styles.overlayContainer}>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]} />
+      </TouchableWithoutFeedback>
+
+      <Animated.View
+        style={[styles.sidebar, { transform: [{ translateX: slideAnim }] }]}
+      >
+        <View style={styles.header}>
+          <View style={styles.logoRow}>
+            <View style={styles.logoIcon}>
+              <MaterialCommunityIcons
+                name="home-outline"
+                size={24}
+                color="#FFFFFF"
+              />
+            </View>
+            <Text style={styles.logoText}>Rentany</Text>
+          </View>
+          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <MaterialCommunityIcons
-                name={icon}
-                size={22}
-                color={isActive ? '#FFFFFF' : colors.textPrimary}
+              name="close"
+              size={20}
+              color={colors.textPrimary}
             />
-            <Text style={[styles.navItemText, isActive && styles.navItemTextActive]}>{label}</Text>
-        </TouchableOpacity>
-    );
-
-    return (
-        <View style={styles.overlayContainer}>
-            <TouchableWithoutFeedback onPress={onClose}>
-                <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]} />
-            </TouchableWithoutFeedback>
-
-            <Animated.View style={[styles.sidebar, { transform: [{ translateX: slideAnim }] }]}>
-                <View style={styles.header}>
-                    <View style={styles.logoRow}>
-                        <View style={styles.logoIcon}>
-                            <MaterialCommunityIcons name="home-outline" size={24} color="#FFFFFF" />
-                        </View>
-                        <Text style={styles.logoText}>Rentany</Text>
-                    </View>
-                    <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                        <MaterialCommunityIcons name="close" size={20} color={colors.textPrimary} />
-                    </TouchableOpacity>
-                </View>
-
-                <Text style={styles.tagline}>Rent anything, from anyone.</Text>
-                <View style={styles.divider} />
-
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                    <Text style={styles.sectionTitle}>NAVIGATE</Text>
-                    {(() => {
-                        const isFavorites = ['Favorites', 'FavoritesTab'].includes(currentRouteName);
-                        const isProfile = ['Profile', 'ProfileTab', 'EditProfile', 'Settings'].includes(currentRouteName);
-                        const isListItem = currentRouteName === 'ListItemTab';
-                        const isRentalHistory = currentRouteName === 'RentalHistory';
-                        const isConversations = currentRouteName === 'MyConversations';
-                        const isDisputes = currentRouteName === 'Disputes';
-                        const isSavedSearches = currentRouteName === 'SavedSearches';
-                        const isBrowseAll = !isFavorites && !isProfile && !isListItem && !isRentalHistory && !isConversations && !isDisputes && !isSavedSearches;
-
-                        return (
-                            <>
-                                {renderNavItem(
-                                    'home-outline',
-                                    'Browse All',
-                                    () => navigation.navigate('HomeTab'),
-                                    isBrowseAll
-                                )}
-                                {renderNavItem(
-                                    'heart-outline',
-                                    'Favorites',
-                                    () => navigation.navigate('FavoritesTab'),
-                                    isFavorites
-                                )}
-                                {renderNavItem(
-                                    'bookmark-outline',
-                                    'Saved Searches',
-                                    () => navigation.navigate('SavedSearches'),
-                                    isSavedSearches
-                                )}
-                                {renderNavItem(
-                                    'clock-outline',
-                                    'Rental History',
-                                    () => navigation.navigate('RentalHistory'),
-                                    isRentalHistory
-                                )}
-                                {renderNavItem(
-                                    'plus',
-                                    'List Item',
-                                    () => navigation.navigate('ListItemTab'),
-                                    isListItem
-                                )}
-                                {renderNavItem('square-edit-outline', 'Bulk Edit Items')}
-                                {renderNavItem(
-                                    'account-outline',
-                                    'My Profile',
-                                    () => navigation.navigate('ProfileTab'),
-                                    isProfile
-                                )}
-                                {renderNavItem(
-                                    'chat-outline',
-                                    'My Conversations',
-                                    () => navigation.navigate('MyConversations'),
-                                    isConversations
-                                )}
-                                {renderNavItem(
-                                    'alert-outline',
-                                    'Disputes',
-                                    () => navigation.navigate('Disputes'),
-                                    isDisputes
-                                )}
-                            </>
-                        );
-                    })()}
-
-                    <View style={styles.divider} />
-
-                    <Text style={styles.sectionTitle}>CATEGORIES</Text>
-                    {renderNavItem('cellphone', 'Electronics')}
-                    {renderNavItem('cog-outline', 'Tools')}
-                    {renderNavItem('account-outline', 'Fashion')}
-                    {renderNavItem('check-decagram-outline', 'Sports')}
-                    {renderNavItem('swap-horizontal', 'Vehicles')}
-                    {renderNavItem('home-outline', 'Home')}
-                    {renderNavItem('book-open-outline', 'Books')}
-                    {renderNavItem('music-note-outline', 'Music')}
-
-                    <View style={styles.bottomSpacer} />
-                </ScrollView>
-            </Animated.View>
+          </TouchableOpacity>
         </View>
-    );
+
+        <Text style={styles.tagline}>Rent anything, from anyone.</Text>
+        <View style={styles.divider} />
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <Text style={styles.sectionTitle}>NAVIGATE</Text>
+          {(() => {
+            const isFavorites = ["Favorites", "FavoritesTab"].includes(
+              currentRouteName,
+            );
+            const isProfile = [
+              "Profile",
+              "ProfileTab",
+              "EditProfile",
+              "Settings",
+            ].includes(currentRouteName);
+            const isListItem = currentRouteName === "ListItemTab";
+            const isRentalHistory = currentRouteName === "RentalHistory";
+            const isConversations = currentRouteName === "MyConversations";
+            const isDisputes = currentRouteName === "Disputes";
+            const isSavedSearches = currentRouteName === "SavedSearches";
+            const isBrowseAll =
+              !isFavorites &&
+              !isProfile &&
+              !isListItem &&
+              !isRentalHistory &&
+              !isConversations &&
+              !isDisputes &&
+              !isSavedSearches &&
+              !isAdminDashboard;
+
+            return (
+              <>
+                {renderNavItem(
+                  "home-outline",
+                  "Browse All",
+                  () => navigation.navigate("Main", { screen: "HomeTab" }),
+                  isBrowseAll,
+                )}
+                {!isAdmin &&
+                  renderNavItem(
+                    "heart-outline",
+                    "Favorites",
+                    () => navigation.navigate("Main", { screen: "FavoritesTab" }),
+                    isFavorites,
+                  )}
+                {!isAdmin &&
+                  renderNavItem(
+                    "bookmark-outline",
+                    "Saved Searches",
+                    () => navigation.navigate("SavedSearches"),
+                    isSavedSearches,
+                  )}
+                {!isAdmin &&
+                  renderNavItem(
+                    "clock-outline",
+                    "Rental History",
+                    () => navigation.navigate("RentalHistory"),
+                    isRentalHistory,
+                  )}
+                {!isAdmin &&
+                  renderNavItem(
+                    "plus",
+                    "List Item",
+                    () => navigation.navigate("Main", { screen: "ListItemTab" }),
+                    isListItem,
+                  )}
+                {!isAdmin && renderNavItem("square-edit-outline", "Bulk Edit Items")}
+                {!isAdmin &&
+                  renderNavItem(
+                    "account-outline",
+                    "My Profile",
+                    () => navigation.navigate("Main", { screen: "ProfileTab" }),
+                    isProfile,
+                  )}
+                {!isAdmin &&
+                  renderNavItem(
+                    "chat-outline",
+                    "My Conversations",
+                    () => navigation.navigate("MyConversations"),
+                    isConversations,
+                  )}
+                {!isAdmin &&
+                  renderNavItem("alert-outline", "Disputes", () =>
+                    navigation.navigate("Disputes"),
+                  )}
+              </>
+            );
+          })()}
+
+          {isAdmin && (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.sectionTitle}>ADMIN</Text>
+              {renderAdminNavItem(
+                "chart-bar",
+                "Admin: Dashboard",
+                () => navigation.navigate("AdminDashboard"),
+                isAdminDashboard,
+              )}
+              {renderAdminNavItem(
+                "clock-outline",
+                "Admin: Review Pending Requests",
+              )}
+              {renderAdminNavItem(
+                "file-document-outline",
+                "Admin: Reports Listing",
+              )}
+              {renderAdminNavItem("alert-outline", "Admin: Disputes")}
+              {renderAdminNavItem(
+                "alert-rhombus-outline",
+                "Admin: User Reports",
+              )}
+              {renderAdminNavItem("shield-check-outline", "Admin: Security")}
+            </>
+          )}
+
+          <View style={styles.divider} />
+
+          <Text style={styles.sectionTitle}>CATEGORIES</Text>
+          {renderNavItem("cellphone", "Electronics")}
+          {renderNavItem("cog-outline", "Tools")}
+          {renderNavItem("account-outline", "Fashion")}
+          {renderNavItem("check-decagram-outline", "Sports")}
+          {renderNavItem("swap-horizontal", "Vehicles")}
+          {renderNavItem("home-outline", "Home")}
+          {renderNavItem("book-open-outline", "Books")}
+          {renderNavItem("music-note-outline", "Music")}
+          {renderNavItem("camera-outline", "Photography")}
+          {renderNavItem("shape-outline", "Other")}
+
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <View style={styles.footerProfileRow}>
+            <View style={styles.footerAvatar}>
+              <MaterialCommunityIcons
+                name="account-outline"
+                size={18}
+                color={colors.textPrimary}
+              />
+            </View>
+            <Text style={styles.footerHandle}>@{derivedHandle || "guest"}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.signOutBtn}
+            onPress={async () => {
+              try {
+                await signOut();
+              } catch (e) {
+                console.log("Clerk sign out failed:", e);
+              } finally {
+                logout();
+                onClose();
+              }
+            }}
+          >
+            <MaterialCommunityIcons name="logout" size={18} color="#374151" />
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-    overlayContainer: {
-        ...StyleSheet.absoluteFillObject,
-        zIndex: 999,
-    },
-    backdrop: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    },
-    sidebar: {
-        width: SIDEBAR_WIDTH,
-        height: '100%',
-        backgroundColor: '#FFFFFF',
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        shadowColor: '#000',
-        shadowOffset: { width: 2, height: 0 },
-        shadowOpacity: 0.15,
-        shadowRadius: 10,
-        elevation: 8,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingTop: 48,
-        paddingBottom: 8,
-    },
-    logoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    logoIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 8,
-        backgroundColor: '#111827',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    logoText: {
-        fontSize: 22,
-        fontWeight: '700',
-        color: '#111827',
-    },
-    closeBtn: {
-        width: 36,
-        height: 36,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    tagline: {
-        fontSize: 14,
-        color: '#6B7280',
-        paddingHorizontal: 16,
-        marginBottom: 16,
-    },
-    divider: {
-        height: 1,
-        backgroundColor: '#E5E7EB',
-        marginHorizontal: 16,
-        marginBottom: 16,
-    },
-    scrollContent: {
-        paddingBottom: 40,
-    },
-    sectionTitle: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#4B5563',
-        paddingHorizontal: 16,
-        marginBottom: 8,
-        letterSpacing: 0.5,
-    },
-    navItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        marginHorizontal: 16,
-        borderRadius: 8,
-        marginBottom: 4,
-        gap: 16,
-    },
-    navItemActive: {
-        backgroundColor: colors.accentBlue,
-    },
-    navItemText: {
-        fontSize: 15,
-        color: colors.textPrimary,
-        fontWeight: '500',
-    },
-    navItemTextActive: {
-        color: '#FFFFFF',
-    },
-    bottomSpacer: {
-        height: 24,
-    },
+  overlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  sidebar: {
+    width: SIDEBAR_WIDTH,
+    height: "100%",
+    backgroundColor: "#FFFFFF",
+    position: "absolute",
+    left: 0,
+    top: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 48,
+    paddingBottom: 8,
+  },
+  logoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  logoIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: "#111827",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoText: {
+    fontSize: typography.title,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tagline: {
+    fontSize: typography.body,
+    color: "#6B7280",
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#E5E7EB",
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  sectionTitle: {
+    fontSize: typography.small,
+    fontWeight: "700",
+    color: "#4B5563",
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    letterSpacing: 0.5,
+  },
+  navItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 4,
+    gap: 16,
+  },
+  navItemActive: {
+    backgroundColor: colors.accentBlue,
+  },
+  navItemText: {
+    fontSize: typography.label,
+    color: colors.textPrimary,
+    fontWeight: "500",
+  },
+  navItemTextActive: {
+    color: "#FFFFFF",
+  },
+  adminNavItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+    gap: 16,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+  },
+  adminNavItemActive: {
+    backgroundColor: "#DC2626",
+    borderColor: "#DC2626",
+  },
+  adminNavItemText: {
+    fontSize: typography.label,
+    color: "#DC2626",
+    fontWeight: "500",
+  },
+  adminNavItemTextActive: {
+    color: "#FFFFFF",
+  },
+  bottomSpacer: {
+    height: 16,
+  },
+  footer: {
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 20,
+    backgroundColor: "#FFFFFF",
+  },
+  footerProfileRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  footerAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  footerHandle: {
+    fontSize: typography.sectionTitle,
+    fontWeight: "500",
+    color: colors.textPrimary,
+  },
+  signOutBtn: {
+    height: 40,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  signOutText: {
+    fontSize: typography.tabLabel,
+    fontWeight: "500",
+    color: "#374151",
+  },
 });

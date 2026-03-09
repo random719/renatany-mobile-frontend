@@ -5,7 +5,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../../components/common/GlobalHeader';
 import { Footer } from '../../../components/home/Footer';
-import { colors } from '../../../theme';
+import { colors, typography } from '../../../theme';
 
 export const SavedSearchesScreen = () => {
     const navigation = useNavigation();
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     },
     backBtnText: {
         color: '#475569',
-        fontSize: 14,
+        fontSize: typography.body,
         fontWeight: '500',
     },
     titleRow: {
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     },
     countText: {
         color: '#64748B',
-        fontSize: 16,
+        fontSize: typography.tabLabel,
     },
     emptyCard: {
         marginHorizontal: 16,

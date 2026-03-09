@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
+import { typography } from '../../theme';
 
 export const Footer = () => {
     return (
@@ -70,18 +71,18 @@ const styles = StyleSheet.create({
     brandTitle: {
         color: '#FFFFFF',
         fontWeight: '700',
-        fontSize: 24,
+        fontSize: typography.headline,
         marginBottom: 12,
     },
     description: {
         color: '#9CA3AF', // Cool gray
-        fontSize: 15,
+        fontSize: typography.label,
         lineHeight: 24,
     },
     sectionTitle: {
         color: '#FFFFFF',
         fontWeight: '600',
-        fontSize: 18,
+        fontSize: typography.sectionTitle,
         marginBottom: 16,
     },
     linkRow: {
@@ -92,7 +93,7 @@ const styles = StyleSheet.create({
     },
     linkText: {
         color: '#D1D5DB', // Slightly brighter gray for links
-        fontSize: 15,
+        fontSize: typography.label,
     },
     divider: {
         height: 1,
@@ -102,7 +103,7 @@ const styles = StyleSheet.create({
     copyrightText: {
         color: '#64748B', // Slate-500
         textAlign: 'center',
-        fontSize: 13,
+        fontSize: typography.caption,
         marginTop: 16,
     },
 });

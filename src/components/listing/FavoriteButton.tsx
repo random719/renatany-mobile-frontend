@@ -2,7 +2,7 @@ import React from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 
 interface FavoriteButtonProps {
   isLiked: boolean;

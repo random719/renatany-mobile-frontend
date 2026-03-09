@@ -16,6 +16,7 @@ interface AuthState {
   loginWithFacebook: () => Promise<void>;
   logout: () => void;
   clearError: () => void;
+  setToken: (token: string | null) => void;
 }
 
 export const useAuthStore = create<AuthState>()(persist((set) => ({
@@ -82,12 +83,13 @@ export const useAuthStore = create<AuthState>()(persist((set) => ({
   },
 
   clearError: () => set({ error: null }),
+  
+  setToken: (token) => set({ token }),
 }), {
   name: 'auth-storage',
   storage: createJSONStorage(() => localStorage),
   partialize: (state) => ({
     user: state.user,
-    token: state.token,
     isAuthenticated: state.isAuthenticated,
   }),
 }));

@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { AuthStackParamList } from '../../types/navigation';
 
@@ -49,17 +49,17 @@ const styles = StyleSheet.create({
   },
   logoLabel: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: typography.tiny,
     marginTop: 2,
   },
   appName: {
-    fontSize: 32,
+    fontSize: typography.displayXL,
     fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 8,
   },
   tagline: {
-    fontSize: 16,
+    fontSize: typography.tabLabel,
     color: 'rgba(255,255,255,0.7)',
   },
   loader: {

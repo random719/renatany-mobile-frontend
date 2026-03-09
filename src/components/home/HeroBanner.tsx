@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 import { GlobalHeader } from '../common/GlobalHeader';
 
 interface HeroBannerProps {
@@ -136,11 +136,11 @@ const styles = StyleSheet.create({
   },
   link: {
     color: '#E5E7EB', // Using light color on dark background
-    fontSize: 13,
+    fontSize: typography.caption,
   },
   linkDot: {
     color: '#9CA3AF',
     marginHorizontal: 8,
-    fontSize: 13,
+    fontSize: typography.caption,
   },
 });

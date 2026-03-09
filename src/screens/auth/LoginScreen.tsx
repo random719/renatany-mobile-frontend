@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Text, TextInput, Button, Divider, HelperText } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+import { useSignIn, useSignUp } from '@clerk/expo/legacy';
 import { GoogleIcon, FacebookIcon } from '../../components/SocialIcons';
-import { useAuthStore } from '../../store/authStore';
 import { getEmailError, getPasswordError } from '../../utils/validators';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { AuthStackParamList } from '../../types/navigation';
 
@@ -14,25 +16,142 @@ type Props = {
 };
 
 export const LoginScreen = ({ navigation }: Props) => {
+  const { signIn, setActive, isLoaded } = useSignIn();
+  const { signUp, isLoaded: isSignUpLoaded } = useSignUp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
-
-  const { login, loginWithGoogle, loginWithFacebook, isLoading, error, clearError } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(false);
+  const [clerkError, setClerkError] = useState<string | null>(null);
 
   const emailError = emailTouched ? getEmailError(email) : undefined;
   const passwordError = passwordTouched ? getPasswordError(password) : undefined;
 
   const canSubmit = !getEmailError(email) && !getPasswordError(password);
 
-  const handleSignIn = () => {
+  const handleSignIn = async () => {
     setEmailTouched(true);
     setPasswordTouched(true);
-    if (canSubmit) {
-      clearError();
-      login(email, password);
+    if (!canSubmit || !isLoaded) return;
+
+    setIsLoading(true);
+    setClerkError(null);
+    try {
+      const completeSignIn = await signIn.create({
+        identifier: email,
+        password,
+      });
+
+      if (completeSignIn.status === 'complete') {
+        await setActive({ session: completeSignIn.createdSessionId });
+        // The AppNavigator will automatically switch to Main stack because of Clerk's SignedIn component or due to our token syncing later.
+      } else {
+        console.log(JSON.stringify(completeSignIn, null, 2));
+      }
+    } catch (err: any) {
+      setClerkError(err.errors?.[0]?.message || 'Invalid email or password');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    if (!isLoaded || !isSignUpLoaded) return;
+    setIsLoading(true);
+    setClerkError(null);
+    try {
+      const redirectUrl = AuthSession.makeRedirectUri({ path: 'oauth-native-callback' });
+      await signIn.create({ strategy: 'oauth_google', redirectUrl });
+
+      const verificationUrl = signIn.firstFactorVerification?.externalVerificationRedirectURL?.toString();
+      if (!verificationUrl) {
+        setClerkError('Google sign in could not be started');
+        return;
+      }
+
+      const authSessionResult = await WebBrowser.openAuthSessionAsync(verificationUrl, redirectUrl);
+      if (authSessionResult.type !== 'success' || !authSessionResult.url) {
+        if (authSessionResult?.type === 'cancel' || authSessionResult?.type === 'dismiss') {
+          setClerkError('Google sign in was cancelled');
+        } else {
+          setClerkError('Google sign in could not be completed');
+        }
+        return;
+      }
+
+      const params = new URL(authSessionResult.url).searchParams;
+      const rotatingTokenNonce = params.get('rotating_token_nonce') || '';
+      await signIn.reload({ rotatingTokenNonce });
+
+      if (signIn.status === 'complete' && signIn.createdSessionId) {
+        await setActive({ session: signIn.createdSessionId });
+        return;
+      }
+
+      if (signIn.firstFactorVerification?.status === 'transferable') {
+        await signUp.create({ transfer: true });
+        if (signUp.createdSessionId) {
+          await setActive({ session: signUp.createdSessionId });
+          return;
+        }
+      }
+
+      setClerkError('Google sign in could not be completed');
+    } catch (err: any) {
+      setClerkError(err?.errors?.[0]?.message || err?.message || 'Google sign in failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFacebookSignIn = async () => {
+    if (!isLoaded || !isSignUpLoaded) return;
+    setIsLoading(true);
+    setClerkError(null);
+    try {
+      const redirectUrl = AuthSession.makeRedirectUri({ path: 'oauth-native-callback' });
+      await signIn.create({ strategy: 'oauth_facebook', redirectUrl });
+
+      const verificationUrl = signIn.firstFactorVerification?.externalVerificationRedirectURL?.toString();
+      if (!verificationUrl) {
+        setClerkError('Facebook sign in could not be started');
+        return;
+      }
+
+      const authSessionResult = await WebBrowser.openAuthSessionAsync(verificationUrl, redirectUrl);
+      if (authSessionResult.type !== 'success' || !authSessionResult.url) {
+        if (authSessionResult?.type === 'cancel' || authSessionResult?.type === 'dismiss') {
+          setClerkError('Facebook sign in was cancelled');
+        } else {
+          setClerkError('Facebook sign in could not be completed');
+        }
+        return;
+      }
+
+      const params = new URL(authSessionResult.url).searchParams;
+      const rotatingTokenNonce = params.get('rotating_token_nonce') || '';
+      await signIn.reload({ rotatingTokenNonce });
+
+      if (signIn.status === 'complete' && signIn.createdSessionId) {
+        await setActive({ session: signIn.createdSessionId });
+        return;
+      }
+
+      if (signIn.firstFactorVerification?.status === 'transferable') {
+        await signUp.create({ transfer: true });
+        if (signUp.createdSessionId) {
+          await setActive({ session: signUp.createdSessionId });
+          return;
+        }
+      }
+
+      setClerkError('Facebook sign in could not be completed');
+    } catch (err: any) {
+      setClerkError(err?.errors?.[0]?.message || err?.message || 'Facebook sign in failed');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -61,7 +180,7 @@ export const LoginScreen = ({ navigation }: Props) => {
           {/* Social Buttons */}
           <Button
             mode="outlined"
-            onPress={loginWithGoogle}
+            onPress={handleGoogleSignIn}
             disabled={isLoading}
             style={styles.socialButton}
             contentStyle={styles.socialButtonContent}
@@ -73,7 +192,7 @@ export const LoginScreen = ({ navigation }: Props) => {
 
           <Button
             mode="outlined"
-            onPress={loginWithFacebook}
+            onPress={handleFacebookSignIn}
             disabled={isLoading}
             style={styles.socialButton}
             contentStyle={styles.socialButtonContent}
@@ -96,7 +215,7 @@ export const LoginScreen = ({ navigation }: Props) => {
             mode="outlined"
             dense
             value={email}
-            onChangeText={(t) => { setEmail(t); clearError(); }}
+            onChangeText={(t) => { setEmail(t); setClerkError(null); }}
             onBlur={() => setEmailTouched(true)}
             placeholder="you@example.com"
             keyboardType="email-address"
@@ -116,7 +235,7 @@ export const LoginScreen = ({ navigation }: Props) => {
             mode="outlined"
             dense
             value={password}
-            onChangeText={(t) => { setPassword(t); clearError(); }}
+            onChangeText={(t) => { setPassword(t); setClerkError(null); }}
             onBlur={() => setPasswordTouched(true)}
             placeholder="Enter your password"
             secureTextEntry={!showPassword}
@@ -136,8 +255,8 @@ export const LoginScreen = ({ navigation }: Props) => {
           />
           {passwordError && <HelperText type="error">{passwordError}</HelperText>}
 
-          {/* Error from store */}
-          {error && <HelperText type="error" style={styles.storeError}>{error}</HelperText>}
+          {/* Error from Clerk */}
+          {clerkError && <HelperText type="error" style={styles.storeError}>{clerkError}</HelperText>}
 
           {/* Sign In Button */}
           <Button
@@ -212,18 +331,18 @@ const styles = StyleSheet.create({
   },
   logoText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: typography.micro,
     marginTop: 2,
   },
   title: {
-    fontSize: 22,
+    fontSize: typography.title,
     fontWeight: '700',
     textAlign: 'center',
     color: colors.textPrimary,
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: typography.body,
     textAlign: 'center',
     color: colors.textSecondary,
     marginBottom: 24,
@@ -238,7 +357,7 @@ const styles = StyleSheet.create({
   },
   socialButtonLabel: {
     color: colors.textPrimary,
-    fontSize: 14,
+    fontSize: typography.body,
   },
   dividerRow: {
     flexDirection: 'row',
@@ -253,10 +372,10 @@ const styles = StyleSheet.create({
   dividerText: {
     marginHorizontal: 16,
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: typography.small,
   },
   inputLabel: {
-    fontSize: 14,
+    fontSize: typography.body,
     fontWeight: '500',
     color: colors.textPrimary,
     marginBottom: 6,
@@ -266,7 +385,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cardLight,
     marginBottom: 4,
     height: 48,
-    fontSize: 14,
+    fontSize: typography.body,
   },
   inputContent: {
     paddingLeft: 0,
@@ -288,7 +407,7 @@ const styles = StyleSheet.create({
     height: 48,
   },
   signInButtonLabel: {
-    fontSize: 16,
+    fontSize: typography.tabLabel,
     fontWeight: '600',
     color: '#FFFFFF',
   },
@@ -298,7 +417,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   footerLink: {
-    fontSize: 13,
+    fontSize: typography.caption,
     color: colors.textSecondary,
   },
 });

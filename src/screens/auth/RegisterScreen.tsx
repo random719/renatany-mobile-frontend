@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity } from 'react-native';
 import { Text, TextInput, Button, HelperText } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useAuthStore } from '../../store/authStore';
+import { useSignUp } from '@clerk/expo/legacy';
 import { getEmailError, getPasswordError, getConfirmPasswordError } from '../../utils/validators';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { AuthStackParamList } from '../../types/navigation';
 
@@ -13,13 +13,19 @@ type Props = {
 };
 
 export const RegisterScreen = ({ navigation }: Props) => {
+  const { isLoaded, signUp, setActive } = useSignUp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [touched, setTouched] = useState({ email: false, password: false, confirm: false });
-
-  const { register, isLoading, error, clearError } = useAuthStore();
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [clerkError, setClerkError] = useState<string | null>(null);
+  
+  // Pending verification state
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [code, setCode] = useState('');
 
   const emailError = touched.email ? getEmailError(email) : undefined;
   const passwordError = touched.password ? getPasswordError(password) : undefined;
@@ -28,13 +34,84 @@ export const RegisterScreen = ({ navigation }: Props) => {
   const canSubmit =
     !getEmailError(email) && !getPasswordError(password) && !getConfirmPasswordError(password, confirmPassword);
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     setTouched({ email: true, password: true, confirm: true });
-    if (canSubmit) {
-      clearError();
-      register('', email, password);
+    if (!canSubmit || !isLoaded) return;
+
+    setIsLoading(true);
+    setClerkError(null);
+
+    try {
+      await signUp.create({
+        emailAddress: email,
+        password,
+      });
+
+      // Send the email verification code
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      
+      setPendingVerification(true);
+    } catch (err: any) {
+      setClerkError(err.errors?.[0]?.message || 'Registration failed');
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  const onPressVerify = async () => {
+    if (!isLoaded) return;
+
+    setIsLoading(true);
+    setClerkError(null);
+    try {
+      const completeSignUp = await signUp.attemptEmailAddressVerification({
+        code,
+      });
+
+      if (completeSignUp.status === 'complete') {
+        await setActive({ session: completeSignUp.createdSessionId });
+        // Navigation auto handled by AppNavigator observing clerk state
+      } else {
+        console.log(JSON.stringify(completeSignUp, null, 2));
+      }
+    } catch (err: any) {
+      setClerkError(err.errors?.[0]?.message || 'Verification failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (pendingVerification) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', padding: 24 }]}>
+        <View style={styles.card}>
+          <Text style={styles.title}>Verify your email</Text>
+          <Text style={{ marginBottom: 20, textAlign: 'center', color: colors.textSecondary }}>
+            We've sent a code to {email}.
+          </Text>
+          <TextInput
+            mode="outlined"
+            value={code}
+            onChangeText={(t) => { setCode(t); setClerkError(null); }}
+            placeholder="Verification code"
+            style={styles.input}
+            disabled={isLoading}
+          />
+          {clerkError && <HelperText type="error" style={styles.storeError}>{clerkError}</HelperText>}
+          <Button
+            mode="contained"
+            onPress={onPressVerify}
+            loading={isLoading}
+            disabled={isLoading || !code}
+            style={styles.submitButton}
+            buttonColor={colors.primary}
+          >
+            Verify
+          </Button>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -61,7 +138,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
             mode="outlined"
             dense
             value={email}
-            onChangeText={(t) => { setEmail(t); clearError(); }}
+            onChangeText={(t) => { setEmail(t); setClerkError(null); }}
             onBlur={() => setTouched((s) => ({ ...s, email: true }))}
             placeholder="you@example.com"
             keyboardType="email-address"
@@ -81,7 +158,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
             mode="outlined"
             dense
             value={password}
-            onChangeText={(t) => { setPassword(t); clearError(); }}
+            onChangeText={(t) => { setPassword(t); setClerkError(null); }}
             onBlur={() => setTouched((s) => ({ ...s, password: true }))}
             placeholder="Min. 8 characters"
             secureTextEntry={!showPassword}
@@ -107,7 +184,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
             mode="outlined"
             dense
             value={confirmPassword}
-            onChangeText={(t) => { setConfirmPassword(t); clearError(); }}
+            onChangeText={(t) => { setConfirmPassword(t); setClerkError(null); }}
             onBlur={() => setTouched((s) => ({ ...s, confirm: true }))}
             placeholder="Re-enter password"
             secureTextEntry={!showPassword}
@@ -120,7 +197,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
           />
           {confirmError && <HelperText type="error">{confirmError}</HelperText>}
 
-          {error && <HelperText type="error" style={styles.storeError}>{error}</HelperText>}
+          {clerkError && <HelperText type="error" style={styles.storeError}>{clerkError}</HelperText>}
 
           <Button
             mode="contained"
@@ -166,18 +243,18 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   backText: {
-    fontSize: 14,
+    fontSize: typography.body,
     color: colors.textSecondary,
     marginLeft: 2,
   },
   title: {
-    fontSize: 22,
+    fontSize: typography.title,
     fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: 20,
   },
   inputLabel: {
-    fontSize: 14,
+    fontSize: typography.body,
     fontWeight: '500',
     color: colors.textPrimary,
     marginBottom: 6,
@@ -187,7 +264,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cardLight,
     marginBottom: 4,
     height: 48,
-    fontSize: 14,
+    fontSize: typography.body,
   },
   inputContent: {
     paddingLeft: 0,
@@ -209,7 +286,7 @@ const styles = StyleSheet.create({
     height: 48,
   },
   submitButtonLabel: {
-    fontSize: 16,
+    fontSize: typography.tabLabel,
     fontWeight: '600',
     color: '#FFFFFF',
   },

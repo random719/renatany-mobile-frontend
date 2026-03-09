@@ -8,7 +8,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

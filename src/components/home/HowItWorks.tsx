@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
+import { typography } from '../../theme';
 
 interface Step {
     id: number;
@@ -107,13 +108,13 @@ const styles = StyleSheet.create({
     title: {
         color: '#111827',
         fontWeight: '700',
-        fontSize: 24,
+        fontSize: typography.headline,
         marginBottom: 8,
     },
     subtitle: {
         color: '#6B7280',
         textAlign: 'center',
-        fontSize: 15,
+        fontSize: typography.label,
         lineHeight: 22,
     },
     stepsContainer: {
@@ -141,7 +142,7 @@ const styles = StyleSheet.create({
     numberText: {
         color: '#FFFFFF',
         fontWeight: '700',
-        fontSize: 13,
+        fontSize: typography.caption,
     },
     stepCard: {
         backgroundColor: '#FFFFFF',
@@ -166,12 +167,12 @@ const styles = StyleSheet.create({
     stepTitle: {
         color: '#111827',
         fontWeight: '700',
-        fontSize: 18,
+        fontSize: typography.sectionTitle,
         marginBottom: 8,
     },
     stepDescription: {
         color: '#6B7280',
-        fontSize: 14,
+        fontSize: typography.body,
         lineHeight: 22,
     },
 });

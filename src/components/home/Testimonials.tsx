@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
+import { typography } from '../../theme';
 
 interface Testimonial {
     id: string;
@@ -114,13 +115,13 @@ const styles = StyleSheet.create({
     title: {
         color: '#111827',
         fontWeight: '700',
-        fontSize: 24,
+        fontSize: typography.headline,
         marginBottom: 12,
     },
     subtitle: {
         color: '#6B7280',
         textAlign: 'center',
-        fontSize: 15,
+        fontSize: typography.label,
         lineHeight: 22,
     },
     listContainer: {
@@ -155,7 +156,7 @@ const styles = StyleSheet.create({
     },
     reviewText: {
         color: '#4B5563',
-        fontSize: 16,
+        fontSize: typography.tabLabel,
         lineHeight: 26,
         marginBottom: 24,
     },
@@ -176,11 +177,11 @@ const styles = StyleSheet.create({
     userName: {
         color: '#111827',
         fontWeight: '700',
-        fontSize: 16,
+        fontSize: typography.tabLabel,
         marginBottom: 2,
     },
     userDetails: {
         color: '#6B7280',
-        fontSize: 13,
+        fontSize: typography.caption,
     },
 });

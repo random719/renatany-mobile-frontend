@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 
 interface HomeSearchFilterProps {
     onSearch: (query: string) => void;
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         color: '#111827',
         fontWeight: '700',
-        fontSize: 22,
+        fontSize: typography.title,
     },
     saveBtn: {
         flexDirection: 'row',
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
         borderColor: '#E5E7EB',
     },
     saveBtnText: {
-        fontSize: 13,
+        fontSize: typography.caption,
         fontWeight: '500',
         color: '#111827',
     },
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         marginLeft: 10,
-        fontSize: 15,
+        fontSize: typography.label,
         color: '#111827',
     },
     dropdownBtn: {
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     dropdownText: {
-        fontSize: 15,
+        fontSize: typography.label,
         color: '#111827',
     },
     filtersRow: {
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     actionBtnText: {
-        fontSize: 14,
+        fontSize: typography.body,
         fontWeight: '500',
         color: '#111827',
     },

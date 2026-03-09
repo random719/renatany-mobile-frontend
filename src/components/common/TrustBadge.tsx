@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 
 interface TrustBadgeProps {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -63,13 +63,13 @@ const styles = StyleSheet.create({
   title: {
     color: colors.textPrimary,
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: typography.body,
   },
   infoIcon: {
     opacity: 0.6,
   },
   subtitle: {
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: typography.small,
   },
 });

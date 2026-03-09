@@ -14,7 +14,7 @@ import { Testimonials } from '../../components/home/Testimonials';
 import { ListingCard } from '../../components/listing/ListingCard';
 import { useListingStore } from '../../store/listingStore';
 import { useUIStore } from '../../store/uiStore';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 import { Category, Listing } from '../../types/listing';
 import { HomeStackParamList } from '../../types/navigation';
 
@@ -293,12 +293,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: '#111827',
     fontWeight: '700',
-    fontSize: 22,
+    fontSize: typography.title,
     marginBottom: 4,
   },
   sectionSubtitleText: {
     color: '#6B7280',
-    fontSize: 14,
+    fontSize: typography.body,
   },
   aiBadge: {
     backgroundColor: '#F3E8FF',
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   aiBadgeTextVertical: {
     color: '#7C3AED',
     fontWeight: '700',
-    fontSize: 11,
+    fontSize: typography.tiny,
     lineHeight: 14,
   },
   horizontalList: {
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   viewAllText: {
     color: colors.primary,
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: typography.body,
   },
   loader: {
     marginTop: 48,

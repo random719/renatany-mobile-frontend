@@ -10,10 +10,13 @@ export const api = axios.create({
   },
 });
 
+import { useAuthStore } from '../store/authStore';
+
 api.interceptors.request.use((config) => {
-  // Token will be set from auth store when API is wired
-  // const token = useAuthStore.getState().token;
-  // if (token) config.headers.Authorization = `Bearer ${token}`;
+  const token = useAuthStore.getState().token;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
 

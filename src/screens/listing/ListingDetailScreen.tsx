@@ -6,7 +6,7 @@ import { ActivityIndicator, Avatar, Button, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { useListingStore } from '../../store/listingStore';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 import { HomeStackParamList } from '../../types/navigation';
 
 type Route = RouteProp<HomeStackParamList, 'ListingDetail'>;
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   listingTitle: {
     fontWeight: '800',
     color: '#0F172A',
-    fontSize: 28,
+    fontSize: typography.display,
   },
   locationContainer: {
     flexDirection: 'row',
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     color: '#64748B',
-    fontSize: 15,
+    fontSize: typography.label,
   },
   actionIcons: {
     flexDirection: 'row',
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
   },
   headerIconText: {
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: typography.body,
   },
   reportButton: {
     backgroundColor: '#FFFFFF',
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   priceUnit: {
-    fontSize: 18,
+    fontSize: typography.sectionTitle,
     color: '#64748B',
     marginLeft: 4,
   },
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
   },
   tagText: {
     fontWeight: '700',
-    fontSize: 12,
+    fontSize: typography.small,
   },
   askQuestionBtn: {
     flexDirection: 'row',
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
   },
   askQuestionText: {
     fontWeight: '600',
-    fontSize: 16,
+    fontSize: typography.tabLabel,
     color: '#0F172A',
   },
   infoGrid: {
@@ -377,12 +377,12 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     color: '#64748B',
-    fontSize: 15,
+    fontSize: typography.label,
   },
   infoValue: {
     fontWeight: '700',
     color: '#0F172A',
-    fontSize: 15,
+    fontSize: typography.label,
   },
   deliverySection: {
     borderTopWidth: 1,
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
   },
   deliveryTitle: {
     color: '#64748B',
-    fontSize: 14,
+    fontSize: typography.body,
     marginBottom: 12,
   },
   deliveryBadge: {
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   },
   deliveryText: {
     fontWeight: '600',
-    fontSize: 13,
+    fontSize: typography.caption,
     color: '#0F172A',
   },
   sectionCard: {
@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
   descriptionText: {
     color: '#4B5563',
     lineHeight: 24,
-    fontSize: 15,
+    fontSize: typography.label,
   },
   ownerRow: {
     flexDirection: 'row',
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
   },
   ownerHandle: {
     color: '#6B7280',
-    fontSize: 14,
+    fontSize: typography.body,
   },
   connectHeader: {
     alignItems: 'center',
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 22,
-    fontSize: 14,
+    fontSize: typography.body,
   },
   statusBadges: {
     flexDirection: 'row',
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statusBadgeText: {
-    fontSize: 12,
+    fontSize: typography.small,
     fontWeight: '600',
     color: '#475569',
   },
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#64748B',
     marginBottom: 16,
-    fontSize: 14,
+    fontSize: typography.body,
   },
   blueInfoBox: {
     backgroundColor: '#EFF6FF',
@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
   blueInfoText: {
     color: '#1E40AF',
     textAlign: 'center',
-    fontSize: 14,
+    fontSize: typography.body,
   },
   connectCardBtn: {
     backgroundColor: '#2563EB',
@@ -522,7 +522,7 @@ const styles = StyleSheet.create({
   },
   stripeDisclaimer: {
     color: '#94A3B8',
-    fontSize: 11,
+    fontSize: typography.tiny,
     textAlign: 'center',
     lineHeight: 16,
   },

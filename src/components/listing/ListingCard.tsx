@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
 import { Image, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { Text } from 'react-native-paper';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 import { Listing } from '../../types/listing';
 import { FavoriteButton } from './FavoriteButton';
 
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     color: '#BE185D', // Dark pink text
-    fontSize: 12,
+    fontSize: typography.small,
     fontWeight: '700',
   },
   favoriteWrapper: {
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   perDay: {
     color: '#6B7280',
     fontWeight: '400',
-    fontSize: 12,
+    fontSize: typography.small,
   },
   viewButton: {
     flexDirection: 'row',
@@ -145,6 +145,6 @@ const styles = StyleSheet.create({
   viewButtonText: {
     color: '#FFFFFF',
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: typography.body,
   },
 });

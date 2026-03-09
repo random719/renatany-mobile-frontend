@@ -3,7 +3,7 @@ import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useUIStore } from '../../store/uiStore';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 
 interface GlobalHeaderProps {
     onMenuPress?: () => void;

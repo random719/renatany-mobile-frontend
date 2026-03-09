@@ -3,7 +3,7 @@ import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Category } from '../../types/listing';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 
 interface CategoryRowProps {
   categories: Category[];
