@@ -11,6 +11,9 @@ export type MainTabParamList = {
   ListItemTab: undefined;
   FavoritesTab: undefined;
   ProfileTab: undefined;
+  RentalHistoryTab: undefined;
+  ConversationsTab: undefined;
+  DisputesTab: undefined;
 };
 
 export type HomeStackParamList = {
@@ -30,6 +33,18 @@ export type FavoritesStackParamList = {
   Favorites: undefined;
   SavedSearches: undefined;
   ListingDetail: { listingId: string };
+};
+
+export type RentalStackParamList = {
+  RentalHistory: undefined;
+};
+
+export type ConversationsStackParamList = {
+  MyConversations: undefined;
+};
+
+export type DisputesStackParamList = {
+  Disputes: undefined;
 };
 
 export type ProfileStackParamList = {

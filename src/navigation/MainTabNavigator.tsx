@@ -2,14 +2,15 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
 import { FAB } from 'react-native-paper';
+import { GlobalHeader } from '../components/common/GlobalHeader';
 import { CategoriesScreen } from '../screens/categories/CategoriesScreen';
 import { CategoryDetailScreen } from '../screens/categories/CategoryDetailScreen';
 import { FavoritesScreen } from '../screens/favorites/FavoritesScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { ListingDetailScreen } from '../screens/listing/ListingDetailScreen';
 import { FilterScreen } from '../screens/search/FilterScreen';
+import { SavedSearchesScreen } from '../screens/search/saved/SavedSearchesScreen';
 import { SearchScreen } from '../screens/search/SearchScreen';
 import { colors } from '../theme';
 import {
@@ -17,7 +18,7 @@ import {
   HomeStackParamList,
   MainTabParamList,
   ProfileStackParamList,
-  SearchStackParamList,
+  SearchStackParamList
 } from '../types/navigation';
 
 // Placeholder screens for tabs not yet built (Flow 3)
@@ -37,15 +38,18 @@ const PlaceholderFavorites = () => (
 const PlaceholderProfile = () => {
   const { user, logout } = useAuthStore();
   return (
-    <RNView style={styles.placeholder}>
-      <Text variant="headlineSmall">Welcome, {user?.name || 'User'}!</Text>
-      <Text variant="bodyMedium" style={{ color: colors.textSecondary, marginTop: 8 }}>
-        Profile coming in Flow 3
-      </Text>
-      <Button mode="outlined" onPress={logout} style={{ marginTop: 24 }}>
-        Sign Out
-      </Button>
-    </RNView>
+    <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+      <GlobalHeader />
+      <RNView style={styles.placeholder}>
+        <Text variant="headlineSmall">Welcome, {user?.name || 'User'}!</Text>
+        <Text variant="bodyMedium" style={{ color: colors.textSecondary, marginTop: 8 }}>
+          Profile coming in Flow 3
+        </Text>
+        <Button mode="outlined" onPress={logout} style={{ marginTop: 24 }}>
+          Sign Out
+        </Button>
+      </RNView>
+    </View>
   );
 };
 
@@ -108,6 +112,11 @@ const FavoritesStackNavigator = () => (
       options={{ headerShown: false }}
     />
     <FavoritesStack.Screen
+      name="SavedSearches"
+      component={SavedSearchesScreen}
+      options={{ headerShown: false }}
+    />
+    <FavoritesStack.Screen
       name="ListingDetail"
       component={ListingDetailScreen}
       options={{ headerShown: false }}
@@ -118,11 +127,10 @@ const FavoritesStackNavigator = () => (
 // --- Profile Stack (placeholder) ---
 const ProfileStack = createStackNavigator<ProfileStackParamList>();
 const ProfileStackNavigator = () => (
-  <ProfileStack.Navigator>
+  <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
     <ProfileStack.Screen
       name="Profile"
       component={PlaceholderProfile}
-      options={{ title: 'Profile' }}
     />
   </ProfileStack.Navigator>
 );
@@ -175,7 +183,7 @@ export const MainTabNavigator = () => (
         },
       })}
       options={{
-        tabBarLabel: '',
+        tabBarLabel: () => null,
         tabBarIcon: () => (
           <View style={styles.fabContainer}>
             <FAB

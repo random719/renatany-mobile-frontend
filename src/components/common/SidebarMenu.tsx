@@ -12,7 +12,7 @@ const SIDEBAR_WIDTH = Math.min(width * 0.8, 320);
 export const SidebarMenu = () => {
     const navigation = useNavigation<any>();
     const { isSidebarVisible: isVisible, closeSidebar: onClose } = useUIStore();
-    const [currentRouteName, setCurrentRouteName] = useState('');
+    const [currentRouteName, setCurrentRouteName] = useState('HomeTab'); // Default to Browse All
 
     // Safely get current route name when sidebar opens
     useEffect(() => {
@@ -119,10 +119,14 @@ export const SidebarMenu = () => {
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                     <Text style={styles.sectionTitle}>NAVIGATE</Text>
                     {(() => {
-                        const isFavorites = ['Favorites', 'FavoritesTab', 'SavedSearches'].includes(currentRouteName);
+                        const isFavorites = ['Favorites', 'FavoritesTab'].includes(currentRouteName);
                         const isProfile = ['Profile', 'ProfileTab', 'EditProfile', 'Settings'].includes(currentRouteName);
                         const isListItem = currentRouteName === 'ListItemTab';
-                        const isBrowseAll = !isFavorites && !isProfile && !isListItem;
+                        const isRentalHistory = currentRouteName === 'RentalHistory';
+                        const isConversations = currentRouteName === 'MyConversations';
+                        const isDisputes = currentRouteName === 'Disputes';
+                        const isSavedSearches = currentRouteName === 'SavedSearches';
+                        const isBrowseAll = !isFavorites && !isProfile && !isListItem && !isRentalHistory && !isConversations && !isDisputes && !isSavedSearches;
 
                         return (
                             <>
@@ -138,8 +142,18 @@ export const SidebarMenu = () => {
                                     () => navigation.navigate('FavoritesTab'),
                                     isFavorites
                                 )}
-                                {renderNavItem('bookmark-outline', 'Saved Searches')}
-                                {renderNavItem('clock-outline', 'Rental History')}
+                                {renderNavItem(
+                                    'bookmark-outline',
+                                    'Saved Searches',
+                                    () => navigation.navigate('SavedSearches'),
+                                    isSavedSearches
+                                )}
+                                {renderNavItem(
+                                    'clock-outline',
+                                    'Rental History',
+                                    () => navigation.navigate('RentalHistory'),
+                                    isRentalHistory
+                                )}
                                 {renderNavItem(
                                     'plus',
                                     'List Item',
@@ -153,11 +167,21 @@ export const SidebarMenu = () => {
                                     () => navigation.navigate('ProfileTab'),
                                     isProfile
                                 )}
+                                {renderNavItem(
+                                    'chat-outline',
+                                    'My Conversations',
+                                    () => navigation.navigate('MyConversations'),
+                                    isConversations
+                                )}
+                                {renderNavItem(
+                                    'alert-outline',
+                                    'Disputes',
+                                    () => navigation.navigate('Disputes'),
+                                    isDisputes
+                                )}
                             </>
                         );
                     })()}
-                    {renderNavItem('chat-outline', 'My Conversations')}
-                    {renderNavItem('alert-outline', 'Disputes')}
 
                     <View style={styles.divider} />
 
