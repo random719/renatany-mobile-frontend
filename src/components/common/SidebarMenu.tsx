@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { Text } from "react-native-paper";
 import { useAuthStore } from "../../store/authStore";
+import { useListingStore } from "../../store/listingStore";
 import { useUIStore } from "../../store/uiStore";
 import { colors, typography } from "../../theme";
 
@@ -27,6 +28,7 @@ export const SidebarMenu = () => {
   const { user: clerkUser } = useUser();
   const { isSidebarVisible: isVisible, closeSidebar: onClose } = useUIStore();
   const { logout } = useAuthStore();
+  const { activeFilter, applyFilter } = useListingStore();
   const [currentRouteName, setCurrentRouteName] = useState("HomeTab"); // Default to Browse All
   const primaryEmail =
     clerkUser?.primaryEmailAddress?.emailAddress?.toLowerCase() || "";
@@ -317,16 +319,46 @@ export const SidebarMenu = () => {
           <View style={styles.divider} />
 
           <Text style={styles.sectionTitle}>CATEGORIES</Text>
-          {renderNavItem("cellphone", "Electronics")}
-          {renderNavItem("cog-outline", "Tools")}
-          {renderNavItem("account-outline", "Fashion")}
-          {renderNavItem("check-decagram-outline", "Sports")}
-          {renderNavItem("swap-horizontal", "Vehicles")}
-          {renderNavItem("home-outline", "Home")}
-          {renderNavItem("book-open-outline", "Books")}
-          {renderNavItem("music-note-outline", "Music")}
-          {renderNavItem("camera-outline", "Photography")}
-          {renderNavItem("shape-outline", "Other")}
+          {renderNavItem("cellphone", "Electronics", () => {
+            applyFilter({ ...activeFilter, category: "Electronics" });
+            navigation.navigate("Main", { screen: "SearchTab" });
+          })}
+          {renderNavItem("cog-outline", "Tools", () => {
+            applyFilter({ ...activeFilter, category: "Tools" });
+            navigation.navigate("Main", { screen: "SearchTab" });
+          })}
+          {renderNavItem("account-outline", "Fashion", () => {
+            applyFilter({ ...activeFilter, category: "Fashion" });
+            navigation.navigate("Main", { screen: "SearchTab" });
+          })}
+          {renderNavItem("check-decagram-outline", "Sports", () => {
+            applyFilter({ ...activeFilter, category: "Sports" });
+            navigation.navigate("Main", { screen: "SearchTab" });
+          })}
+          {renderNavItem("swap-horizontal", "Vehicles", () => {
+            applyFilter({ ...activeFilter, category: "Vehicles" });
+            navigation.navigate("Main", { screen: "SearchTab" });
+          })}
+          {renderNavItem("home-outline", "Home", () => {
+            applyFilter({ ...activeFilter, category: "Home" });
+            navigation.navigate("Main", { screen: "SearchTab" });
+          })}
+          {renderNavItem("book-open-outline", "Books", () => {
+            applyFilter({ ...activeFilter, category: "Books" });
+            navigation.navigate("Main", { screen: "SearchTab" });
+          })}
+          {renderNavItem("music-note-outline", "Music", () => {
+            applyFilter({ ...activeFilter, category: "Music" });
+            navigation.navigate("Main", { screen: "SearchTab" });
+          })}
+          {renderNavItem("camera-outline", "Photography", () => {
+            applyFilter({ ...activeFilter, category: "Photography" });
+            navigation.navigate("Main", { screen: "SearchTab" });
+          })}
+          {renderNavItem("shape-outline", "Other", () => {
+            applyFilter({ ...activeFilter, category: "Other" });
+            navigation.navigate("Main", { screen: "SearchTab" });
+          })}
 
           <View style={styles.bottomSpacer} />
         </ScrollView>

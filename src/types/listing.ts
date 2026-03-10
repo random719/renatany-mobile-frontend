@@ -33,4 +33,5 @@ export interface ListingFilter {
   rating?: number;
   sortBy?: 'newest' | 'price_low' | 'price_high' | 'rating' | 'popular';
   query?: string;
+  location?: string;
 }

@@ -1,11 +1,11 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
-import { colors, typography } from '../../theme';
-import { useAuthStore } from '../../store/authStore';
 import { getRentalRequests } from '../../services/rentalService';
+import { useAuthStore } from '../../store/authStore';
+import { colors, typography } from '../../theme';
 import { RentalRequest } from '../../types/models';
 
 export const ConversationsScreen = () => {
@@ -56,18 +56,27 @@ export const ConversationsScreen = () => {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                 <View style={styles.header}>
                     <View style={styles.titleRow}>
-                        <Text variant="displaySmall" style={styles.title}>My Conversations</Text>
-                        <TouchableOpacity style={styles.stripeBtn}>
-                            <MaterialCommunityIcons name="alert-circle-outline" size={18} color={colors.accentBlue} />
-                            <Text style={styles.stripeText}>Test Stripe</Text>
-                        </TouchableOpacity>
+                        <Text variant="displaySmall" style={styles.title}>My{'\n'}Conversations</Text>
+                        <View style={styles.actionButtons}>
+                            <TouchableOpacity style={styles.loadingBtn} disabled>
+                                <ActivityIndicator size={16} color={colors.primary} style={styles.loadingSpinner} />
+                                <View>
+                                    <Text style={styles.loadingText}>Loading</Text>
+                                    <Text style={styles.loadingText}>details...</Text>
+                                </View>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.stripeBtn}>
+                                <MaterialCommunityIcons name="alert-circle-outline" size={18} color={colors.primary} />
+                                <Text style={styles.stripeText}>Test Stripe</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                     <Text variant="bodyMedium" style={styles.subtitle}>
                         Active conversations only (last 7 days)
                     </Text>
                 </View>
 
-                <View style={styles.tabContainer}>
+                <View style={styles.mainCard}>
                     <View style={styles.tabs}>
                         <TouchableOpacity 
                             style={[styles.tab, activeTab === 'sent' && styles.activeTab]}
@@ -90,9 +99,9 @@ export const ConversationsScreen = () => {
                             <ActivityIndicator size="large" color={colors.primary} />
                         </View>
                     ) : displayedConversations.length === 0 ? (
-                        <View style={styles.emptyCard}>
-                            <MaterialCommunityIcons name="message-text-outline" size={72} color="#CBD5E1" style={styles.emptyIcon} />
-                            <Text variant="headlineSmall" style={styles.emptyTitle}>No active requests</Text>
+                        <View style={styles.emptyContainer}>
+                            <MaterialCommunityIcons name="chat-outline" size={80} color="#94A3B8" style={styles.emptyIcon} />
+                            <Text variant="titleLarge" style={styles.emptyTitle}>No active requests</Text>
                             <Text variant="bodyMedium" style={styles.emptySubtitle}>
                                 {activeTab === 'sent' ? "You haven't sent any rental requests recently" : "You have no incoming rental requests"}
                             </Text>
@@ -140,42 +149,76 @@ const styles = StyleSheet.create({
     titleRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
+        alignItems: 'flex-start',
+        marginBottom: 12,
     },
     title: {
         fontWeight: '800',
         color: '#0F172A',
         flex: 1,
+        lineHeight: 40,
+    },
+    actionButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    loadingBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EFF6FF',
+        borderWidth: 1,
+        borderColor: '#DBEAFE',
+        borderRadius: 20,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        gap: 8,
+    },
+    loadingSpinner: {
+        marginRight: 4,
+    },
+    loadingText: {
+        color: '#475569',
+        fontSize: 10,
+        fontWeight: '500',
+        lineHeight: 12,
     },
     stripeBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 6,
         backgroundColor: '#FFFFFF',
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: '#DBEAFE',
         borderRadius: 8,
         paddingHorizontal: 12,
-        height: 40,
+        paddingVertical: 10,
     },
     stripeText: {
-        color: colors.accentBlue,
+        color: colors.primary,
         fontWeight: '600',
         fontSize: typography.body,
     },
     subtitle: {
         color: '#64748B',
     },
-    tabContainer: {
-        paddingHorizontal: 16,
+    mainCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        marginHorizontal: 16,
+        paddingBottom: 48,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 2,
     },
     tabs: {
         flexDirection: 'row',
-        backgroundColor: '#F1F5F9',
-        borderRadius: 12,
-        padding: 4,
-        marginBottom: 16,
+        backgroundColor: '#F8FAFC',
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        padding: 8,
         gap: 4,
     },
     tab: {
@@ -191,9 +234,9 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.05,
         shadowRadius: 2,
-        elevation: 2,
+        elevation: 1,
     },
     tabText: {
         color: '#64748B',
@@ -203,34 +246,33 @@ const styles = StyleSheet.create({
         color: '#1E293B',
         fontWeight: '600',
     },
-    emptyCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 48,
+    emptyContainer: {
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
+        justifyContent: 'center',
+        paddingTop: 64,
+        paddingHorizontal: 24,
     },
     emptyIcon: {
         marginBottom: 24,
     },
     emptyTitle: {
         fontWeight: '700',
-        color: '#1E293B',
-        marginBottom: 12,
+        color: '#0F172A',
+        marginBottom: 8,
     },
     emptySubtitle: {
         textAlign: 'center',
         color: '#64748B',
-        lineHeight: 20,
+        lineHeight: 22,
+        fontSize: typography.body,
     },
     loadingContainer: {
-        marginTop: 40,
+        marginTop: 64,
         alignItems: 'center',
         justifyContent: 'center',
     },
     listContainer: {
-        paddingTop: 8,
+        padding: 16,
         gap: 12,
     },
     convCard: {
@@ -283,3 +325,4 @@ const styles = StyleSheet.create({
         color: '#475569',
     },
 });
+
