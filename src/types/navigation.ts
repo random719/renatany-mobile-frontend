@@ -14,6 +14,7 @@ export type MainTabParamList = {
   RentalHistoryTab: undefined;
   ConversationsTab: undefined;
   DisputesTab: undefined;
+  BulkEditItems: undefined;
 };
 
 export type HomeStackParamList = {

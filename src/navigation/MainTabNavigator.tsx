@@ -8,6 +8,7 @@ import { CategoriesScreen } from '../screens/categories/CategoriesScreen';
 import { CategoryDetailScreen } from '../screens/categories/CategoryDetailScreen';
 import { FavoritesScreen } from '../screens/favorites/FavoritesScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
+import { CreateListingScreen } from '../screens/listing/CreateListingScreen';
 import { ListingDetailScreen } from '../screens/listing/ListingDetailScreen';
 import { FilterScreen } from '../screens/search/FilterScreen';
 import { SavedSearchesScreen } from '../screens/search/saved/SavedSearchesScreen';
@@ -24,7 +25,7 @@ import {
 // Placeholder screens for tabs not yet built (Flow 3)
 import { View as RNView, View, StyleSheet } from 'react-native';
 import { Button, Text } from 'react-native-paper';
-import { useAuthStore } from '../store/authStore';
+import { ProfileScreen } from '../screens/profile/ProfileScreen';
 
 const PlaceholderFavorites = () => (
   <RNView style={styles.placeholder}>
@@ -34,24 +35,6 @@ const PlaceholderFavorites = () => (
     </Text>
   </RNView>
 );
-
-const PlaceholderProfile = () => {
-  const { user, logout } = useAuthStore();
-  return (
-    <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <GlobalHeader />
-      <RNView style={styles.placeholder}>
-        <Text variant="headlineSmall">Welcome, {user?.name || 'User'}!</Text>
-        <Text variant="bodyMedium" style={{ color: colors.textSecondary, marginTop: 8 }}>
-          Profile coming in Flow 3
-        </Text>
-        <Button mode="outlined" onPress={logout} style={{ marginTop: 24 }}>
-          Sign Out
-        </Button>
-      </RNView>
-    </View>
-  );
-};
 
 // --- Home Stack ---
 const HomeStack = createStackNavigator<HomeStackParamList>();
@@ -102,6 +85,18 @@ const SearchStackNavigator = () => (
   </SearchStack.Navigator>
 );
 
+// --- ListItem Stack ---
+const ListItemStack = createStackNavigator();
+const ListItemStackNavigator = () => (
+  <ListItemStack.Navigator>
+    <ListItemStack.Screen
+      name="CreateListing"
+      component={CreateListingScreen}
+      options={{ headerShown: false }}
+    />
+  </ListItemStack.Navigator>
+);
+
 // --- Favorites Stack (placeholder) ---
 const FavoritesStack = createStackNavigator<FavoritesStackParamList>();
 const FavoritesStackNavigator = () => (
@@ -130,7 +125,7 @@ const ProfileStackNavigator = () => (
   <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
     <ProfileStack.Screen
       name="Profile"
-      component={PlaceholderProfile}
+      component={ProfileScreen}
     />
   </ProfileStack.Navigator>
 );
@@ -175,13 +170,7 @@ export const MainTabNavigator = () => (
     />
     <Tab.Screen
       name="ListItemTab"
-      component={PlaceholderFavorites}
-      listeners={({ navigation }) => ({
-        tabPress: (e) => {
-          e.preventDefault();
-          // Will navigate to CreateListingScreen in Flow 3
-        },
-      })}
+      component={ListItemStackNavigator}
       options={{
         tabBarLabel: () => null,
         tabBarIcon: () => (

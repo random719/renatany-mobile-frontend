@@ -1,79 +1,92 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, ScrollView } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../../components/common/GlobalHeader';
 import { Footer } from '../../../components/home/Footer';
-import { colors, typography } from '../../../theme';
 
 export const SavedSearchesScreen = () => {
     const navigation = useNavigation();
 
     return (
-        <View style={styles.container}>
+        <View style={styles.mainContainer}>
             <GlobalHeader />
-            <View style={styles.content}>
-                <View style={styles.headerSection}>
+            <ScrollView 
+                style={styles.scrollContainer} 
+                contentContainerStyle={styles.scrollContent}
+            >
+                <View style={styles.contentWrapper}>
                     <TouchableOpacity
                         style={styles.backBtn}
                         onPress={() => navigation.goBack()}
                     >
-                        <MaterialCommunityIcons name="arrow-left" size={20} color={colors.textSecondary} />
+                        <MaterialCommunityIcons name="arrow-left" size={20} color="#475569" />
                         <Text style={styles.backBtnText}>Back to Browse</Text>
                     </TouchableOpacity>
 
                     <View style={styles.titleRow}>
-                        <MaterialCommunityIcons name="bookmark" size={32} color={colors.accentBlue} />
-                        <Text variant="displaySmall" style={styles.title}>Saved Searches</Text>
+                        <MaterialCommunityIcons name="bookmark" size={32} color="#2563EB" />
+                        <Text style={styles.title}>Saved Searches</Text>
                     </View>
 
-                    <Text variant="bodyLarge" style={styles.countText}>0 saved searches</Text>
-                </View>
+                    <Text style={styles.countText}>0 saved searches</Text>
 
-                <View style={styles.emptyCard}>
-                    <MaterialCommunityIcons name="bookmark-outline" size={64} color="#CBD5E1" style={styles.emptyIcon} />
-                    <Text variant="headlineSmall" style={styles.emptyTitle}>No saved searches yet.</Text>
-                    <Text variant="bodyMedium" style={styles.emptySubtitle}>
-                        Save your search criteria to get notified when new items match!
-                    </Text>
-                    <Button
-                        mode="contained"
-                        style={styles.searchBtn}
-                        contentStyle={styles.searchBtnContent}
-                        onPress={() => navigation.navigate('HomeTab' as never)}
-                    >
-                        Start Searching
-                    </Button>
+                    <View style={styles.emptyCard}>
+                        <MaterialCommunityIcons name="bookmark-outline" size={72} color="#CBD5E1" style={styles.emptyIcon} />
+                        <Text style={styles.emptyTitle}>No saved searches yet.</Text>
+                        <Text style={styles.emptySubtitle}>
+                            Save your search criteria to get notified{"\n"}when new items match!
+                        </Text>
+                        <Button
+                            mode="contained"
+                            style={styles.searchBtn}
+                            contentStyle={styles.searchBtnContent}
+                            labelStyle={styles.searchBtnLabel}
+                            buttonColor="#111827"
+                            textColor="#FFFFFF"
+                            onPress={() => navigation.navigate('HomeTab' as never)}
+                        >
+                            Start Searching
+                        </Button>
+                    </View>
                 </View>
-            </View>
-            <Footer />
+                <Footer />
+            </ScrollView>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
+    mainContainer: {
         flex: 1,
         backgroundColor: '#FFFFFF',
     },
-    content: {
+    scrollContainer: {
         flex: 1,
     },
-    headerSection: {
-        paddingHorizontal: 24,
+    scrollContent: {
+        flexGrow: 1,
+        backgroundColor: '#FFFFFF',
+    },
+    contentWrapper: {
+        flex: 1,
+        paddingHorizontal: 20,
         paddingTop: 32,
-        paddingBottom: 32,
+        paddingBottom: 48,
+        maxWidth: 768,
+        width: '100%',
+        alignSelf: 'center',
     },
     backBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        marginBottom: 24,
+        gap: 6,
+        marginBottom: 28,
     },
     backBtnText: {
         color: '#475569',
-        fontSize: typography.body,
+        fontSize: 15,
         fontWeight: '500',
     },
     titleRow: {
@@ -83,48 +96,58 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     title: {
-        fontWeight: '800',
+        fontSize: 30,
+        fontWeight: 'bold',
         color: '#0F172A',
+        letterSpacing: -0.5,
     },
     countText: {
         color: '#64748B',
-        fontSize: typography.tabLabel,
+        fontSize: 16,
+        marginBottom: 32,
+        fontWeight: 'regular',
     },
     emptyCard: {
-        marginHorizontal: 16,
-        padding: 32,
         backgroundColor: '#FFFFFF',
         borderRadius: 12,
         borderWidth: 1,
         borderColor: '#E2E8F0',
+        paddingVertical: 56,
+        paddingHorizontal: 24,
         alignItems: 'center',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.05,
-        shadowRadius: 15,
+        shadowRadius: 12,
         elevation: 2,
     },
     emptyIcon: {
         marginBottom: 24,
     },
     emptyTitle: {
-        fontWeight: '700',
-        color: '#334155',
+        fontSize: 20,
+        fontWeight: '500',
+        color: '#64748B',
         marginBottom: 12,
+        textAlign: 'center',
     },
     emptySubtitle: {
         textAlign: 'center',
         color: '#94A3B8',
-        marginBottom: 24,
-        lineHeight: 20,
-        paddingHorizontal: 12,
+        fontSize: 15,
+        lineHeight: 24,
+        marginBottom: 32,
     },
     searchBtn: {
-        backgroundColor: '#1E293B',
         borderRadius: 8,
-        width: '100%',
     },
     searchBtnContent: {
         height: 48,
+        paddingHorizontal: 28,
+    },
+    searchBtnLabel: {
+        fontSize: 15,
+        fontWeight: '600',
+        letterSpacing: 0,
     },
 });

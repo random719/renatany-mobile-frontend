@@ -623,36 +623,456 @@ export const AdminDashboardScreen = () => {
 
     if (activeTab === "moderation") {
       return (
-        <View style={styles.singlePaneCard}>
-          <Text style={styles.cardTitle}>Moderation Queue</Text>
-          <Text style={styles.tabBigValue}>{dashboardData.pendingModerationCount}</Text>
-          <Text style={styles.metricSubtext}>Pending reports for review</Text>
-          <View style={styles.divider} />
-          <Text style={styles.inlineActivity}>• Disputes: 0</Text>
-          <Text style={styles.inlineActivity}>• Reported listings: 0</Text>
-          <Text style={styles.inlineActivity}>• Flagged users: 0</Text>
-        </View>
+        <>
+          <View style={styles.metricsGrid}>
+            <UsersMetricCard
+              title="Open Disputes"
+              value={String(dashboardData.openDisputesCount)}
+              subtitle="Requiring attention"
+              color="#DC2626"
+            />
+            <UsersMetricCard
+              title="User Reports"
+              value={String(dashboardData.userReportsCount)}
+              subtitle="Pending review"
+              color="#D97706"
+            />
+            <UsersMetricCard
+              title="Fraud Alerts"
+              value={String(dashboardData.fraudReportsCount)}
+              subtitle="Pending review"
+              color="#A855F7"
+            />
+            <UsersMetricCard
+              title="Pending Requests"
+              value={String(dashboardData.pendingRequestsCount)}
+              subtitle="Awaiting approval"
+              color="#2563EB"
+            />
+          </View>
+          <View style={styles.userManagementCard}>
+            <View style={styles.sectionHeaderRow}>
+              <MaterialCommunityIcons name="alert-outline" size={iconSize.lg} color="#DC2626" />
+              <Text style={styles.cardTitle}>Quick Actions</Text>
+            </View>
+            <View style={styles.quickActionsList}>
+              <TouchableOpacity style={styles.quickActionBtn}>
+                <MaterialCommunityIcons name="alert-outline" size={iconSize.md} color="#DC2626" />
+                <Text style={styles.quickActionText}>Review Disputes ({dashboardData.openDisputesCount})</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickActionBtn}>
+                <MaterialCommunityIcons name="account-group-outline" size={iconSize.md} color="#D97706" />
+                <Text style={styles.quickActionText}>Review User Reports ({dashboardData.userReportsCount})</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickActionBtn}>
+                <MaterialCommunityIcons name="shield-outline" size={iconSize.md} color="#A855F7" />
+                <Text style={styles.quickActionText}>Review Fraud Reports ({dashboardData.fraudReportsCount})</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickActionBtn}>
+                <MaterialCommunityIcons name="clock-outline" size={iconSize.md} color="#2563EB" />
+                <Text style={styles.quickActionText}>Review Pending Requests ({dashboardData.pendingRequestsCount})</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          <View style={styles.userManagementCard}>
+            <View style={styles.sectionHeaderRow}>
+              <MaterialCommunityIcons name="cube-outline" size={iconSize.lg} color="#2563EB" />
+              <Text style={styles.cardTitle}>Platform Statistics</Text>
+            </View>
+            <View style={styles.statsList}>
+              <View style={styles.statRow}>
+                <Text style={styles.statLabel}>Total Items</Text>
+                <Text style={styles.statValue}>{dashboardData.totalItems}</Text>
+              </View>
+              <View style={styles.statRow}>
+                <Text style={styles.statLabel}>Active Items</Text>
+                <Text style={[styles.statValue, { color: "#16A34A" }]}>{dashboardData.activeItems}</Text>
+              </View>
+              <View style={styles.statRow}>
+                <Text style={styles.statLabel}>Total Rentals</Text>
+                <Text style={styles.statValue}>{dashboardData.totalRentals}</Text>
+              </View>
+              <View style={styles.statRow}>
+                <Text style={styles.statLabel}>Completed</Text>
+                <Text style={[styles.statValue, { color: "#2563EB" }]}>{dashboardData.completedRentals}</Text>
+              </View>
+            </View>
+          </View>
+        </>
       );
     }
 
     return (
-      <View style={styles.singlePaneCard}>
-        <Text style={styles.cardTitle}>Platform Health</Text>
-        {dashboardData.healthChecks.map((item) => (
-          <View key={item.label} style={styles.healthRow}>
-            <Text style={styles.healthLabel}>{item.label}</Text>
-            <Text
-              style={[
-                styles.healthValue,
-                item.tone === "good" && styles.healthGood,
-                item.tone === "warn" && styles.healthWarn,
-              ]}
-            >
-              {item.value}
-            </Text>
+      <>
+        {/* System Status: Critical */}
+        <View style={[styles.healthCard, styles.healthCardCritical]}>
+          <View style={styles.healthStatusHeader}>
+            <View style={styles.criticalDot} />
+            <Text style={styles.cardTitle}>System Status: Critical</Text>
           </View>
-        ))}
-      </View>
+          <View style={styles.metricsGrid}>
+             <View style={styles.healthSubCard}>
+               <Text style={styles.healthSubTitle}>Uptime</Text>
+               <Text style={[styles.healthSubValue, { color: "#16A34A" }]}>{dashboardData.uptime}%</Text>
+               <Text style={styles.healthSubText}>Last 30 days</Text>
+             </View>
+          </View>
+          <View style={styles.metricsGrid}>
+             <View style={styles.healthSubCard}>
+               <Text style={styles.healthSubTitle}>Rate Limit Issues</Text>
+               <Text style={styles.healthSubValue}>{dashboardData.rateLimitIssues}</Text>
+               <Text style={styles.healthSubText}>Last 24 hours</Text>
+             </View>
+          </View>
+          <View style={styles.metricsGrid}>
+             <View style={styles.healthSubCard}>
+               <Text style={styles.healthSubTitle}>API Errors</Text>
+               <Text style={styles.healthSubValue}>{dashboardData.apiErrors}</Text>
+               <Text style={styles.healthSubText}>Recent errors</Text>
+             </View>
+          </View>
+
+          {/* Page Load Times inside Critical container */}
+          <View style={[styles.singlePaneCard, { marginTop: 14 }]}>
+             <View style={styles.sectionHeaderRow}>
+               <MaterialCommunityIcons name="clock-outline" size={iconSize.lg} color="#2563EB" />
+               <Text style={styles.cardTitle}>Page Load Times</Text>
+             </View>
+             <View style={styles.pageLoadList}>
+               {dashboardData.pageLoadTimes.map((item, idx) => (
+                 <View key={idx} style={styles.pageLoadRow}>
+                   <View style={styles.pageLoadLeft}>
+                     <MaterialCommunityIcons 
+                       name={
+                         item.page === "Admin Dashboard" ? "pulse" : 
+                         item.page === "My Conversations" ? "message-text-outline" :
+                         item.page === "Home Page" ? "home-outline" :
+                         item.page === "Profile Page" ? "account-outline" : "cube-outline"
+                       } 
+                       size={iconSize.md} 
+                       color="#64748B" 
+                     />
+                     <Text style={styles.pageLoadName}>{item.page}</Text>
+                   </View>
+                   <View style={styles.pageLoadRight}>
+                     {item.loadTime === null ? (
+                       <Text style={styles.pageLoadNotMeasured}>Not measured</Text>
+                     ) : (
+                       <>
+                         <Text style={styles.pageLoadTimeVal}>{item.loadTime}s</Text>
+                         {item.loadTime < 2 ? (
+                           <View style={styles.fastPill}>
+                             <MaterialCommunityIcons name="checkbox-marked" size={14} color="#16A34A" />
+                             <Text style={styles.fastPillText}>Fast</Text>
+                           </View>
+                         ) : null}
+                       </>
+                     )}
+                   </View>
+                 </View>
+               ))}
+             </View>
+             <View style={styles.infoBox}>
+               <Text style={styles.infoBoxText}>
+                 <Text style={{ fontWeight: "700", color: "#1E3A8A" }}>Performance Targets:</Text> Fast: {"<2s"} | Acceptable: 2-5s | Needs Optimization: {">5s"}
+               </Text>
+             </View>
+          </View>
+        </View>
+
+        {/* Slow Loading Pages */}
+        <View style={styles.singlePaneCard}>
+          <View style={styles.sectionHeaderRow}>
+            <MaterialCommunityIcons name="clock-outline" size={iconSize.lg} color="#D97706" />
+            <Text style={styles.cardTitle}>Slow Loading Pages</Text>
+          </View>
+          {dashboardData.slowPages.map((page, idx) => (
+            <View key={idx} style={styles.slowPageCard}>
+              <Text style={styles.slowPageName}>{page.page}</Text>
+              <View style={styles.slowPageTimePill}>
+                <Text style={styles.slowPageTimeText}>{page.time}s</Text>
+              </View>
+            </View>
+          ))}
+          <View style={styles.recommendationsBox}>
+            <View style={styles.recommendationsHeader}>
+              <MaterialCommunityIcons name="lightbulb-on" size={18} color="#D97706" style={{ marginTop: 2 }} />
+              <Text style={styles.recommendationsTitle}>Recommendations:</Text>
+            </View>
+            {dashboardData.slowPageRecommendations.map((rec, idx) => (
+              <Text key={idx} style={styles.recommendationItem}>• {rec}</Text>
+            ))}
+          </View>
+        </View>
+
+        {/* Recent API Errors */}
+        <View style={styles.singlePaneCard}>
+           <View style={styles.sectionHeaderRow}>
+             <MaterialCommunityIcons name="alert-outline" size={iconSize.lg} color="#DC2626" />
+             <Text style={styles.cardTitle}>Recent API Errors</Text>
+           </View>
+           <View style={styles.apiErrorsEmpty}>
+             <MaterialCommunityIcons name="check-circle-outline" size={48} color="#16A34A" />
+             <Text style={styles.apiErrorsTextMain}>No errors detected!</Text>
+             <Text style={styles.apiErrorsTextSub}>System running smoothly</Text>
+           </View>
+        </View>
+
+        {/* Performance Optimization Guide */}
+        <View style={styles.singlePaneCard}>
+          <View style={styles.sectionHeaderRow}>
+             <MaterialCommunityIcons name="lightning-bolt" size={iconSize.lg} color="#D97706" />
+             <Text style={styles.cardTitle}>Performance Optimization Guide</Text>
+          </View>
+          
+          <View style={styles.performanceScoreBox}>
+            <View style={styles.scoreRow}>
+              <Text style={styles.scoreTitle}>Current Performance{"\n"}Score</Text>
+              <Text style={styles.scoreValueBig}>
+                <Text style={styles.scoreValueCurrent}>{dashboardData.performanceScore}</Text>
+                <Text style={styles.scoreValueTotal}> /100</Text>
+              </Text>
+            </View>
+            <View style={styles.progressBarBg}>
+              <View style={[styles.progressBarFill, { width: `${dashboardData.performanceScore}%` }]} />
+            </View>
+            <Text style={styles.scoreSubtitle}>Based on load times, API efficiency, and user experience metrics</Text>
+          </View>
+
+          <View style={styles.alreadyOptimizedBox}>
+            <View style={styles.alreadyOptimizedHeader}>
+              <MaterialCommunityIcons name="check-circle-outline" size={24} color="#16A34A" />
+              <View style={styles.alreadyOptimizedCheckWrap}>
+                <MaterialCommunityIcons name="checkbox-marked" size={20} color="#16A34A" />
+                <Text style={styles.alreadyOptimizedTitle}>Already Optimized</Text>
+              </View>
+            </View>
+            <Text style={styles.alreadyOptimizedDesc}>Great news! Your app already has these performance features:</Text>
+            <View style={styles.alreadyOptimizedList}>
+              {dashboardData.alreadyOptimized.map((item, idx) => (
+                <Text key={idx} style={styles.alreadyItemText}>
+                  <Text style={styles.alreadyItemTitle}>• {item.title}</Text> - {item.description}
+                </Text>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.recommendedGuideBox}>
+            <View style={styles.recommendedHeaderRow}>
+              <MaterialCommunityIcons name="rocket-launch-outline" size={22} color="#2563EB" />
+              <Text style={styles.recommendedGuideTitle}>Recommended{"\n"}Improvements</Text>
+            </View>
+            <Text style={styles.recommendedGuideDesc}>Implement these to make your app even faster:</Text>
+            
+            <View style={styles.improvementsList}>
+              {dashboardData.recommendedImprovements.map((item) => (
+                <View key={item.id} style={styles.improvementCard}>
+                  <View style={styles.improvementCardHeader}>
+                    <View style={[styles.impactBadge, { backgroundColor: item.impactColor }]}>
+                      <Text style={styles.impactBadgeText}>{item.impactLabel.replace(" ", "\n")}</Text>
+                    </View>
+                    <Text style={styles.improvementTitle}>{item.title}</Text>
+                    <Text style={styles.speedIncreaseText}>{item.speedIncrease}</Text>
+                  </View>
+                  <Text style={styles.improvementDesc}>{item.description}</Text>
+                  
+                  {item.type === "code" && item.codeSnippet && (
+                    <View style={styles.codeSnippetBox}>
+                      <Text style={styles.codeComment}>{item.codeSnippet.beforeDesc}</Text>
+                      <Text style={styles.codeLine}>{item.codeSnippet.beforeCode}</Text>
+                      <Text style={styles.codeComment}>{item.codeSnippet.afterDesc}</Text>
+                      <Text style={styles.codeLine}>{item.codeSnippet.afterCode}</Text>
+                    </View>
+                  )}
+
+                  {item.type === "comparison" && item.comparisonBox && (
+                    <View style={styles.comparisonFlexBox}>
+                       <View style={styles.comparisonCurrent}>
+                         <View style={styles.comparisonHeader}>
+                           <MaterialCommunityIcons name="close" size={16} color="#DC2626" />
+                           <Text style={styles.comparisonTitleRed}>{item.comparisonBox.currentLabel}</Text>
+                         </View>
+                         <Text style={styles.comparisonDescRed}>{item.comparisonBox.currentDesc}</Text>
+                       </View>
+                       <View style={styles.comparisonRecommended}>
+                         <View style={styles.comparisonHeader}>
+                           <MaterialCommunityIcons name="checkbox-marked" size={16} color="#16A34A" />
+                           <Text style={styles.comparisonTitleGreen}>{item.comparisonBox.recommendedLabel}</Text>
+                         </View>
+                         <Text style={styles.comparisonDescGreen}>{item.comparisonBox.recommendedDesc}</Text>
+                       </View>
+                    </View>
+                  )}
+
+                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: item.actionButtonColor || "#2563EB" }]}>
+                    <MaterialCommunityIcons name="lightning-bolt" size={18} color="#FFFFFF" />
+                    <Text style={styles.actionBtnText}>{item.actionButtonText}</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* Golden Rules for Fast & Reliable Apps */}
+        <View style={styles.singlePaneCard}>
+          <View style={styles.sectionHeaderRow}>
+             <MaterialCommunityIcons name="shield-outline" size={iconSize.lg} color="#0F172A" />
+             <Text style={styles.cardTitle}>Golden Rules for Fast &{"\n"}Reliable Apps</Text>
+          </View>
+          <View style={styles.goldenRulesList}>
+            {dashboardData.goldenRules.map((rule, idx) => (
+              <View 
+                key={idx} 
+                style={[
+                  styles.goldenRuleCard, 
+                  rule.type === "do" ? styles.goldenRuleDo : styles.goldenRuleDont
+                ]}
+              >
+                <View style={styles.goldenRuleIconWrap}>
+                  <MaterialCommunityIcons 
+                    name={rule.type === "do" ? "checkbox-marked" : "close-circle"} 
+                    size={28} 
+                    color={rule.type === "do" ? "#16A34A" : "#DC2626"} 
+                  />
+                </View>
+                <View style={styles.goldenRuleTextWrap}>
+                  <Text 
+                    style={[
+                      styles.goldenRuleTitle, 
+                      rule.type === "do" ? { color: "#0F172A" } : { color: "#991B1B" }
+                    ]}
+                  >
+                    {rule.title}
+                  </Text>
+                  <Text 
+                    style={[
+                      styles.goldenRuleDesc, 
+                      rule.type === "do" ? { color: "#64748B" } : { color: "#DC2626" }
+                    ]}
+                  >
+                    {rule.description}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* How to Monitor Performance */}
+        <View style={[styles.singlePaneCard, styles.monitorCard]}>
+          <View style={styles.sectionHeaderRow}>
+             <MaterialCommunityIcons name="pulse" size={iconSize.lg} color="#6B21A8" />
+             <Text style={[styles.cardTitle, { color: "#6B21A8" }]}>How to Monitor{"\n"}Performance</Text>
+          </View>
+          <View style={styles.monitorList}>
+            {dashboardData.monitoringSteps.map((step) => (
+              <View key={step.id} style={styles.monitorRow}>
+                <Text style={styles.monitorStepId}>{step.id}.</Text>
+                <Text style={styles.monitorStepText}>
+                  <Text style={styles.monitorStepTitle}>{step.title}: </Text>
+                  {step.description}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Performance Quick Reference */}
+        <View style={[styles.singlePaneCard, styles.quickReferenceCard]}>
+          <View style={styles.sectionHeaderRow}>
+             <MaterialCommunityIcons name="lightning-bolt" size={iconSize.lg} color="#FBBF24" />
+             <Text style={[styles.cardTitle, { color: "#FFFFFF" }]}>Performance Quick{"\n"}Reference</Text>
+          </View>
+          
+          <Text style={styles.quickRefSectionTitle}>Page Load Times:</Text>
+          {dashboardData.quickReference.pageLoadTimes.map((item, idx) => (
+            <Text key={`plt-${idx}`} style={styles.quickRefText}>{item}</Text>
+          ))}
+
+          <Text style={styles.quickRefSectionTitle}>Image Sizes:</Text>
+          {dashboardData.quickReference.imageSizes.map((item, idx) => (
+            <Text key={`is-${idx}`} style={styles.quickRefText}>{item}</Text>
+          ))}
+
+          <Text style={styles.quickRefSectionTitle}>API Best Practices:</Text>
+          {dashboardData.quickReference.apiBestPractices.map((item, idx) => (
+            <Text key={`abp-${idx}`} style={styles.quickRefText}>{item}</Text>
+          ))}
+
+          <Text style={styles.quickRefSectionTitle}>Data Loading:</Text>
+          {dashboardData.quickReference.dataLoading.map((item, idx) => (
+            <Text key={`dl-${idx}`} style={styles.quickRefText}>{item}</Text>
+          ))}
+        </View>
+
+        {/* Common Issues & Solutions */}
+        <View style={styles.singlePaneCard}>
+          <View style={styles.sectionHeaderRow}>
+             <MaterialCommunityIcons name="shield-outline" size={iconSize.lg} color="#2563EB" />
+             <Text style={styles.cardTitle}>Common Issues & Solutions</Text>
+          </View>
+          <View style={styles.issuesList}>
+            {dashboardData.commonIssues.map((issue) => (
+              <View key={issue.id} style={styles.issueCard}>
+                <View style={styles.issueHeaderRow}>
+                  <View style={[styles.issueIconWrap, { backgroundColor: issue.iconBg }]}>
+                    <MaterialCommunityIcons name={issue.icon as any} size={20} color={issue.iconColor} />
+                  </View>
+                  <Text style={styles.issueTitle}>{issue.title}</Text>
+                </View>
+                <Text style={styles.issueDesc}>{issue.description}</Text>
+                <View style={styles.solutionBox}>
+                  <View style={styles.solutionHeader}>
+                    <MaterialCommunityIcons name="checkbox-marked" size={16} color="#16A34A" />
+                    <Text style={styles.solutionTitle}>Solution:</Text>
+                  </View>
+                  {issue.solutions.map((sol, idx) => (
+                    <Text key={idx} style={styles.solutionText}>• {sol}</Text>
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Performance Best Practices */}
+        <View style={[styles.singlePaneCard, styles.bestPracticesCard]}>
+          <View style={styles.sectionHeaderRow}>
+             <MaterialCommunityIcons name="lightning-bolt-outline" size={iconSize.lg} color="#4F46E5" />
+             <Text style={styles.cardTitle}>Performance Best Practices</Text>
+          </View>
+          <View style={[styles.bestPracticesList, { backgroundColor: "#FFFFFF" }]}>
+            <View style={styles.bestPracticeHeaderRow}>
+              <MaterialCommunityIcons name="check-circle-outline" size={20} color="#16A34A" />
+              <Text style={styles.bestPracticeHeader}>DO</Text>
+            </View>
+            {dashboardData.bestPractices.do.map((practice, idx) => (
+              <View key={`do-${idx}`} style={styles.bestPracticeRow}>
+                <View style={styles.bestPracticeIconWrap}>
+                   <MaterialCommunityIcons name="checkbox-marked" size={20} color="#16A34A" />
+                </View>
+                <Text style={styles.bestPracticeText}>{practice}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={[styles.bestPracticesList, { backgroundColor: "#FFFFFF" }]}>
+            <View style={styles.bestPracticeHeaderRow}>
+              <MaterialCommunityIcons name="close" size={20} color="#DC2626" />
+              <Text style={styles.bestPracticeHeaderDont}>DON'T</Text>
+            </View>
+            {dashboardData.bestPractices.dont.map((practice, idx) => (
+              <View key={`dont-${idx}`} style={styles.bestPracticeRow}>
+                <View style={styles.bestPracticeIconWrap}>
+                   <MaterialCommunityIcons name="close" size={20} color="#DC2626" />
+                </View>
+                <Text style={styles.bestPracticeText}>{practice}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </>
     );
   };
 
@@ -1028,6 +1448,49 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: "600",
   },
+  quickActionsList: {
+    marginTop: 14,
+    gap: 10,
+  },
+  quickActionBtn: {
+    height: 48,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    alignItems: "center",
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    gap: 12,
+    backgroundColor: "#FFFFFF",
+  },
+  quickActionText: {
+    color: "#111827",
+    fontSize: typography.body,
+    fontWeight: "600",
+  },
+  statsList: {
+    marginTop: 18,
+    gap: 12,
+  },
+  statRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+  },
+  statLabel: {
+    fontSize: typography.body,
+    color: "#475569",
+    fontWeight: "500",
+  },
+  statValue: {
+    fontSize: typography.bodyStrong,
+    color: "#0F172A",
+    fontWeight: "700",
+  },
   tabBigValue: {
     fontSize: typography.valueL,
     fontWeight: "800",
@@ -1073,5 +1536,621 @@ const styles = StyleSheet.create({
   placeholderText: {
     color: "#64748B",
     fontSize: typography.cardTitle,
+  },
+  healthCard: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 18,
+    gap: 8,
+  },
+  healthCardCritical: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+  },
+  healthStatusHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  criticalDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#EF4444",
+  },
+  healthSubCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    width: "100%",
+    alignItems: "center",
+  },
+  healthSubTitle: {
+    fontSize: typography.body,
+    color: "#475569",
+    fontWeight: "500",
+  },
+  healthSubValue: {
+    fontSize: typography.valueL,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginTop: 4,
+  },
+  healthSubText: {
+    fontSize: typography.caption,
+    color: "#64748B",
+    marginTop: 4,
+  },
+  pageLoadList: {
+    marginTop: 12,
+    gap: 8,
+  },
+  pageLoadRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  pageLoadLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  pageLoadName: {
+    fontSize: typography.body,
+    color: "#0F172A",
+    fontWeight: "500",
+  },
+  pageLoadRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  pageLoadTimeVal: {
+    fontSize: typography.bodyStrong,
+    color: "#0F172A",
+    fontWeight: "700",
+  },
+  pageLoadNotMeasured: {
+    fontSize: typography.bodyStrong,
+    color: "#0F172A",
+    fontWeight: "700",
+  },
+  fastPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#DCFCE7",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+  },
+  fastPillText: {
+    fontSize: typography.caption,
+    color: "#16A34A",
+    fontWeight: "600",
+  },
+  infoBox: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: "#EFF6FF",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+  infoBoxText: {
+    fontSize: typography.caption,
+    color: "#1E3A8A",
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  slowPageCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 14,
+  },
+  slowPageName: {
+    fontSize: typography.bodyStrong,
+    color: "#9A3412",
+    fontWeight: "600",
+  },
+  slowPageTimePill: {
+    backgroundColor: "#FFEDD5",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  slowPageTimeText: {
+    fontSize: typography.caption,
+    color: "#C2410C",
+    fontWeight: "700",
+  },
+  recommendationsBox: {
+    marginTop: 14,
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 12,
+    padding: 16,
+  },
+  recommendationsHeader: {
+    flexDirection: "row",
+    gap: 6,
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+  recommendationsTitle: {
+    fontSize: typography.bodyStrong,
+    color: "#1E3A8A",
+    fontWeight: "700",
+  },
+  recommendationItem: {
+    fontSize: typography.body,
+    color: "#1E40AF",
+    lineHeight: 22,
+    marginTop: 4,
+    paddingLeft: 4,
+  },
+  apiErrorsEmpty: {
+    alignItems: "center",
+    paddingVertical: 24,
+  },
+  apiErrorsTextMain: {
+    fontSize: typography.cardTitle,
+    fontWeight: "700",
+    color: "#0F172A",
+    marginTop: 12,
+  },
+  apiErrorsTextSub: {
+    fontSize: typography.body,
+    color: "#64748B",
+    marginTop: 4,
+  },
+  performanceScoreBox: {
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 12,
+    padding: 20,
+    marginTop: 14,
+  },
+  scoreRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  scoreTitle: {
+    fontSize: typography.cardTitle,
+    fontWeight: "800",
+    color: "#0F172A",
+    lineHeight: 24,
+  },
+  scoreValueBig: {
+    flexDirection: "row",
+    alignItems: "baseline",
+  },
+  scoreValueCurrent: {
+    fontSize: typography.valueXL,
+    fontWeight: "800",
+    color: "#DC2626",
+  },
+  scoreValueTotal: {
+    fontSize: typography.body,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 4,
+    marginTop: 16,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: "#EF4444",
+  },
+  scoreSubtitle: {
+    fontSize: typography.caption,
+    color: "#475569",
+    marginTop: 12,
+    lineHeight: 16,
+  },
+  alreadyOptimizedBox: {
+    backgroundColor: "#F0FDF4",
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+  },
+  alreadyOptimizedHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  alreadyOptimizedCheckWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#DCFCE7",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 6,
+  },
+  alreadyOptimizedTitle: {
+    fontSize: typography.bodyStrong,
+    fontWeight: "700",
+    color: "#166534",
+  },
+  alreadyOptimizedDesc: {
+    fontSize: typography.body,
+    color: "#166534",
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  alreadyOptimizedList: {
+    gap: 8,
+    paddingLeft: 4,
+  },
+  alreadyItemText: {
+    fontSize: typography.body,
+    color: "#166534",
+    lineHeight: 20,
+  },
+  alreadyItemTitle: {
+    fontWeight: "700",
+  },
+  recommendedGuideBox: {
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+  },
+  recommendedHeaderRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+  },
+  recommendedGuideTitle: {
+    fontSize: typography.cardTitle,
+    fontWeight: "800",
+    color: "#1E3A8A",
+  },
+  recommendedGuideDesc: {
+    fontSize: typography.body,
+    color: "#1E40AF",
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  improvementsList: {
+    gap: 12,
+  },
+  improvementCard: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 12,
+    padding: 16,
+  },
+  improvementCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  impactBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    width: 60,
+  },
+  impactBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+    textAlign: "center",
+    lineHeight: 14,
+  },
+  improvementTitle: {
+    flex: 1,
+    fontSize: typography.bodyStrong,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  speedIncreaseText: {
+    fontSize: typography.caption,
+    color: "#2563EB",
+    fontWeight: "500",
+  },
+  improvementDesc: {
+    fontSize: typography.body,
+    color: "#475569",
+    marginTop: 12,
+    lineHeight: 20,
+  },
+  codeSnippetBox: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+  },
+  codeComment: {
+    fontSize: 12,
+    color: "#16A34A",
+    fontFamily: "monospace",
+    marginTop: 4,
+  },
+  codeLine: {
+    fontSize: 12,
+    color: "#334155",
+    fontFamily: "monospace",
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  comparisonFlexBox: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  comparisonCurrent: {
+    flex: 1,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: 8,
+    padding: 10,
+  },
+  comparisonRecommended: {
+    flex: 1,
+    backgroundColor: "#F0FDF4",
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+    borderRadius: 8,
+    padding: 10,
+  },
+  comparisonHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  comparisonTitleRed: {
+    fontSize: typography.caption,
+    fontWeight: "700",
+    color: "#DC2626",
+  },
+  comparisonDescRed: {
+    fontSize: typography.caption,
+    color: "#991B1B",
+  },
+  comparisonTitleGreen: {
+    fontSize: typography.caption,
+    fontWeight: "700",
+    color: "#16A34A",
+  },
+  comparisonDescGreen: {
+    fontSize: typography.caption,
+    color: "#166534",
+  },
+  actionBtn: {
+    marginTop: 16,
+    height: 44,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  actionBtnText: {
+    color: "#FFFFFF",
+    fontSize: typography.bodyStrong,
+    fontWeight: "600",
+  },
+  goldenRulesList: {
+    marginTop: 14,
+    gap: 12,
+  },
+  goldenRuleCard: {
+    flexDirection: "row",
+    gap: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderRadius: 12,
+    alignItems: "flex-start",
+  },
+  goldenRuleDo: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+  },
+  goldenRuleDont: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+  },
+  goldenRuleIconWrap: {
+    marginTop: 2,
+  },
+  goldenRuleTextWrap: {
+    flex: 1,
+  },
+  goldenRuleTitle: {
+    fontSize: typography.bodyStrong,
+    fontWeight: "700",
+  },
+  goldenRuleDesc: {
+    fontSize: typography.caption,
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  monitorCard: {
+    backgroundColor: "#FAF5FF",
+    borderColor: "#E9D5FF",
+  },
+  monitorList: {
+    marginTop: 14,
+    gap: 12,
+  },
+  monitorRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingRight: 10,
+  },
+  monitorStepId: {
+    fontSize: typography.bodyStrong,
+    color: "#6B21A8",
+    fontWeight: "700",
+    width: 20,
+  },
+  monitorStepText: {
+    flex: 1,
+    fontSize: typography.body,
+    color: "#6B21A8",
+    lineHeight: 22,
+  },
+  monitorStepTitle: {
+    fontWeight: "700",
+  },
+  quickReferenceCard: {
+    backgroundColor: "#0F172A",
+    borderColor: "#1E293B",
+  },
+  quickRefSectionTitle: {
+    fontSize: typography.bodyStrong,
+    color: "#60A5FA",
+    fontWeight: "700",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  quickRefText: {
+    fontSize: typography.body,
+    color: "#CBD5E1",
+    lineHeight: 24,
+  },
+  issuesList: {
+    marginTop: 14,
+    gap: 16,
+  },
+  issueCard: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    padding: 16,
+    backgroundColor: "#FFFFFF",
+  },
+  issueHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 8,
+  },
+  issueIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  issueTitle: {
+    flex: 1,
+    fontSize: typography.bodyStrong,
+    fontWeight: "700",
+    color: "#0F172A",
+    marginTop: 4,
+  },
+  issueDesc: {
+    fontSize: typography.body,
+    color: "#64748B",
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  solutionBox: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    padding: 12,
+  },
+  solutionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+  },
+  solutionTitle: {
+    fontSize: typography.bodyStrong,
+    fontWeight: "700",
+    color: "#1E40AF",
+  },
+  solutionText: {
+    fontSize: typography.body,
+    color: "#1E40AF",
+    lineHeight: 22,
+    paddingLeft: 4,
+  },
+  bestPracticesCard: {
+    backgroundColor: "#EEF2FF",
+    borderColor: "#C7D2FE",
+  },
+  bestPracticesList: {
+    marginTop: 14,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    padding: 16,
+  },
+  bestPracticeHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  bestPracticeHeader: {
+    fontSize: typography.bodyStrong,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  bestPracticeHeaderDont: {
+    fontSize: typography.bodyStrong,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  bestPracticeRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 10,
+  },
+  bestPracticeIconWrap: {
+    marginTop: 2,
+  },
+  bestPracticeText: {
+    flex: 1,
+    fontSize: typography.body,
+    color: "#334155",
+    lineHeight: 22,
   },
 });

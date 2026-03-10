@@ -210,6 +210,7 @@ export const SidebarMenu = () => {
             const isConversations = currentRouteName === "MyConversations";
             const isDisputes = currentRouteName === "Disputes";
             const isSavedSearches = currentRouteName === "SavedSearches";
+            const isBulkEditItems = currentRouteName === "BulkEditItems";
             const isBrowseAll =
               !isFavorites &&
               !isProfile &&
@@ -218,6 +219,7 @@ export const SidebarMenu = () => {
               !isConversations &&
               !isDisputes &&
               !isSavedSearches &&
+              !isBulkEditItems &&
               !isAdminDashboard;
 
             return (
@@ -256,7 +258,13 @@ export const SidebarMenu = () => {
                     () => navigation.navigate("Main", { screen: "ListItemTab" }),
                     isListItem,
                   )}
-                {!isAdmin && renderNavItem("square-edit-outline", "Bulk Edit Items")}
+                {!isAdmin &&
+                  renderNavItem(
+                    "square-edit-outline",
+                    "Bulk Edit Items",
+                    () => navigation.navigate("BulkEditItems"),
+                    isBulkEditItems
+                  )}
                 {!isAdmin &&
                   renderNavItem(
                     "account-outline",
