@@ -1,6 +1,8 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -485,6 +487,7 @@ const DailyRevenueBreakdownChart = ({ data }: { data: DailyRevenuePoint[] }) => 
 };
 
 export const AdminDashboardScreen = () => {
+  const navigation = useNavigation<any>();
   const [activeTab, setActiveTab] = useState<AdminTabKey>("overview");
   const [dashboardData, setDashboardData] = useState<AdminDashboardData | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -656,19 +659,19 @@ export const AdminDashboardScreen = () => {
               <Text style={styles.cardTitle}>Quick Actions</Text>
             </View>
             <View style={styles.quickActionsList}>
-              <TouchableOpacity style={styles.quickActionBtn}>
+              <TouchableOpacity style={styles.quickActionBtn} onPress={() => Alert.alert('Disputes', 'Dispute review will be available when the API is connected.')}>
                 <MaterialCommunityIcons name="alert-outline" size={iconSize.md} color="#DC2626" />
                 <Text style={styles.quickActionText}>Review Disputes ({dashboardData.openDisputesCount})</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionBtn}>
+              <TouchableOpacity style={styles.quickActionBtn} onPress={() => Alert.alert('User Reports', 'User report review will be available when the API is connected.')}>
                 <MaterialCommunityIcons name="account-group-outline" size={iconSize.md} color="#D97706" />
                 <Text style={styles.quickActionText}>Review User Reports ({dashboardData.userReportsCount})</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionBtn}>
+              <TouchableOpacity style={styles.quickActionBtn} onPress={() => Alert.alert('Fraud Reports', 'Fraud report review will be available when the API is connected.')}>
                 <MaterialCommunityIcons name="shield-outline" size={iconSize.md} color="#A855F7" />
                 <Text style={styles.quickActionText}>Review Fraud Reports ({dashboardData.fraudReportsCount})</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionBtn}>
+              <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('AdminModeration')}>
                 <MaterialCommunityIcons name="clock-outline" size={iconSize.md} color="#2563EB" />
                 <Text style={styles.quickActionText}>Review Pending Requests ({dashboardData.pendingRequestsCount})</Text>
               </TouchableOpacity>

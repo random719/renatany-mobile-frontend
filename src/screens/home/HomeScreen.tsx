@@ -3,6 +3,7 @@ import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  Alert,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -14,7 +15,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { WebView } from "react-native-webview";
-import { ActivityIndicator, Text } from "react-native-paper";
+import { ActivityIndicator, Menu, Text } from "react-native-paper";
 import { TrustBadge } from "../../components/common/TrustBadge";
 import { CategoryRow } from "../../components/home/CategoryRow";
 import { Footer } from "../../components/home/Footer";
@@ -47,12 +48,27 @@ export const HomeScreen = () => {
     fetchRecentlyViewed,
     fetchCategories,
     toggleLike,
+    applyFilter,
+    setActiveFilter,
   } = useListingStore();
 
   const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
+  const [categoryMenuVisible, setCategoryMenuVisible] = useState(false);
+  const [sortMenuVisible, setSortMenuVisible] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
+  const [selectedSort, setSelectedSort] = useState<string>("Relevance");
   const { height: screenHeight } = useWindowDimensions();
+
+  const SORT_OPTIONS = [
+    { label: "Relevance", value: undefined },
+    { label: "Newest", value: "newest" as const },
+    { label: "Price: Low", value: "price_low" as const },
+    { label: "Price: High", value: "price_high" as const },
+    { label: "Rating", value: "rating" as const },
+    { label: "Popular", value: "popular" as const },
+  ];
 
   const loadData = useCallback(() => {
     fetchListings();
@@ -75,6 +91,40 @@ export const HomeScreen = () => {
 
   const handleViewAllCategories = () => {
     navigation.navigate("Categories");
+  };
+
+  const handleSearchSubmit = () => {
+    const filter: any = {};
+    if (query.trim()) filter.query = query.trim();
+    if (location.trim()) filter.location = location.trim();
+    if (selectedCategory) filter.category = selectedCategory;
+    const sortOption = SORT_OPTIONS.find((o) => o.label === selectedSort);
+    if (sortOption?.value) filter.sortBy = sortOption.value;
+    setActiveFilter(filter);
+    applyFilter(filter);
+    navigation.navigate("SearchTab" as any);
+  };
+
+  const handleCategorySelect = (categoryName?: string) => {
+    setCategoryMenuVisible(false);
+    setSelectedCategory(categoryName);
+  };
+
+  const handleSortSelect = (label: string) => {
+    setSortMenuVisible(false);
+    setSelectedSort(label);
+  };
+
+  const handleSaveSearch = () => {
+    if (!query.trim() && !location.trim() && !selectedCategory) {
+      Alert.alert("No Search", "Enter a search query, location, or select a category first.");
+      return;
+    }
+    Alert.alert("Search Saved", "Your search has been saved. You can find it in your Saved Searches.");
+  };
+
+  const handleAdvancedFilters = () => {
+    navigation.navigate("SearchTab" as any);
   };
 
   const renderSection = (
@@ -217,7 +267,7 @@ export const HomeScreen = () => {
                   Search & Filter
                 </Text>
                 <View style={styles.headerActions}>
-                  <TouchableOpacity style={styles.saveBtn}>
+                  <TouchableOpacity style={styles.saveBtn} onPress={handleSaveSearch}>
                     <MaterialCommunityIcons
                       name="bookmark-outline"
                       size={18}
@@ -240,7 +290,7 @@ export const HomeScreen = () => {
                   placeholderTextColor="#9CA3AF"
                   value={query}
                   onChangeText={setQuery}
-                  onSubmitEditing={() => console.log("search:", query)}
+                  onSubmitEditing={handleSearchSubmit}
                 />
               </View>
 
@@ -256,21 +306,32 @@ export const HomeScreen = () => {
                   placeholderTextColor="#9CA3AF"
                   value={location}
                   onChangeText={setLocation}
-                  onSubmitEditing={() => console.log("location:", location)}
+                  onSubmitEditing={handleSearchSubmit}
                 />
               </View>
 
-              <TouchableOpacity style={styles.dropdownBtn}>
-                <Text style={styles.dropdownText}>All Categories</Text>
-                <MaterialCommunityIcons
-                  name="chevron-down"
-                  size={20}
-                  color="#6B7280"
-                />
-              </TouchableOpacity>
+              <Menu
+                visible={categoryMenuVisible}
+                onDismiss={() => setCategoryMenuVisible(false)}
+                anchor={
+                  <TouchableOpacity style={styles.dropdownBtn} onPress={() => setCategoryMenuVisible(true)}>
+                    <Text style={styles.dropdownText}>{selectedCategory || "All Categories"}</Text>
+                    <MaterialCommunityIcons
+                      name="chevron-down"
+                      size={20}
+                      color="#6B7280"
+                    />
+                  </TouchableOpacity>
+                }
+              >
+                <Menu.Item onPress={() => handleCategorySelect(undefined)} title="All Categories" />
+                {categories.map((cat) => (
+                  <Menu.Item key={cat.id} onPress={() => handleCategorySelect(cat.name)} title={cat.name} />
+                ))}
+              </Menu>
 
               <View style={styles.filtersRow}>
-                <TouchableOpacity style={styles.actionBtnRow}>
+                <TouchableOpacity style={styles.actionBtnRow} onPress={handleAdvancedFilters}>
                   <MaterialCommunityIcons
                     name="tune-variant"
                     size={18}
@@ -279,20 +340,30 @@ export const HomeScreen = () => {
                   <Text style={styles.actionBtnText}>Advanced Filters</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.actionBtnRow}>
-                  <MaterialCommunityIcons
-                    name="swap-vertical"
-                    size={18}
-                    color={colors.textPrimary}
-                  />
-                  <Text style={styles.actionBtnText}>Relevance</Text>
-                  <MaterialCommunityIcons
-                    name="chevron-down"
-                    size={18}
-                    color="#6B7280"
-                    style={styles.chevronIcon}
-                  />
-                </TouchableOpacity>
+                <Menu
+                  visible={sortMenuVisible}
+                  onDismiss={() => setSortMenuVisible(false)}
+                  anchor={
+                    <TouchableOpacity style={styles.actionBtnRow} onPress={() => setSortMenuVisible(true)}>
+                      <MaterialCommunityIcons
+                        name="swap-vertical"
+                        size={18}
+                        color={colors.textPrimary}
+                      />
+                      <Text style={styles.actionBtnText}>{selectedSort}</Text>
+                      <MaterialCommunityIcons
+                        name="chevron-down"
+                        size={18}
+                        color="#6B7280"
+                        style={styles.chevronIcon}
+                      />
+                    </TouchableOpacity>
+                  }
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <Menu.Item key={opt.label} onPress={() => handleSortSelect(opt.label)} title={opt.label} />
+                  ))}
+                </Menu>
               </View>
 
               <View

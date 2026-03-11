@@ -1,40 +1,151 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View, Image } from 'react-native';
-import { Button, Checkbox, Text, TextInput, Surface } from 'react-native-paper';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, Image } from 'react-native';
+import { ActivityIndicator, Button, Checkbox, Menu, Text, TextInput, Surface } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { colors } from '../../theme';
+import { BulkEditChanges, Listing } from '../../types/listing';
+import { useListingStore } from '../../store/listingStore';
+import { useAuthStore } from '../../store/authStore';
+
+const TRISTATE_OPTIONS = [
+    { value: null, label: 'No change' },
+    { value: true, label: 'Yes' },
+    { value: false, label: 'No' },
+];
+
+const INITIAL_BULK_CHANGES: BulkEditChanges = {
+    availability: null,
+    min_rental_days: '',
+    max_rental_days: '',
+    notice_period_hours: '',
+    instant_booking: null,
+    same_day_pickup: null,
+    daily_rate_multiplier: '',
+    deposit: '',
+};
 
 export const BulkEditItemsScreen = () => {
     const navigation = useNavigation();
-    
-    // Mock Data State
+    const { user } = useAuthStore();
+    const { userItems, isLoading, isSubmitting, fetchUserItems, updateItem, deleteItem } = useListingStore();
+
     const [selectedItems, setSelectedItems] = useState<string[]>([]);
-    
-    // Bulk Changes State
-    const [availabilityStatus, setAvailabilityStatus] = useState('No change');
-    const [instantBooking, setInstantBooking] = useState('No change');
-    const [sameDayPickup, setSameDayPickup] = useState('No change');
+    const [bulkChanges, setBulkChanges] = useState<BulkEditChanges>(INITIAL_BULK_CHANGES);
+    const [availabilityMenuVisible, setAvailabilityMenuVisible] = useState(false);
+    const [instantBookingMenuVisible, setInstantBookingMenuVisible] = useState(false);
+    const [sameDayPickupMenuVisible, setSameDayPickupMenuVisible] = useState(false);
 
-    const toggleSelection = (id: string) => {
-        if (selectedItems.includes(id)) {
-            setSelectedItems(selectedItems.filter(itemId => itemId !== id));
-        } else {
-            setSelectedItems([...selectedItems, id]);
+    useEffect(() => {
+        if (user?.id) {
+            fetchUserItems(user.id);
         }
-    };
+    }, [user?.id, fetchUserItems]);
 
-    const isAllSelected = selectedItems.length === 1; // Example: only 1 mock item
+    const toggleSelection = useCallback((id: string) => {
+        setSelectedItems(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    }, []);
 
-    const toggleSelectAll = () => {
-        if (isAllSelected) {
+    const toggleSelectAll = useCallback(() => {
+        if (selectedItems.length === userItems.length) {
             setSelectedItems([]);
         } else {
-            setSelectedItems(['1']);
+            setSelectedItems(userItems.map(item => item.id));
         }
-    };
+    }, [selectedItems.length, userItems]);
+
+    const handleBulkDelete = useCallback(async () => {
+        if (selectedItems.length === 0) {
+            Alert.alert('No Selection', 'Please select at least one item to delete.');
+            return;
+        }
+        Alert.alert(
+            'Confirm Delete',
+            `Delete ${selectedItems.length} item(s)? This cannot be undone.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            for (const itemId of selectedItems) {
+                                await deleteItem(itemId);
+                            }
+                            Alert.alert('Success', `Deleted ${selectedItems.length} item(s).`);
+                            setSelectedItems([]);
+                            if (user?.id) fetchUserItems(user.id);
+                        } catch (error) {
+                            console.error('Bulk delete error:', error);
+                            Alert.alert('Error', 'Failed to delete some items. Please try again.');
+                        }
+                    },
+                },
+            ]
+        );
+    }, [selectedItems, deleteItem, fetchUserItems, user?.id]);
+
+    const handleBulkUpdate = useCallback(async () => {
+        if (selectedItems.length === 0) {
+            Alert.alert('No Selection', 'Please select at least one item to update.');
+            return;
+        }
+        const changesCount = Object.values(bulkChanges).filter(v => v !== null && v !== '').length;
+        if (changesCount === 0) {
+            Alert.alert('No Changes', 'Please specify at least one change to apply.');
+            return;
+        }
+
+        Alert.alert(
+            'Confirm Update',
+            `Apply changes to ${selectedItems.length} item(s)?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Apply',
+                    onPress: async () => {
+                        try {
+                            const baseUpdates: Record<string, any> = {};
+                            if (bulkChanges.availability !== null) baseUpdates.availability = bulkChanges.availability;
+                            if (bulkChanges.min_rental_days !== '') baseUpdates.min_rental_days = parseInt(bulkChanges.min_rental_days);
+                            if (bulkChanges.max_rental_days !== '') baseUpdates.max_rental_days = parseInt(bulkChanges.max_rental_days);
+                            if (bulkChanges.notice_period_hours !== '') baseUpdates.notice_period_hours = parseInt(bulkChanges.notice_period_hours);
+                            if (bulkChanges.instant_booking !== null) baseUpdates.instant_booking = bulkChanges.instant_booking;
+                            if (bulkChanges.same_day_pickup !== null) baseUpdates.same_day_pickup = bulkChanges.same_day_pickup;
+                            if (bulkChanges.deposit !== '') baseUpdates.deposit = parseFloat(bulkChanges.deposit);
+
+                            for (const itemId of selectedItems) {
+                                const item = userItems.find(i => i.id === itemId);
+                                if (!item) continue;
+                                const itemUpdates = { ...baseUpdates };
+                                if (bulkChanges.daily_rate_multiplier !== '') {
+                                    const multiplier = parseFloat(bulkChanges.daily_rate_multiplier);
+                                    const currentRate = item.daily_rate ?? item.pricePerDay;
+                                    itemUpdates.daily_rate = currentRate * multiplier;
+                                }
+                                await updateItem(itemId, itemUpdates);
+                            }
+
+                            Alert.alert('Success', `Updated ${selectedItems.length} item(s).`);
+                            setSelectedItems([]);
+                            setBulkChanges(INITIAL_BULK_CHANGES);
+                            if (user?.id) fetchUserItems(user.id);
+                        } catch (error) {
+                            console.error('Bulk update error:', error);
+                            Alert.alert('Error', 'Failed to update some items. Please try again.');
+                        }
+                    },
+                },
+            ]
+        );
+    }, [selectedItems, bulkChanges, userItems, updateItem, fetchUserItems, user?.id]);
+
+    const getTriStateLabel = (value: boolean | null) =>
+        TRISTATE_OPTIONS.find(o => o.value === value)?.label || 'No change';
 
     return (
         <View style={styles.mainContainer}>
@@ -46,7 +157,7 @@ export const BulkEditItemsScreen = () => {
                         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
                             <MaterialCommunityIcons name="arrow-left" size={24} color="#0F172A" />
                         </TouchableOpacity>
-                        
+
                         <View style={styles.headerTitleContainer}>
                             <Text style={styles.pageTitle}>Bulk Edit{"\n"}Items</Text>
                             <Text style={styles.pageSubtitle}>
@@ -55,7 +166,7 @@ export const BulkEditItemsScreen = () => {
                         </View>
 
                         <View style={styles.selectedCountBadge}>
-                            <Text style={styles.selectedCountText}>{selectedItems.length} / 1 selected</Text>
+                            <Text style={styles.selectedCountText}>{selectedItems.length} / {userItems.length} selected</Text>
                         </View>
                     </View>
 
@@ -64,54 +175,70 @@ export const BulkEditItemsScreen = () => {
                         <View style={styles.cardHeader}>
                             <Text style={styles.cardTitle}>Your Items</Text>
                             <View style={styles.actionButtonsRow}>
-                                <Button 
-                                    mode="contained" 
+                                <Button
+                                    mode="contained"
                                     icon="trash-can-outline"
                                     style={styles.deleteBtn}
                                     labelStyle={styles.deleteBtnLabel}
-                                    onPress={() => {}}
+                                    onPress={handleBulkDelete}
+                                    disabled={selectedItems.length === 0 || isSubmitting}
                                 >
                                     Delete Selected ({selectedItems.length})
                                 </Button>
-                                <Button 
-                                    mode="outlined" 
+                                <Button
+                                    mode="outlined"
                                     style={styles.selectAllBtn}
                                     labelStyle={styles.selectAllBtnLabel}
                                     onPress={toggleSelectAll}
                                 >
-                                    Select All
+                                    {selectedItems.length === userItems.length ? 'Deselect All' : 'Select All'}
                                 </Button>
                             </View>
                         </View>
 
                         {/* List of Items */}
                         <View style={styles.itemListContainer}>
-                            <TouchableOpacity 
-                                style={[styles.itemRow, selectedItems.includes('1') && styles.itemRowSelected]}
-                                onPress={() => toggleSelection('1')}
-                                activeOpacity={0.8}
-                            >
-                                <Checkbox.Android
-                                    status={selectedItems.includes('1') ? 'checked' : 'unchecked'}
-                                    onPress={() => toggleSelection('1')}
-                                    color="#0F172A"
-                                    uncheckedColor="#CBD5E1"
-                                />
-                                <View style={styles.itemImagePlaceholder}>
-                                    <MaterialCommunityIcons name="camera-outline" size={24} color="#64748B" />
-                                </View>
-                                <View style={styles.itemDetails}>
-                                    <Text style={styles.itemName}>product</Text>
-                                    <View style={styles.itemTags}>
-                                        <View style={styles.priceTag}>
-                                            <Text style={styles.priceText}>$25/day</Text>
+                            {isLoading ? (
+                                <ActivityIndicator size="large" style={{ padding: 24 }} />
+                            ) : userItems.length === 0 ? (
+                                <Text style={{ padding: 24, color: '#64748B', textAlign: 'center' }}>No items found.</Text>
+                            ) : (
+                                userItems.map(item => (
+                                    <TouchableOpacity
+                                        key={item.id}
+                                        style={[styles.itemRow, selectedItems.includes(item.id) && styles.itemRowSelected, { marginBottom: 8 }]}
+                                        onPress={() => toggleSelection(item.id)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Checkbox.Android
+                                            status={selectedItems.includes(item.id) ? 'checked' : 'unchecked'}
+                                            onPress={() => toggleSelection(item.id)}
+                                            color="#0F172A"
+                                            uncheckedColor="#CBD5E1"
+                                        />
+                                        {item.images?.[0] ? (
+                                            <Image source={{ uri: item.images[0] }} style={styles.itemImagePlaceholder as any} />
+                                        ) : (
+                                            <View style={styles.itemImagePlaceholder}>
+                                                <MaterialCommunityIcons name="camera-outline" size={24} color="#64748B" />
+                                            </View>
+                                        )}
+                                        <View style={styles.itemDetails}>
+                                            <Text style={styles.itemName} numberOfLines={1}>{item.title}</Text>
+                                            <View style={styles.itemTags}>
+                                                <View style={styles.priceTag}>
+                                                    <Text style={styles.priceText}>${item.daily_rate ?? item.pricePerDay}/day</Text>
+                                                </View>
+                                                <View style={styles.statusTag}>
+                                                    <Text style={styles.statusText}>
+                                                        {item.isActive !== false ? 'Available' : 'Unavailable'}
+                                                    </Text>
+                                                </View>
+                                            </View>
                                         </View>
-                                        <View style={styles.statusTag}>
-                                            <Text style={styles.statusText}>Available</Text>
-                                        </View>
-                                    </View>
-                                </View>
-                            </TouchableOpacity>
+                                    </TouchableOpacity>
+                                ))
+                            )}
                         </View>
                     </Surface>
 
@@ -120,15 +247,28 @@ export const BulkEditItemsScreen = () => {
                         <View style={styles.bulkChangesHeader}>
                             <Text style={styles.cardTitle}>Bulk Changes</Text>
                         </View>
-                        
+
                         <View style={styles.bulkFormContainer}>
-                            
+
                             <View style={styles.inputGroup}>
                                 <Text style={styles.label}>Availability Status</Text>
-                                <View style={styles.dropdownContainer}>
-                                    <Text style={styles.dropdownTextValue}>{availabilityStatus}</Text>
-                                    <MaterialCommunityIcons name="chevron-down" size={20} color="#64748B" />
-                                </View>
+                                <Menu
+                                    visible={availabilityMenuVisible}
+                                    onDismiss={() => setAvailabilityMenuVisible(false)}
+                                    anchor={
+                                        <TouchableOpacity style={styles.dropdownContainer} onPress={() => setAvailabilityMenuVisible(true)}>
+                                            <Text style={styles.dropdownTextValue}>{getTriStateLabel(bulkChanges.availability)}</Text>
+                                            <MaterialCommunityIcons name="chevron-down" size={20} color="#64748B" />
+                                        </TouchableOpacity>
+                                    }
+                                >
+                                    {TRISTATE_OPTIONS.map((opt, idx) => (
+                                        <Menu.Item key={idx} title={opt.label} onPress={() => {
+                                            setBulkChanges(prev => ({ ...prev, availability: opt.value }));
+                                            setAvailabilityMenuVisible(false);
+                                        }} />
+                                    ))}
+                                </Menu>
                             </View>
 
                             <View style={styles.rowInputs}>
@@ -138,27 +278,33 @@ export const BulkEditItemsScreen = () => {
                                         <TextInput
                                             mode="outlined"
                                             placeholder="No change"
+                                            value={bulkChanges.min_rental_days}
+                                            onChangeText={(text) => setBulkChanges(prev => ({ ...prev, min_rental_days: text }))}
                                             outlineColor="#E2E8F0"
                                             activeOutlineColor="#CBD5E1"
                                             style={styles.numberInput}
                                             contentStyle={styles.inputTextPlaceholder}
+                                            keyboardType="numeric"
                                         />
                                         <View style={styles.stepperIcons}>
                                             <MaterialCommunityIcons name="unfold-more-horizontal" size={20} color="#94A3B8" style={{ transform: [{ rotate: '90deg' }] }} />
                                         </View>
                                     </View>
                                 </View>
-                                
+
                                 <View style={[styles.inputGroup, styles.flex1]}>
                                     <Text style={styles.label}>Max Days</Text>
                                     <View style={styles.numberInputContainer}>
                                         <TextInput
                                             mode="outlined"
                                             placeholder="No change"
+                                            value={bulkChanges.max_rental_days}
+                                            onChangeText={(text) => setBulkChanges(prev => ({ ...prev, max_rental_days: text }))}
                                             outlineColor="#E2E8F0"
                                             activeOutlineColor="#CBD5E1"
                                             style={styles.numberInput}
                                             contentStyle={styles.inputTextPlaceholder}
+                                            keyboardType="numeric"
                                         />
                                         <View style={styles.stepperIcons}>
                                             <MaterialCommunityIcons name="unfold-more-horizontal" size={20} color="#94A3B8" style={{ transform: [{ rotate: '90deg' }] }} />
@@ -173,10 +319,13 @@ export const BulkEditItemsScreen = () => {
                                     <TextInput
                                         mode="outlined"
                                         placeholder="No change"
+                                        value={bulkChanges.notice_period_hours}
+                                        onChangeText={(text) => setBulkChanges(prev => ({ ...prev, notice_period_hours: text }))}
                                         outlineColor="#E2E8F0"
                                         activeOutlineColor="#CBD5E1"
                                         style={styles.numberInput}
                                         contentStyle={styles.inputTextPlaceholder}
+                                        keyboardType="numeric"
                                     />
                                     <View style={styles.stepperIcons}>
                                         <MaterialCommunityIcons name="unfold-more-horizontal" size={20} color="#94A3B8" style={{ transform: [{ rotate: '90deg' }] }} />
@@ -190,10 +339,13 @@ export const BulkEditItemsScreen = () => {
                                     <TextInput
                                         mode="outlined"
                                         placeholder="e.g., 1.2 for 20% increase"
+                                        value={bulkChanges.daily_rate_multiplier}
+                                        onChangeText={(text) => setBulkChanges(prev => ({ ...prev, daily_rate_multiplier: text }))}
                                         outlineColor="#E2E8F0"
                                         activeOutlineColor="#CBD5E1"
                                         style={styles.numberInput}
                                         contentStyle={styles.inputTextPlaceholder}
+                                        keyboardType="numeric"
                                     />
                                     <View style={styles.stepperIcons}>
                                         <MaterialCommunityIcons name="unfold-more-horizontal" size={20} color="#94A3B8" style={{ transform: [{ rotate: '90deg' }] }} />
@@ -208,10 +360,13 @@ export const BulkEditItemsScreen = () => {
                                     <TextInput
                                         mode="outlined"
                                         placeholder="No change"
+                                        value={bulkChanges.deposit}
+                                        onChangeText={(text) => setBulkChanges(prev => ({ ...prev, deposit: text }))}
                                         outlineColor="#E2E8F0"
                                         activeOutlineColor="#CBD5E1"
                                         style={styles.numberInput}
                                         contentStyle={styles.inputTextPlaceholder}
+                                        keyboardType="numeric"
                                     />
                                     <View style={styles.stepperIcons}>
                                         <MaterialCommunityIcons name="unfold-more-horizontal" size={20} color="#94A3B8" style={{ transform: [{ rotate: '90deg' }] }} />
@@ -222,18 +377,44 @@ export const BulkEditItemsScreen = () => {
                             <View style={styles.preferencesContainer}>
                                 <View style={styles.preferenceRow}>
                                     <Text style={styles.preferenceLabel}>Instant Booking</Text>
-                                    <View style={styles.smallDropdownContainer}>
-                                        <Text style={styles.dropdownTextValueSmall}>{instantBooking}</Text>
-                                        <MaterialCommunityIcons name="chevron-down" size={18} color="#64748B" />
-                                    </View>
+                                    <Menu
+                                        visible={instantBookingMenuVisible}
+                                        onDismiss={() => setInstantBookingMenuVisible(false)}
+                                        anchor={
+                                            <TouchableOpacity style={styles.smallDropdownContainer} onPress={() => setInstantBookingMenuVisible(true)}>
+                                                <Text style={styles.dropdownTextValueSmall}>{getTriStateLabel(bulkChanges.instant_booking)}</Text>
+                                                <MaterialCommunityIcons name="chevron-down" size={18} color="#64748B" />
+                                            </TouchableOpacity>
+                                        }
+                                    >
+                                        {TRISTATE_OPTIONS.map((opt, idx) => (
+                                            <Menu.Item key={idx} title={opt.label} onPress={() => {
+                                                setBulkChanges(prev => ({ ...prev, instant_booking: opt.value }));
+                                                setInstantBookingMenuVisible(false);
+                                            }} />
+                                        ))}
+                                    </Menu>
                                 </View>
 
                                 <View style={styles.preferenceRow}>
                                     <Text style={styles.preferenceLabel}>Same-Day Pickup</Text>
-                                    <View style={styles.smallDropdownContainer}>
-                                        <Text style={styles.dropdownTextValueSmall}>{sameDayPickup}</Text>
-                                        <MaterialCommunityIcons name="chevron-down" size={18} color="#64748B" />
-                                    </View>
+                                    <Menu
+                                        visible={sameDayPickupMenuVisible}
+                                        onDismiss={() => setSameDayPickupMenuVisible(false)}
+                                        anchor={
+                                            <TouchableOpacity style={styles.smallDropdownContainer} onPress={() => setSameDayPickupMenuVisible(true)}>
+                                                <Text style={styles.dropdownTextValueSmall}>{getTriStateLabel(bulkChanges.same_day_pickup)}</Text>
+                                                <MaterialCommunityIcons name="chevron-down" size={18} color="#64748B" />
+                                            </TouchableOpacity>
+                                        }
+                                    >
+                                        {TRISTATE_OPTIONS.map((opt, idx) => (
+                                            <Menu.Item key={idx} title={opt.label} onPress={() => {
+                                                setBulkChanges(prev => ({ ...prev, same_day_pickup: opt.value }));
+                                                setSameDayPickupMenuVisible(false);
+                                            }} />
+                                        ))}
+                                    </Menu>
                                 </View>
                             </View>
 
@@ -242,7 +423,9 @@ export const BulkEditItemsScreen = () => {
                                 icon="content-save-outline"
                                 style={styles.applyBtn}
                                 labelStyle={styles.applyBtnLabel}
-                                onPress={() => console.log('Apply Bulk Changes')}
+                                onPress={handleBulkUpdate}
+                                disabled={selectedItems.length === 0 || isSubmitting}
+                                loading={isSubmitting}
                             >
                                 Apply to {selectedItems.length} Item(s)
                             </Button>

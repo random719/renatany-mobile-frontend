@@ -1,9 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import { ActivityIndicator, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { ListingCard } from '../../components/listing/ListingCard';
@@ -17,16 +17,31 @@ export const FavoritesScreen = () => {
     const navigation = useNavigation<Nav>();
     const { listings, toggleLike } = useListingStore();
 
+    const [page, setPage] = useState(1);
+    const ITEMS_PER_PAGE = 20;
+
     const favoriteListings = useMemo(() => {
         return listings.filter((l) => l.isLiked);
     }, [listings]);
+
+    const paginatedData = useMemo(() => {
+        return favoriteListings.slice(0, page * ITEMS_PER_PAGE);
+    }, [favoriteListings, page]);
+
+    const handleLoadMore = () => {
+        if (page * ITEMS_PER_PAGE < favoriteListings.length) {
+            setPage((prev) => prev + 1);
+        }
+    };
 
     return (
         <View style={styles.container}>
             <GlobalHeader />
             <FlatList
-                data={favoriteListings}
+                data={paginatedData}
                 keyExtractor={(item) => item.id}
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.5}
                 ListHeaderComponent={
                     <>
                         <View style={styles.headerSection}>
@@ -62,7 +77,14 @@ export const FavoritesScreen = () => {
                         />
                     </View>
                 )}
-                ListFooterComponent={<Footer />}
+                ListFooterComponent={
+                    <>
+                        {page * ITEMS_PER_PAGE < favoriteListings.length && (
+                            <ActivityIndicator style={{ paddingVertical: 20 }} color={colors.primary} />
+                        )}
+                        <Footer />
+                    </>
+                }
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
             />

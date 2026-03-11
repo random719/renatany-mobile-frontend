@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import React, { useEffect } from 'react';
 import { SidebarMenu } from '../components/common/SidebarMenu';
 import { AdminDashboardScreen } from '../screens/admin/AdminDashboardScreen';
+import { AdminModerationScreen } from '../screens/admin/AdminModerationScreen';
 import { DisputesScreen } from '../screens/disputes/DisputesScreen';
 import { BulkEditItemsScreen } from '../screens/listing/BulkEditItemsScreen';
 import { ConversationsScreen } from '../screens/messages/ConversationsScreen';
@@ -49,6 +50,7 @@ export const AppNavigator = () => {
             <Stack.Screen name="Disputes" component={DisputesScreen} />
             <Stack.Screen name="SavedSearches" component={SavedSearchesScreen} />
             <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+            <Stack.Screen name="AdminModeration" component={AdminModerationScreen} />
             <Stack.Screen name="BulkEditItems" component={BulkEditItemsScreen} />
           </>
         ) : (

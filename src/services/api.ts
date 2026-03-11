@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = 'https://api.rentany.fr';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://172.28.145.1:5000/api';
 
 export const api = axios.create({
   baseURL: BASE_URL,

@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import React, { useEffect } from 'react';
-import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Linking, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Avatar, Button, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
@@ -26,6 +26,45 @@ export const ListingDetailScreen = () => {
       addToRecentlyViewed(listing);
     }
   }, [listing, addToRecentlyViewed]);
+
+  const handleShare = async () => {
+    if (!listing) return;
+    try {
+      await Share.share({
+        message: `Check out "${listing.title}" on Rentany - $${listing.pricePerDay}/day`,
+        title: listing.title,
+      });
+    } catch (e) {
+      // user cancelled
+    }
+  };
+
+  const handleReport = () => {
+    Alert.alert(
+      'Report Listing',
+      'Are you sure you want to report this listing?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: () => Alert.alert('Reported', 'Thank you for your report. Our team will review this listing.'),
+        },
+      ]
+    );
+  };
+
+  const handleAskQuestion = () => {
+    Alert.alert('Ask a Question', 'Messaging functionality will be available when the API is connected.');
+  };
+
+  const handleConnectCard = () => {
+    Alert.alert('Connect Card', 'Stripe payment setup will be available when the API is connected.');
+  };
+
+  const handleConnectBank = () => {
+    Alert.alert('Connect Bank', 'Stripe Connect onboarding will be available when the API is connected.');
+  };
 
   if (isLoading || !listing) {
     return (
@@ -61,11 +100,11 @@ export const ListingDetailScreen = () => {
           </View>
 
           <View style={styles.actionIcons}>
-            <TouchableOpacity style={styles.headerIconButton}>
+            <TouchableOpacity style={styles.headerIconButton} onPress={handleShare}>
               <MaterialCommunityIcons name="share-variant-outline" size={20} color={colors.textPrimary} />
               <Text style={styles.headerIconText}>Share</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.reportButton}>
+            <TouchableOpacity style={styles.reportButton} onPress={handleReport}>
               <MaterialCommunityIcons name="alert-outline" size={20} color="#EF4444" />
             </TouchableOpacity>
           </View>
@@ -91,15 +130,17 @@ export const ListingDetailScreen = () => {
             </View>
             <View style={styles.tagsContainer}>
               <View style={[styles.tag, { backgroundColor: '#FDF2F8' }]}>
-                <Text style={[styles.tagText, { color: '#DB2777' }]}>fashion</Text>
+                <Text style={[styles.tagText, { color: '#DB2777' }]}>{listing.category}</Text>
               </View>
-              <View style={[styles.tag, { backgroundColor: '#EFF6FF' }]}>
-                <Text style={[styles.tagText, { color: '#2563EB' }]}>good</Text>
-              </View>
+              {listing.condition && (
+                <View style={[styles.tag, { backgroundColor: '#EFF6FF' }]}>
+                  <Text style={[styles.tagText, { color: '#2563EB' }]}>{listing.condition}</Text>
+                </View>
+              )}
             </View>
           </View>
 
-          <TouchableOpacity style={styles.askQuestionBtn}>
+          <TouchableOpacity style={styles.askQuestionBtn} onPress={handleAskQuestion}>
             <MaterialCommunityIcons name="chat-outline" size={20} color={colors.textPrimary} />
             <Text style={styles.askQuestionText}>Ask a Question</Text>
           </TouchableOpacity>
@@ -110,23 +151,59 @@ export const ListingDetailScreen = () => {
                 <MaterialCommunityIcons name="shield-outline" size={18} color={colors.textSecondary} />
                 <Text style={styles.infoLabel}>Security Deposit</Text>
               </View>
-              <Text style={styles.infoValue}>$60</Text>
+              <Text style={styles.infoValue}>${listing.deposit ?? 0}</Text>
             </View>
             <View style={styles.infoRow}>
               <View style={styles.infoLabelContainer}>
                 <MaterialCommunityIcons name="clock-outline" size={18} color={colors.textSecondary} />
                 <Text style={styles.infoLabel}>Min/Max Days</Text>
               </View>
-              <Text style={styles.infoValue}>1 - 30 days</Text>
+              <Text style={styles.infoValue}>{listing.min_rental_days ?? 1} - {listing.max_rental_days ?? 30} days</Text>
             </View>
+            {listing.rating > 0 && (
+              <View style={styles.infoRow}>
+                <View style={styles.infoLabelContainer}>
+                  <MaterialCommunityIcons name="star" size={18} color="#F59E0B" />
+                  <Text style={styles.infoLabel}>Rating</Text>
+                </View>
+                <Text style={styles.infoValue}>{listing.rating.toFixed(1)} ({listing.totalReviews} reviews)</Text>
+              </View>
+            )}
           </View>
+
+          {listing.pricing_tiers && listing.pricing_tiers.length > 0 && (
+            <View style={{ marginBottom: 16 }}>
+              <Text style={styles.deliveryTitle}>Pricing Tiers:</Text>
+              {listing.pricing_tiers.map((tier, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+                  <Text style={{ color: '#64748B' }}>{tier.days}+ days</Text>
+                  <Text style={{ fontWeight: '700', color: '#0F172A' }}>${tier.price}/day</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <View style={styles.deliverySection}>
             <Text style={styles.deliveryTitle}>Delivery Options:</Text>
-            <View style={styles.deliveryBadge}>
-              <MaterialCommunityIcons name="map-marker" size={14} color="#EF4444" />
-              <Text style={styles.deliveryText}>Pickup at location</Text>
-            </View>
+            {(listing.delivery_options && listing.delivery_options.length > 0) ? (
+              listing.delivery_options.map((opt, idx) => (
+                <View key={idx} style={[styles.deliveryBadge, { marginBottom: 6 }]}>
+                  <MaterialCommunityIcons
+                    name={opt === 'pickup' ? 'map-marker' : opt === 'delivery' ? 'truck-delivery' : 'map-marker'}
+                    size={14}
+                    color="#EF4444"
+                  />
+                  <Text style={styles.deliveryText}>
+                    {opt === 'pickup' ? 'Pickup at location' : opt === 'delivery' ? `Delivery ($${listing.delivery_fee ?? 0})` : opt}
+                  </Text>
+                </View>
+              ))
+            ) : (
+              <View style={styles.deliveryBadge}>
+                <MaterialCommunityIcons name="map-marker" size={14} color="#EF4444" />
+                <Text style={styles.deliveryText}>Pickup at location</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -185,6 +262,7 @@ export const ListingDetailScreen = () => {
             mode="contained"
             style={styles.connectCardBtn}
             icon="shield-outline"
+            onPress={handleConnectCard}
           >
             Connect Card (to Rent)
           </Button>
@@ -193,6 +271,7 @@ export const ListingDetailScreen = () => {
             mode="outlined"
             style={styles.connectBankBtn}
             icon="shield-outline"
+            onPress={handleConnectBank}
           >
             Connect Bank Account (to Lend)
           </Button>

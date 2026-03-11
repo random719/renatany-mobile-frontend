@@ -5,9 +5,26 @@ export interface Listing {
   description: string;
   category: string;
   images: string[];
+  videos?: string[];
   pricePerDay: number;
+  daily_rate?: number;
+  deposit?: number;
+  condition?: string;
+  pricing_tiers?: Array<{ days: number; price: number }>;
   location: { address: string; city: string; lat: number; lng: number };
-  availability: { startDate: string; endDate: string }[];
+  street_address?: string;
+  postcode?: string;
+  country?: string;
+  show_on_map?: boolean;
+  availability: { startDate: string; endDate: string }[] | boolean;
+  min_rental_days?: number;
+  max_rental_days?: number;
+  notice_period_hours?: number;
+  instant_booking?: boolean;
+  same_day_pickup?: boolean;
+  delivery_options?: string[];
+  delivery_fee?: number;
+  delivery_radius?: number | null;
   rating: number;
   totalReviews: number;
   features: string[];
@@ -17,6 +34,40 @@ export interface Listing {
   createdAt: string;
   isActive: boolean;
   status: 'active' | 'pending' | 'rejected' | 'draft';
+}
+
+export interface CreateListingFormData {
+  title: string;
+  description: string;
+  category: string;
+  daily_rate: string;
+  pricing_tiers: Array<{ days: number; price: number }>;
+  deposit: string;
+  condition: string;
+  location: string;
+  street_address: string;
+  postcode: string;
+  country: string;
+  show_on_map: boolean;
+  min_rental_days: string;
+  max_rental_days: string;
+  notice_period_hours: string;
+  instant_booking: boolean;
+  same_day_pickup: boolean;
+  delivery_options: string[];
+  delivery_fee: string;
+  delivery_radius: string;
+}
+
+export interface BulkEditChanges {
+  availability: boolean | null;
+  min_rental_days: string;
+  max_rental_days: string;
+  notice_period_hours: string;
+  instant_booking: boolean | null;
+  same_day_pickup: boolean | null;
+  daily_rate_multiplier: string;
+  deposit: string;
 }
 
 export interface Category {

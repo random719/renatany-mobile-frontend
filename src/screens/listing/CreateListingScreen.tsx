@@ -1,22 +1,268 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Button, Checkbox, Text, TextInput, Surface } from 'react-native-paper';
+import * as ImagePicker from 'expo-image-picker';
+import React, { useCallback, useState } from 'react';
+import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Button, Checkbox, Menu, Text, TextInput, Surface } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { colors } from '../../theme';
+import { CreateListingFormData } from '../../types/listing';
+import { useListingStore } from '../../store/listingStore';
+import { useAuthStore } from '../../store/authStore';
+import { uploadFile } from '../../services/listingService';
+import { geocodeLocation } from '../../utils/geocodeLocation';
+
+const CATEGORIES = [
+    { value: 'electronics', label: 'Electronics' },
+    { value: 'tools', label: 'Tools' },
+    { value: 'fashion', label: 'Fashion' },
+    { value: 'sports', label: 'Sports' },
+    { value: 'vehicles', label: 'Vehicles' },
+    { value: 'home', label: 'Home' },
+    { value: 'books', label: 'Books' },
+    { value: 'music', label: 'Music' },
+    { value: 'photography', label: 'Photography' },
+    { value: 'other', label: 'Other' },
+];
+
+const CONDITIONS = [
+    { value: 'excellent', label: 'Excellent' },
+    { value: 'good', label: 'Good' },
+    { value: 'fair', label: 'Fair' },
+    { value: 'poor', label: 'Poor' },
+];
+
+const INITIAL_FORM_DATA: CreateListingFormData = {
+    title: '',
+    description: '',
+    category: '',
+    daily_rate: '',
+    pricing_tiers: [],
+    deposit: '',
+    condition: 'good',
+    location: '',
+    street_address: '',
+    postcode: '',
+    country: '',
+    show_on_map: true,
+    min_rental_days: '1',
+    max_rental_days: '30',
+    notice_period_hours: '24',
+    instant_booking: false,
+    same_day_pickup: false,
+    delivery_options: ['pickup'],
+    delivery_fee: '',
+    delivery_radius: '',
+};
 
 export const CreateListingScreen = () => {
     const navigation = useNavigation();
+    const { createItem, isSubmitting } = useListingStore();
+    const { user } = useAuthStore();
+
     const [step, setStep] = useState(1);
-    const [showOnMap, setShowOnMap] = useState(true);
-    
-    // Step 3 State
-    const [instantBooking, setInstantBooking] = useState(false);
-    const [sameDayPickup, setSameDayPickup] = useState(false);
-    const [pickupLocation, setPickupLocation] = useState(true);
-    const [deliveryToRenter, setDeliveryToRenter] = useState(false);
+    const [formData, setFormData] = useState<CreateListingFormData>(INITIAL_FORM_DATA);
+    const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+    const [uploadedVideos, setUploadedVideos] = useState<string[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
+    const [isGeocodingLocation, setIsGeocodingLocation] = useState(false);
+    const [newTier, setNewTier] = useState({ days: '', price: '' });
+    const [categoryMenuVisible, setCategoryMenuVisible] = useState(false);
+    const [conditionMenuVisible, setConditionMenuVisible] = useState(false);
+
+    const handleInputChange = useCallback((field: keyof CreateListingFormData, value: string | boolean | string[]) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    }, []);
+
+    const handleDeliveryOptionToggle = useCallback((option: string) => {
+        setFormData(prev => {
+            const current = prev.delivery_options;
+            if (current.includes(option)) {
+                const next = current.filter(o => o !== option);
+                return { ...prev, delivery_options: next.length > 0 ? next : ['pickup'] };
+            }
+            return { ...prev, delivery_options: [...current, option] };
+        });
+    }, []);
+
+    const addPricingTier = useCallback(() => {
+        if (!newTier.days || !newTier.price) {
+            Alert.alert('Missing Info', 'Please enter both days and price for the tier.');
+            return;
+        }
+        const days = parseInt(newTier.days);
+        const price = parseFloat(newTier.price);
+        if (isNaN(days) || isNaN(price) || days <= 0 || price <= 0) {
+            Alert.alert('Invalid Values', 'Days and price must be positive numbers.');
+            return;
+        }
+        if (formData.pricing_tiers.some(t => t.days === days)) {
+            Alert.alert('Duplicate', 'A pricing tier for this duration already exists.');
+            return;
+        }
+        setFormData(prev => ({
+            ...prev,
+            pricing_tiers: [...prev.pricing_tiers, { days, price }].sort((a, b) => a.days - b.days),
+        }));
+        setNewTier({ days: '', price: '' });
+    }, [newTier, formData.pricing_tiers]);
+
+    const removePricingTier = useCallback((index: number) => {
+        setFormData(prev => ({
+            ...prev,
+            pricing_tiers: prev.pricing_tiers.filter((_, i) => i !== index),
+        }));
+    }, []);
+
+    const pickImages = useCallback(async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission needed', 'Please grant photo library access to upload images.');
+            return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsMultipleSelection: true,
+            quality: 0.8,
+            selectionLimit: 10 - uploadedImages.length,
+        });
+        if (result.canceled || !result.assets?.length) return;
+
+        setIsUploading(true);
+        try {
+            const urls: string[] = [];
+            for (const asset of result.assets) {
+                const url = await uploadFile(asset.uri, 'image');
+                urls.push(url);
+            }
+            setUploadedImages(prev => [...prev, ...urls].slice(0, 10));
+        } catch (error) {
+            console.error('Image upload failed:', error);
+            Alert.alert('Upload Failed', 'Failed to upload images. Please try again.');
+        } finally {
+            setIsUploading(false);
+        }
+    }, [uploadedImages.length]);
+
+    const pickVideos = useCallback(async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission needed', 'Please grant photo library access to upload videos.');
+            return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['videos'],
+            quality: 0.7,
+            videoMaxDuration: 30,
+        });
+        if (result.canceled || !result.assets?.length) return;
+
+        setIsUploading(true);
+        try {
+            const url = await uploadFile(result.assets[0].uri, 'video');
+            setUploadedVideos(prev => [...prev, url]);
+        } catch (error) {
+            console.error('Video upload failed:', error);
+            Alert.alert('Upload Failed', 'Failed to upload video. Please try again.');
+        } finally {
+            setIsUploading(false);
+        }
+    }, []);
+
+    const removeImage = useCallback((index: number) => {
+        setUploadedImages(prev => prev.filter((_, i) => i !== index));
+    }, []);
+
+    const removeVideo = useCallback((index: number) => {
+        setUploadedVideos(prev => prev.filter((_, i) => i !== index));
+    }, []);
+
+    const isStepValid = useCallback((s: number): boolean => {
+        switch (s) {
+            case 1:
+                return !!(formData.title && formData.description && formData.category && formData.location);
+            case 2:
+                return uploadedImages.length > 0;
+            case 3:
+                return !!formData.daily_rate;
+            default:
+                return false;
+        }
+    }, [formData, uploadedImages.length]);
+
+    const handleContinue = useCallback(() => {
+        if (!isStepValid(step)) {
+            const messages: Record<number, string> = {
+                1: 'Please fill in title, description, category, and location.',
+                2: 'Please upload at least one photo.',
+                3: 'Please set a daily rate.',
+            };
+            Alert.alert('Incomplete', messages[step] || 'Please complete all required fields.');
+            return;
+        }
+        setStep(prev => prev + 1);
+    }, [step, isStepValid]);
+
+    const handleSubmit = useCallback(async () => {
+        if (!isStepValid(3)) {
+            Alert.alert('Incomplete', 'Please set a daily rate.');
+            return;
+        }
+
+        try {
+            // Geocode location if show_on_map is enabled
+            let coordinates: { lat: number | null; lng: number | null } = { lat: null, lng: null };
+            if (formData.show_on_map && formData.location) {
+                setIsGeocodingLocation(true);
+                try {
+                    let fullAddress = formData.location;
+                    if (formData.street_address) fullAddress = formData.street_address + ', ' + fullAddress;
+                    if (formData.postcode) fullAddress += ', ' + formData.postcode;
+                    if (formData.country) fullAddress += ', ' + formData.country;
+
+                    const geoResult = await geocodeLocation({ location: fullAddress });
+                    if (geoResult.success && geoResult.data?.lat && geoResult.data?.lng) {
+                        coordinates = { lat: geoResult.data.lat, lng: geoResult.data.lng };
+                    }
+                } catch (geoError) {
+                    console.error('Geocoding failed:', geoError);
+                } finally {
+                    setIsGeocodingLocation(false);
+                }
+            }
+
+            const payload = {
+                ...formData,
+                daily_rate: parseFloat(formData.daily_rate),
+                pricing_tiers: formData.pricing_tiers.length > 0 ? formData.pricing_tiers : undefined,
+                deposit: parseFloat(formData.deposit) || 0,
+                min_rental_days: parseInt(formData.min_rental_days),
+                max_rental_days: parseInt(formData.max_rental_days),
+                notice_period_hours: parseInt(formData.notice_period_hours),
+                delivery_fee: parseFloat(formData.delivery_fee) || 0,
+                delivery_radius: parseFloat(formData.delivery_radius) || null,
+                lat: coordinates.lat,
+                lng: coordinates.lng,
+                images: uploadedImages,
+                videos: uploadedVideos,
+                availability: true,
+            };
+
+            await createItem(payload);
+            Alert.alert('Success', 'Your item has been listed!', [
+                { text: 'OK', onPress: () => navigation.goBack() },
+            ]);
+        } catch (error) {
+            console.error('Error creating item:', error);
+            Alert.alert('Error', 'Failed to create listing. Please try again.');
+        }
+    }, [formData, uploadedImages, uploadedVideos, createItem, navigation, isStepValid]);
+
+    const categoryLabel = CATEGORIES.find(c => c.value === formData.category)?.label || '';
+    const conditionLabel = CONDITIONS.find(c => c.value === formData.condition)?.label || 'Good';
+    const dailyRate = parseFloat(formData.daily_rate) || 0;
+    const depositAmount = parseFloat(formData.deposit) || 0;
 
     return (
         <View style={styles.mainContainer}>
@@ -55,23 +301,25 @@ export const CreateListingScreen = () => {
                     </View>
 
                     {/* Warning Banner */}
-                    <View style={styles.warningBanner}>
-                        <MaterialCommunityIcons name="alert-outline" size={20} color="#B45309" style={styles.warningIcon} />
-                        <View style={styles.warningTextContainer}>
-                            <Text style={styles.warningTitle}>Connect your bank account to receive payouts</Text>
-                            <Text style={styles.warningText}>
-                                You can list items, but you won't be able to receive payments until you connect your bank account.{' '}
-                                <Text style={styles.warningLink}>Connect now</Text>
-                            </Text>
+                    {user && !user.paymentSetup?.bankConnected && (
+                        <View style={styles.warningBanner}>
+                            <MaterialCommunityIcons name="alert-outline" size={20} color="#B45309" style={styles.warningIcon} />
+                            <View style={styles.warningTextContainer}>
+                                <Text style={styles.warningTitle}>Connect your bank account to receive payouts</Text>
+                                <Text style={styles.warningText}>
+                                    You can list items, but you won't be able to receive payments until you connect your bank account.{' '}
+                                    <Text style={styles.warningLink}>Connect now</Text>
+                                </Text>
+                            </View>
                         </View>
-                    </View>
+                    )}
 
                     {/* Form Card */}
                     <Surface style={styles.formCard} elevation={0}>
                         {step === 1 && (
                             <>
                                 <Text style={styles.sectionTitle}>Tell us about your item</Text>
-                                
+
                                 <View style={styles.formSection}>
                                     {/* Item Title */}
                                     <View style={styles.inputGroup}>
@@ -79,6 +327,8 @@ export const CreateListingScreen = () => {
                                         <TextInput
                                             mode="outlined"
                                             placeholder="e.g., Canon EOS R5 Camera"
+                                            value={formData.title}
+                                            onChangeText={(text) => handleInputChange('title', text)}
                                             outlineColor="#E2E8F0"
                                             activeOutlineColor="#CBD5E1"
                                             style={styles.input}
@@ -92,6 +342,8 @@ export const CreateListingScreen = () => {
                                         <TextInput
                                             mode="outlined"
                                             placeholder="Describe your item in detail..."
+                                            value={formData.description}
+                                            onChangeText={(text) => handleInputChange('description', text)}
                                             multiline
                                             numberOfLines={4}
                                             outlineColor="#E2E8F0"
@@ -104,19 +356,55 @@ export const CreateListingScreen = () => {
                                     {/* Category */}
                                     <View style={styles.inputGroup}>
                                         <Text style={styles.label}>Category</Text>
-                                        <View style={styles.dropdownContainer}>
-                                            <Text style={styles.dropdownText}>Choose a category</Text>
-                                            <MaterialCommunityIcons name="chevron-down" size={20} color="#64748B" />
-                                        </View>
+                                        <Menu
+                                            visible={categoryMenuVisible}
+                                            onDismiss={() => setCategoryMenuVisible(false)}
+                                            anchor={
+                                                <TouchableOpacity style={styles.dropdownContainer} onPress={() => setCategoryMenuVisible(true)}>
+                                                    <Text style={formData.category ? styles.dropdownTextValue : styles.dropdownText}>
+                                                        {categoryLabel || 'Choose a category'}
+                                                    </Text>
+                                                    <MaterialCommunityIcons name="chevron-down" size={20} color="#64748B" />
+                                                </TouchableOpacity>
+                                            }
+                                        >
+                                            {CATEGORIES.map(cat => (
+                                                <Menu.Item
+                                                    key={cat.value}
+                                                    onPress={() => {
+                                                        handleInputChange('category', cat.value);
+                                                        setCategoryMenuVisible(false);
+                                                    }}
+                                                    title={cat.label}
+                                                />
+                                            ))}
+                                        </Menu>
                                     </View>
 
                                     {/* Condition */}
                                     <View style={styles.inputGroup}>
                                         <Text style={styles.label}>Condition</Text>
-                                        <View style={styles.dropdownContainer}>
-                                            <Text style={styles.dropdownTextValue}>Good</Text>
-                                            <MaterialCommunityIcons name="chevron-down" size={20} color="#64748B" />
-                                        </View>
+                                        <Menu
+                                            visible={conditionMenuVisible}
+                                            onDismiss={() => setConditionMenuVisible(false)}
+                                            anchor={
+                                                <TouchableOpacity style={styles.dropdownContainer} onPress={() => setConditionMenuVisible(true)}>
+                                                    <Text style={styles.dropdownTextValue}>{conditionLabel}</Text>
+                                                    <MaterialCommunityIcons name="chevron-down" size={20} color="#64748B" />
+                                                </TouchableOpacity>
+                                            }
+                                        >
+                                            {CONDITIONS.map(cond => (
+                                                <Menu.Item
+                                                    key={cond.value}
+                                                    onPress={() => {
+                                                        handleInputChange('condition', cond.value);
+                                                        setConditionMenuVisible(false);
+                                                    }}
+                                                    title={cond.label}
+                                                />
+                                            ))}
+                                        </Menu>
                                     </View>
 
                                     {/* Location */}
@@ -128,6 +416,8 @@ export const CreateListingScreen = () => {
                                         <TextInput
                                             mode="outlined"
                                             placeholder="e.g., Downtown Brooklyn, New York"
+                                            value={formData.location}
+                                            onChangeText={(text) => handleInputChange('location', text)}
                                             outlineColor="#E2E8F0"
                                             activeOutlineColor="#CBD5E1"
                                             style={styles.input}
@@ -143,20 +433,24 @@ export const CreateListingScreen = () => {
                                         <Text style={styles.subtext}>
                                             This information is private and will only be shared with confirmed renters
                                         </Text>
-                                        
+
                                         <TextInput
                                             mode="outlined"
                                             placeholder="Street address (optional)"
+                                            value={formData.street_address}
+                                            onChangeText={(text) => handleInputChange('street_address', text)}
                                             outlineColor="#E2E8F0"
                                             activeOutlineColor="#CBD5E1"
                                             style={[styles.input, { marginBottom: 12 }]}
                                             contentStyle={styles.inputText}
                                         />
-                                        
+
                                         <View style={styles.rowInputs}>
                                             <TextInput
                                                 mode="outlined"
-                                                placeholder="Postal/ZIP code (opt"
+                                                placeholder="Postal/ZIP code"
+                                                value={formData.postcode}
+                                                onChangeText={(text) => handleInputChange('postcode', text)}
                                                 outlineColor="#E2E8F0"
                                                 activeOutlineColor="#CBD5E1"
                                                 style={[styles.input, styles.flex1, { marginRight: 12 }]}
@@ -165,6 +459,8 @@ export const CreateListingScreen = () => {
                                             <TextInput
                                                 mode="outlined"
                                                 placeholder="Country (optional)"
+                                                value={formData.country}
+                                                onChangeText={(text) => handleInputChange('country', text)}
                                                 outlineColor="#E2E8F0"
                                                 activeOutlineColor="#CBD5E1"
                                                 style={[styles.input, styles.flex1]}
@@ -175,8 +471,8 @@ export const CreateListingScreen = () => {
 
                                     <View style={styles.checkboxContainer}>
                                         <Checkbox.Android
-                                            status={showOnMap ? 'checked' : 'unchecked'}
-                                            onPress={() => setShowOnMap(!showOnMap)}
+                                            status={formData.show_on_map ? 'checked' : 'unchecked'}
+                                            onPress={() => handleInputChange('show_on_map', !formData.show_on_map)}
                                             color="#A855F7"
                                         />
                                         <Text style={styles.checkboxLabel}>Show this item on the interactive map</Text>
@@ -188,26 +484,60 @@ export const CreateListingScreen = () => {
                         {step === 2 && (
                             <>
                                 <Text style={styles.sectionTitle}>Add photos and videos</Text>
-                                
+
                                 <View style={styles.formSection}>
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Photos</Text>
-                                        <TouchableOpacity style={styles.uploadAreaImages}>
-                                            <MaterialCommunityIcons name="image-outline" size={48} color="#94A3B8" />
+                                        <Text style={styles.label}>Photos ({uploadedImages.length}/10)</Text>
+                                        <TouchableOpacity style={styles.uploadAreaImages} onPress={pickImages} disabled={isUploading}>
+                                            {isUploading ? (
+                                                <ActivityIndicator size="large" color="#94A3B8" />
+                                            ) : (
+                                                <MaterialCommunityIcons name="image-outline" size={48} color="#94A3B8" />
+                                            )}
                                             <Text style={styles.uploadTitle}>Upload Photos</Text>
                                             <Text style={styles.uploadSubtext}>Add up to 10 photos of your item</Text>
                                             <Text style={styles.uploadHint}>Images will be automatically compressed for{"\n"}faster upload</Text>
                                         </TouchableOpacity>
+                                        {uploadedImages.length > 0 && (
+                                            <View style={styles.mediaPreviewRow}>
+                                                {uploadedImages.map((uri, idx) => (
+                                                    <View key={idx} style={styles.mediaThumb}>
+                                                        <Image source={{ uri }} style={styles.mediaThumbImage} />
+                                                        <TouchableOpacity style={styles.mediaRemoveBtn} onPress={() => removeImage(idx)}>
+                                                            <MaterialCommunityIcons name="close-circle" size={22} color="#EF4444" />
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        )}
                                     </View>
 
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Videos (Optional)</Text>
-                                        <TouchableOpacity style={styles.uploadAreaVideos}>
-                                            <MaterialCommunityIcons name="video-outline" size={48} color="#A855F7" />
+                                        <Text style={styles.label}>Videos (Optional) ({uploadedVideos.length})</Text>
+                                        <TouchableOpacity style={styles.uploadAreaVideos} onPress={pickVideos} disabled={isUploading}>
+                                            {isUploading ? (
+                                                <ActivityIndicator size="large" color="#A855F7" />
+                                            ) : (
+                                                <MaterialCommunityIcons name="video-outline" size={48} color="#A855F7" />
+                                            )}
                                             <Text style={styles.uploadTitle}>Upload Short Videos</Text>
                                             <Text style={styles.uploadSubtext}>Add videos to showcase your item (max 30{"\n"}seconds each)</Text>
                                             <Text style={styles.uploadHintVideo}>Keep videos under 10MB for best results</Text>
                                         </TouchableOpacity>
+                                        {uploadedVideos.length > 0 && (
+                                            <View style={styles.mediaPreviewRow}>
+                                                {uploadedVideos.map((uri, idx) => (
+                                                    <View key={idx} style={styles.mediaThumb}>
+                                                        <View style={[styles.mediaThumbImage, { backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }]}>
+                                                            <MaterialCommunityIcons name="video" size={24} color="#A855F7" />
+                                                        </View>
+                                                        <TouchableOpacity style={styles.mediaRemoveBtn} onPress={() => removeVideo(idx)}>
+                                                            <MaterialCommunityIcons name="close-circle" size={22} color="#EF4444" />
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        )}
                                     </View>
                                 </View>
                             </>
@@ -216,15 +546,17 @@ export const CreateListingScreen = () => {
                         {step === 3 && (
                             <>
                                 <Text style={styles.sectionTitle}>Set pricing and booking rules</Text>
-                                
+
                                 <View style={styles.formSection}>
-                                    
+
                                     <View style={styles.inputGroup}>
                                         <Text style={styles.label}>Daily Rate ($)</Text>
                                         <View style={styles.numberInputContainer}>
                                             <TextInput
                                                 mode="outlined"
                                                 placeholder="25.00"
+                                                value={formData.daily_rate}
+                                                onChangeText={(text) => handleInputChange('daily_rate', text)}
                                                 outlineColor="#E2E8F0"
                                                 activeOutlineColor="#CBD5E1"
                                                 style={styles.numberInput}
@@ -244,6 +576,8 @@ export const CreateListingScreen = () => {
                                             <TextInput
                                                 mode="outlined"
                                                 placeholder="50.00"
+                                                value={formData.deposit}
+                                                onChangeText={(text) => handleInputChange('deposit', text)}
                                                 outlineColor="#E2E8F0"
                                                 activeOutlineColor="#CBD5E1"
                                                 style={styles.numberInput}
@@ -263,15 +597,33 @@ export const CreateListingScreen = () => {
                                             Offer discounts for longer rentals (e.g., 7 days for{"\n"}$150)
                                         </Text>
 
+                                        {formData.pricing_tiers.length > 0 && (
+                                            <View style={{ marginBottom: 12 }}>
+                                                {formData.pricing_tiers.map((tier, idx) => (
+                                                    <View key={idx} style={styles.tierItemRow}>
+                                                        <Text style={styles.tierItemText}>
+                                                            {tier.days} {tier.days === 1 ? 'day' : 'days'}: ${tier.price.toFixed(2)}
+                                                        </Text>
+                                                        <TouchableOpacity onPress={() => removePricingTier(idx)}>
+                                                            <MaterialCommunityIcons name="close-circle" size={20} color="#EF4444" />
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        )}
+
                                         <View style={styles.tierRow}>
                                             <View style={[styles.numberInputContainer, { flex: 1, marginRight: 12 }]}>
                                                 <TextInput
                                                     mode="outlined"
                                                     placeholder="Days (e.g., 7)"
+                                                    value={newTier.days}
+                                                    onChangeText={(text) => setNewTier(prev => ({ ...prev, days: text }))}
                                                     outlineColor="#E2E8F0"
                                                     activeOutlineColor="#CBD5E1"
                                                     style={styles.numberInput}
                                                     contentStyle={styles.inputText}
+                                                    keyboardType="numeric"
                                                 />
                                                 <View style={styles.stepperIcons}>
                                                     <MaterialCommunityIcons name="unfold-more-horizontal" size={20} color="#94A3B8" style={{ transform: [{ rotate: '90deg' }] }} />
@@ -281,10 +633,13 @@ export const CreateListingScreen = () => {
                                                 <TextInput
                                                     mode="outlined"
                                                     placeholder="Price (e.g., 150)"
+                                                    value={newTier.price}
+                                                    onChangeText={(text) => setNewTier(prev => ({ ...prev, price: text }))}
                                                     outlineColor="#E2E8F0"
                                                     activeOutlineColor="#CBD5E1"
                                                     style={styles.numberInput}
                                                     contentStyle={styles.inputText}
+                                                    keyboardType="numeric"
                                                 />
                                                 <View style={styles.stepperIcons}>
                                                     <MaterialCommunityIcons name="unfold-more-horizontal" size={20} color="#94A3B8" style={{ transform: [{ rotate: '90deg' }] }} />
@@ -297,7 +652,7 @@ export const CreateListingScreen = () => {
                                             icon="plus"
                                             style={styles.addTierBtn}
                                             labelStyle={styles.addTierBtnLabel}
-                                            onPress={() => {}}
+                                            onPress={addPricingTier}
                                         >
                                             Add Pricing Tier
                                         </Button>
@@ -319,10 +674,13 @@ export const CreateListingScreen = () => {
                                                 <TextInput
                                                     mode="outlined"
                                                     placeholder="1"
+                                                    value={formData.min_rental_days}
+                                                    onChangeText={(text) => handleInputChange('min_rental_days', text)}
                                                     outlineColor="#E2E8F0"
                                                     activeOutlineColor="#CBD5E1"
                                                     style={styles.numberInputSmall}
                                                     contentStyle={styles.inputText}
+                                                    keyboardType="numeric"
                                                 />
                                                 <View style={styles.stepperIcons}>
                                                     <MaterialCommunityIcons name="unfold-more-horizontal" size={20} color="#94A3B8" style={{ transform: [{ rotate: '90deg' }] }} />
@@ -336,10 +694,13 @@ export const CreateListingScreen = () => {
                                                 <TextInput
                                                     mode="outlined"
                                                     placeholder="30"
+                                                    value={formData.max_rental_days}
+                                                    onChangeText={(text) => handleInputChange('max_rental_days', text)}
                                                     outlineColor="#E2E8F0"
                                                     activeOutlineColor="#CBD5E1"
                                                     style={styles.numberInputSmall}
                                                     contentStyle={styles.inputText}
+                                                    keyboardType="numeric"
                                                 />
                                                 <View style={styles.stepperIcons}>
                                                     <MaterialCommunityIcons name="unfold-more-horizontal" size={20} color="#94A3B8" style={{ transform: [{ rotate: '90deg' }] }} />
@@ -353,10 +714,13 @@ export const CreateListingScreen = () => {
                                                 <TextInput
                                                     mode="outlined"
                                                     placeholder="24"
+                                                    value={formData.notice_period_hours}
+                                                    onChangeText={(text) => handleInputChange('notice_period_hours', text)}
                                                     outlineColor="#E2E8F0"
                                                     activeOutlineColor="#CBD5E1"
                                                     style={styles.numberInputSmall}
                                                     contentStyle={styles.inputText}
+                                                    keyboardType="numeric"
                                                 />
                                                 <View style={styles.stepperIcons}>
                                                     <MaterialCommunityIcons name="unfold-more-horizontal" size={20} color="#94A3B8" style={{ transform: [{ rotate: '90deg' }] }} />
@@ -372,13 +736,13 @@ export const CreateListingScreen = () => {
                                                     <Text style={styles.preferenceDesc}>Allow renters to book without your{"\n"}approval</Text>
                                                 </View>
                                                 <Checkbox.Android
-                                                    status={instantBooking ? 'checked' : 'unchecked'}
-                                                    onPress={() => setInstantBooking(!instantBooking)}
+                                                    status={formData.instant_booking ? 'checked' : 'unchecked'}
+                                                    onPress={() => handleInputChange('instant_booking', !formData.instant_booking)}
                                                     color="#A855F7"
                                                     uncheckedColor="#CBD5E1"
                                                 />
                                             </View>
-                                            
+
                                             <View style={styles.preferenceDivider} />
 
                                             <View style={styles.preferenceRow}>
@@ -387,8 +751,8 @@ export const CreateListingScreen = () => {
                                                     <Text style={styles.preferenceDesc}>Allow pickup on the same day as booking</Text>
                                                 </View>
                                                 <Checkbox.Android
-                                                    status={sameDayPickup ? 'checked' : 'unchecked'}
-                                                    onPress={() => setSameDayPickup(!sameDayPickup)}
+                                                    status={formData.same_day_pickup ? 'checked' : 'unchecked'}
+                                                    onPress={() => handleInputChange('same_day_pickup', !formData.same_day_pickup)}
                                                     color="#A855F7"
                                                     uncheckedColor="#CBD5E1"
                                                 />
@@ -399,29 +763,29 @@ export const CreateListingScreen = () => {
                                     {/* Delivery Options */}
                                     <View style={styles.inputGroup}>
                                         <Text style={styles.label}>Delivery Options</Text>
-                                        
-                                        <TouchableOpacity 
-                                            style={styles.checkboxRowRaw} 
-                                            onPress={() => setPickupLocation(!pickupLocation)}
+
+                                        <TouchableOpacity
+                                            style={styles.checkboxRowRaw}
+                                            onPress={() => handleDeliveryOptionToggle('pickup')}
                                             activeOpacity={0.7}
                                         >
                                             <Checkbox.Android
-                                                status={pickupLocation ? 'checked' : 'unchecked'}
-                                                onPress={() => setPickupLocation(!pickupLocation)}
+                                                status={formData.delivery_options.includes('pickup') ? 'checked' : 'unchecked'}
+                                                onPress={() => handleDeliveryOptionToggle('pickup')}
                                                 color="#A855F7"
                                                 uncheckedColor="#CBD5E1"
                                             />
                                             <Text style={styles.deliveryOptionLabel}>Pickup at location</Text>
                                         </TouchableOpacity>
 
-                                        <TouchableOpacity 
-                                            style={styles.checkboxRowRaw} 
-                                            onPress={() => setDeliveryToRenter(!deliveryToRenter)}
+                                        <TouchableOpacity
+                                            style={styles.checkboxRowRaw}
+                                            onPress={() => handleDeliveryOptionToggle('delivery')}
                                             activeOpacity={0.7}
                                         >
                                             <Checkbox.Android
-                                                status={deliveryToRenter ? 'checked' : 'unchecked'}
-                                                onPress={() => setDeliveryToRenter(!deliveryToRenter)}
+                                                status={formData.delivery_options.includes('delivery') ? 'checked' : 'unchecked'}
+                                                onPress={() => handleDeliveryOptionToggle('delivery')}
                                                 color="#A855F7"
                                                 uncheckedColor="#CBD5E1"
                                             />
@@ -429,26 +793,75 @@ export const CreateListingScreen = () => {
                                         </TouchableOpacity>
                                     </View>
 
+                                    {formData.delivery_options.includes('delivery') && (
+                                        <View style={styles.rowInputs}>
+                                            <View style={[styles.inputGroup, styles.flex1, { marginRight: 12 }]}>
+                                                <Text style={styles.smallLabel}>Delivery Fee ($)</Text>
+                                                <TextInput
+                                                    mode="outlined"
+                                                    placeholder="0.00"
+                                                    value={formData.delivery_fee}
+                                                    onChangeText={(text) => handleInputChange('delivery_fee', text)}
+                                                    outlineColor="#E2E8F0"
+                                                    activeOutlineColor="#CBD5E1"
+                                                    style={styles.input}
+                                                    contentStyle={styles.inputText}
+                                                    keyboardType="numeric"
+                                                />
+                                            </View>
+                                            <View style={[styles.inputGroup, styles.flex1]}>
+                                                <Text style={styles.smallLabel}>Max Distance (miles)</Text>
+                                                <TextInput
+                                                    mode="outlined"
+                                                    placeholder="10"
+                                                    value={formData.delivery_radius}
+                                                    onChangeText={(text) => handleInputChange('delivery_radius', text)}
+                                                    outlineColor="#E2E8F0"
+                                                    activeOutlineColor="#CBD5E1"
+                                                    style={styles.input}
+                                                    contentStyle={styles.inputText}
+                                                    keyboardType="numeric"
+                                                />
+                                            </View>
+                                        </View>
+                                    )}
+
                                     {/* Pricing Summary */}
                                     <View style={styles.pricingSummaryCard}>
                                         <Text style={styles.pricingSummaryTitle}>Pricing Summary</Text>
-                                        
+
                                         <View style={styles.summaryRow}>
                                             <Text style={styles.summaryLabel}>Base daily rate:</Text>
-                                            <Text style={styles.summaryValue}>$0.00/day</Text>
+                                            <Text style={styles.summaryValue}>${dailyRate.toFixed(2)}/day</Text>
                                         </View>
-                                        
+
+                                        {formData.pricing_tiers.length > 0 && formData.pricing_tiers.map((tier, idx) => (
+                                            <View key={idx} style={styles.summaryRow}>
+                                                <Text style={styles.summaryLabel}>{tier.days} days:</Text>
+                                                <Text style={styles.summaryValue}>${tier.price.toFixed(2)}</Text>
+                                            </View>
+                                        ))}
+
                                         <View style={styles.summaryRow}>
                                             <Text style={styles.summaryLabel}>Security deposit:</Text>
-                                            <Text style={styles.summaryValue}>$0.00</Text>
+                                            <Text style={styles.summaryValue}>${depositAmount.toFixed(2)}</Text>
                                         </View>
-                                        
+
+                                        {formData.delivery_options.includes('delivery') && parseFloat(formData.delivery_fee) > 0 && (
+                                            <View style={styles.summaryRow}>
+                                                <Text style={styles.summaryLabel}>Delivery fee:</Text>
+                                                <Text style={styles.summaryValue}>${(parseFloat(formData.delivery_fee) || 0).toFixed(2)}</Text>
+                                            </View>
+                                        )}
+
                                         <View style={styles.summaryDivider} />
-                                        
-                                        <View style={styles.summaryRow}>
-                                            <Text style={styles.summaryLabel}>Weekly estimate (base rate):</Text>
-                                            <Text style={styles.summaryValueBold}>$0.00</Text>
-                                        </View>
+
+                                        {formData.pricing_tiers.length === 0 && (
+                                            <View style={styles.summaryRow}>
+                                                <Text style={styles.summaryLabel}>Weekly estimate (base rate):</Text>
+                                                <Text style={styles.summaryValueBold}>${(dailyRate * 7).toFixed(2)}</Text>
+                                            </View>
+                                        )}
                                     </View>
 
                                 </View>
@@ -471,14 +884,16 @@ export const CreateListingScreen = () => {
                             )}
                             <Button
                                 mode="contained"
+                                disabled={isSubmitting || isGeocodingLocation || isUploading}
+                                loading={isSubmitting || isGeocodingLocation}
                                 onPress={() => {
-                                    if (step < 3) setStep(step + 1);
-                                    else navigation.goBack(); // Example completion action
+                                    if (step < 3) handleContinue();
+                                    else handleSubmit();
                                 }}
                                 style={[styles.continueBtn, step === 3 && { backgroundColor: '#71DCA3' }]}
                                 labelStyle={styles.continueBtnLabel}
                             >
-                                {step === 3 ? 'List Item' : 'Continue'}
+                                {isGeocodingLocation ? 'Getting location...' : isSubmitting ? 'Publishing...' : step === 3 ? 'List Item' : 'Continue'}
                             </Button>
                         </View>
                     </Surface>
@@ -757,6 +1172,43 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#A855F7',
         textAlign: 'center',
+    },
+    mediaPreviewRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 12,
+    },
+    mediaThumb: {
+        position: 'relative',
+    },
+    mediaThumbImage: {
+        width: 72,
+        height: 72,
+        borderRadius: 8,
+    },
+    mediaRemoveBtn: {
+        position: 'absolute',
+        top: -6,
+        right: -6,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 11,
+    },
+    tierItemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 8,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 8,
+    },
+    tierItemText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#0F172A',
     },
     tieredPricingBlock: {
         backgroundColor: '#F0F9FF',

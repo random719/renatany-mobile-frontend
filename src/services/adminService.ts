@@ -1,6 +1,37 @@
 import { mockListings } from "../data/listings";
 import { mockUsers } from "../data/users";
 import { AdminDashboardData, DailyRevenuePoint, RevenuePoint } from "../types/admin";
+import { api } from "./api";
+
+export interface RentalRequest {
+  id: string;
+  item_id: string;
+  renter_email: string;
+  owner_email: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  total_amount: number;
+  message?: string;
+  created_date: string;
+  updated_date?: string;
+}
+
+export const getPendingRequests = async (): Promise<RentalRequest[]> => {
+  return api.get('/rental-requests', { params: { status: 'pending' } }).then((r) => r.data);
+};
+
+export const updateRentalRequestStatus = async (
+  id: string,
+  status: 'approved' | 'rejected',
+  note?: string
+): Promise<void> => {
+  const data: any = { status };
+  if (note?.trim()) {
+    data.message = `[Admin Note: ${note}]`;
+  }
+  return api.put(`/rental-requests/${id}`, data).then((r) => r.data);
+};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

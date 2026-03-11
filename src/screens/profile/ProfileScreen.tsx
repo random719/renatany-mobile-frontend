@@ -1,18 +1,44 @@
 import { useClerk, useUser } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import React from 'react';
-import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Button, Surface, Text } from 'react-native-paper';
+import React, { useEffect, useMemo } from 'react';
+import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Button, Surface, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { useAuthStore } from '../../store/authStore';
+import { useListingStore } from '../../store/listingStore';
 
 export const ProfileScreen = () => {
     const { user } = useUser();
     const { signOut } = useClerk();
     const { logout } = useAuthStore();
     const navigation = useNavigation<any>();
+    const { userItems, fetchUserItems, isLoading } = useListingStore();
+
+    useEffect(() => {
+        if (user?.id) {
+            fetchUserItems(user.id);
+        }
+    }, [user?.id, fetchUserItems]);
+
+    const stats = useMemo(() => {
+        const totalItems = userItems.length;
+        const availableItems = userItems.filter((item) => item.isActive).length;
+        const avgRating = userItems.length > 0
+            ? userItems.reduce((sum, item) => sum + item.rating, 0) / userItems.length
+            : 0;
+        const totalReviews = userItems.reduce((sum, item) => sum + item.totalReviews, 0);
+        return { totalItems, availableItems, avgRating, totalReviews };
+    }, [userItems]);
+
+    const handleAddPayment = () => {
+        Alert.alert('Add Payment Method', 'Stripe SetupIntent integration will be available when the API is connected.');
+    };
+
+    const handleConnectBank = () => {
+        Alert.alert('Connect Bank Account', 'Stripe Connect onboarding will be available when the API is connected.');
+    };
 
     const handleSignOut = async () => {
         try {
@@ -53,19 +79,19 @@ export const ProfileScreen = () => {
                             
                             <View style={styles.statsRow}>
                                 <View style={styles.statBox}>
-                                    <Text style={styles.statNumber}>1</Text>
+                                    <Text style={styles.statNumber}>{stats.totalItems}</Text>
                                     <Text style={styles.statLabel}>Items</Text>
                                 </View>
                                 <View style={styles.statBox}>
-                                    <Text style={[styles.statNumber, { color: '#16A34A' }]}>1</Text>
+                                    <Text style={[styles.statNumber, { color: '#16A34A' }]}>{stats.availableItems}</Text>
                                     <Text style={styles.statLabel}>Available</Text>
                                 </View>
                                 <View style={styles.statBox}>
                                     <View style={styles.ratingRow}>
-                                        <Text style={[styles.statNumber, { color: '#F59E0B' }]}>0.0</Text>
+                                        <Text style={[styles.statNumber, { color: '#F59E0B' }]}>{stats.avgRating.toFixed(1)}</Text>
                                         <MaterialCommunityIcons name="star" size={16} color="#F59E0B" style={styles.starIcon} />
                                     </View>
-                                    <Text style={styles.statLabel}>(0 reviews)</Text>
+                                    <Text style={styles.statLabel}>({stats.totalReviews} reviews)</Text>
                                 </View>
                             </View>
 
@@ -108,23 +134,23 @@ export const ProfileScreen = () => {
                             </View>
                         </View>
 
-                        <Button 
-                            mode="contained" 
+                        <Button
+                            mode="contained"
                             icon="credit-card-outline"
                             style={styles.addPaymentBtn}
                             labelStyle={styles.addPaymentBtnLabel}
-                            onPress={() => {}}
+                            onPress={handleAddPayment}
                         >
                             Add payment method
                         </Button>
                         <Text style={styles.helperText}>Stripe SetupIntent (card) - Required to rent items</Text>
 
-                        <Button 
-                            mode="contained" 
+                        <Button
+                            mode="contained"
                             icon="bank-outline"
                             style={styles.connectBankBtn}
                             labelStyle={styles.connectBankBtnLabel}
-                            onPress={() => {}}
+                            onPress={handleConnectBank}
                         >
                             Connect bank account
                         </Button>
@@ -134,29 +160,29 @@ export const ProfileScreen = () => {
                     {/* Quick Links Grid */}
                     <Surface style={[styles.card, styles.gridCard]} elevation={0}>
                         <View style={styles.gridRow}>
-                            <TouchableOpacity style={styles.gridItem}>
+                            <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('Main', { screen: 'BulkEditItems' })}>
                                 <MaterialCommunityIcons name="package-variant-closed" size={24} color="#0F172A" />
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.gridItem}>
+                            <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('Main', { screen: 'RentalHistoryTab' })}>
                                 <MaterialCommunityIcons name="chart-line-variant" size={24} color="#94A3B8" />
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.gridItem}>
+                            <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('Main', { screen: 'FavoritesTab' })}>
                                 <MaterialCommunityIcons name="star-outline" size={24} color="#94A3B8" />
                             </TouchableOpacity>
                         </View>
                         <View style={styles.gridRow}>
-                            <TouchableOpacity style={styles.gridItem}>
+                            <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('Main', { screen: 'RentalHistoryTab' })}>
                                 <MaterialCommunityIcons name="calendar-outline" size={24} color="#94A3B8" />
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.gridItem}>
+                            <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('Main', { screen: 'DisputesTab' })}>
                                 <MaterialCommunityIcons name="alert-outline" size={24} color="#94A3B8" />
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.gridItem}>
+                            <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('Main', { screen: 'ConversationsTab' })}>
                                 <MaterialCommunityIcons name="file-document-outline" size={24} color="#94A3B8" />
                             </TouchableOpacity>
                         </View>
                         <View style={styles.gridRowBottom}>
-                            <TouchableOpacity style={styles.gridItem}>
+                            <TouchableOpacity style={styles.gridItem} onPress={() => Alert.alert('Settings', 'Settings screen coming soon.')}>
                                 <MaterialCommunityIcons name="cog-outline" size={24} color="#94A3B8" />
                             </TouchableOpacity>
                             <View style={styles.gridItemEmpty} />
@@ -197,12 +223,16 @@ export const ProfileScreen = () => {
                                 <Text style={styles.itemCardPriceUnit}>/day</Text>
                             </View>
                             
-                            <Button 
-                                mode="contained" 
+                            <Button
+                                mode="contained"
                                 icon="eye-outline"
                                 style={styles.viewBtn}
                                 labelStyle={styles.viewBtnLabel}
-                                onPress={() => {}}
+                                onPress={() => {
+                                    if (userItems.length > 0) {
+                                        navigation.navigate('Main', { screen: 'HomeTab', params: { screen: 'ListingDetail', params: { listingId: userItems[0].id } } });
+                                    }
+                                }}
                             >
                                 View
                             </Button>

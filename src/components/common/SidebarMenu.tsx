@@ -302,6 +302,7 @@ export const SidebarMenu = () => {
               {renderAdminNavItem(
                 "clock-outline",
                 "Admin: Review Pending Requests",
+                () => navigation.navigate("AdminModeration"),
               )}
               {renderAdminNavItem(
                 "file-document-outline",

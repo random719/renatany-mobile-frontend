@@ -7,11 +7,13 @@ interface ListingState {
   listings: Listing[];
   recommended: Listing[];
   recentlyViewed: Listing[];
+  userItems: Listing[];
   categories: Category[];
   selectedListing: Listing | null;
   searchResults: Listing[];
   categoryListings: Listing[];
   isLoading: boolean;
+  isSubmitting: boolean;
   error: string | null;
   activeFilter: ListingFilter;
   fetchListings: () => Promise<void>;
@@ -19,6 +21,10 @@ interface ListingState {
   fetchRecentlyViewed: () => Promise<void>;
   fetchCategories: () => Promise<void>;
   fetchListingById: (id: string) => Promise<void>;
+  fetchUserItems: (ownerId: string) => Promise<void>;
+  createItem: (data: Record<string, any>) => Promise<any>;
+  updateItem: (id: string, data: Record<string, any>) => Promise<void>;
+  deleteItem: (id: string) => Promise<void>;
   search: (query: string) => Promise<void>;
   applyFilter: (filter: ListingFilter) => Promise<void>;
   fetchByCategory: (category: string) => Promise<void>;
@@ -34,11 +40,13 @@ export const useListingStore = create<ListingState>()(
       listings: [],
       recommended: [],
       recentlyViewed: [],
+      userItems: [],
       categories: [],
       selectedListing: null,
       searchResults: [],
       categoryListings: [],
       isLoading: false,
+      isSubmitting: false,
       error: null,
       activeFilter: {},
 
@@ -113,6 +121,80 @@ export const useListingStore = create<ListingState>()(
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : 'Filter failed';
           set({ error: message, isLoading: false });
+        }
+      },
+
+      fetchUserItems: async (ownerId: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const userItems = await listingService.getItemsByOwner(ownerId);
+          set({ userItems, isLoading: false });
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : 'Failed to fetch your items';
+          set({ error: message, isLoading: false });
+        }
+      },
+
+      createItem: async (data: Record<string, any>) => {
+        set({ isSubmitting: true, error: null });
+        try {
+          const result = await listingService.createItem(data);
+          const { userItems, listings } = get();
+          const newItem: Listing = {
+            id: result.id || `item_${Date.now()}`,
+            title: data.title || '',
+            description: data.description || '',
+            pricePerDay: Number(data.price_per_day) || 0,
+            category: data.category || '',
+            images: data.images || [],
+            ownerId: data.owner_id || '',
+            ownerName: data.owner_name || '',
+            location: data.location || '',
+            rating: 0,
+            likes: 0,
+            isLiked: false,
+            condition: data.condition || 'Good',
+            deposit: Number(data.deposit) || 0,
+            min_rental_days: Number(data.min_rental_days) || 1,
+            max_rental_days: Number(data.max_rental_days) || 30,
+            delivery_options: data.delivery_options || [],
+            createdAt: new Date().toISOString(),
+            ...result,
+          };
+          set({ userItems: [newItem, ...userItems], listings: [newItem, ...listings], isSubmitting: false });
+          return result;
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : 'Failed to create listing';
+          set({ error: message, isSubmitting: false });
+          throw e;
+        }
+      },
+
+      updateItem: async (id: string, data: Record<string, any>) => {
+        set({ isSubmitting: true, error: null });
+        try {
+          await listingService.updateItem(id, data);
+          set({ isSubmitting: false });
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : 'Failed to update item';
+          set({ error: message, isSubmitting: false });
+          throw e;
+        }
+      },
+
+      deleteItem: async (id: string) => {
+        set({ isSubmitting: true, error: null });
+        try {
+          await listingService.deleteItem(id);
+          const { userItems } = get();
+          set({
+            userItems: userItems.filter((item) => item.id !== id),
+            isSubmitting: false,
+          });
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : 'Failed to delete item';
+          set({ error: message, isSubmitting: false });
+          throw e;
         }
       },
 

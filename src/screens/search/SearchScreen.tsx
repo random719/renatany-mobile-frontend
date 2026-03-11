@@ -3,7 +3,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, TextInput, TouchableOpacity, View, Modal, Platform } from 'react-native';
-import { ActivityIndicator, Text, Checkbox } from 'react-native-paper';
+import { ActivityIndicator, Menu, Text, Checkbox } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { ListingCard } from '../../components/listing/ListingCard';
 import { useListingStore } from '../../store/listingStore';
@@ -27,6 +27,19 @@ export const SearchScreen = () => {
   const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
   const [isAdvancedFilterModalVisible, setIsAdvancedFilterModalVisible] = useState(false);
   
+  // Sort state
+  const [sortMenuVisible, setSortMenuVisible] = useState(false);
+  const [selectedSort, setSelectedSort] = useState<string>('Relevance');
+
+  const SORT_OPTIONS: { label: string; value?: 'newest' | 'price_low' | 'price_high' | 'rating' | 'popular' }[] = [
+    { label: 'Relevance', value: undefined },
+    { label: 'Newest', value: 'newest' },
+    { label: 'Price: Low', value: 'price_low' },
+    { label: 'Price: High', value: 'price_high' },
+    { label: 'Rating', value: 'rating' },
+    { label: 'Popular', value: 'popular' },
+  ];
+
   // Advanced Filter state
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
@@ -55,6 +68,29 @@ export const SearchScreen = () => {
     applyFilter({}); // Clear all store filters
     clearSearch();
   };
+
+  const handleApplyAdvancedFilters = useCallback(() => {
+    setIsAdvancedFilterModalVisible(false);
+    setPage(1);
+    const updatedFilter = { ...activeFilter };
+    if (minPrice.trim()) updatedFilter.minPrice = parseFloat(minPrice);
+    else delete updatedFilter.minPrice;
+    if (maxPrice.trim()) updatedFilter.maxPrice = parseFloat(maxPrice);
+    else delete updatedFilter.maxPrice;
+    if (hasRating) updatedFilter.rating = 4.0;
+    else delete updatedFilter.rating;
+    applyFilter(updatedFilter);
+  }, [activeFilter, minPrice, maxPrice, hasRating, applyFilter]);
+
+  const handleSortSelect = useCallback((label: string, value?: 'newest' | 'price_low' | 'price_high' | 'rating' | 'popular') => {
+    setSortMenuVisible(false);
+    setSelectedSort(label);
+    setPage(1);
+    const updatedFilter = { ...activeFilter };
+    if (value) updatedFilter.sortBy = value;
+    else delete updatedFilter.sortBy;
+    applyFilter(updatedFilter);
+  }, [activeFilter, applyFilter]);
 
   const handleSelectCategory = (categoryName?: string) => {
     setIsCategoryModalVisible(false);
@@ -148,11 +184,21 @@ export const SearchScreen = () => {
           <Text style={styles.actionBtnText}>Advanced Filters</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionBtnRow}>
-          <MaterialCommunityIcons name="swap-vertical" size={18} color={colors.textPrimary} />
-          <Text style={styles.actionBtnText}>Relevance</Text>
-          <MaterialCommunityIcons name="chevron-down" size={18} color="#6B7280" style={styles.chevronIcon} />
-        </TouchableOpacity>
+        <Menu
+          visible={sortMenuVisible}
+          onDismiss={() => setSortMenuVisible(false)}
+          anchor={
+            <TouchableOpacity style={styles.actionBtnRow} onPress={() => setSortMenuVisible(true)}>
+              <MaterialCommunityIcons name="swap-vertical" size={18} color={colors.textPrimary} />
+              <Text style={styles.actionBtnText}>{selectedSort}</Text>
+              <MaterialCommunityIcons name="chevron-down" size={18} color="#6B7280" style={styles.chevronIcon} />
+            </TouchableOpacity>
+          }
+        >
+          {SORT_OPTIONS.map((opt) => (
+            <Menu.Item key={opt.label} onPress={() => handleSortSelect(opt.label, opt.value)} title={opt.label} />
+          ))}
+        </Menu>
       </View>
     </View>
   );
@@ -286,7 +332,7 @@ export const SearchScreen = () => {
               <View style={styles.checkboxRow}>
                 <View style={styles.checkboxLabelRow}>
                   <MaterialCommunityIcons name="star-outline" size={20} color="#111827" />
-                  <Text style={styles.checkboxLabel}>Rating</Text>
+                  <Text style={styles.checkboxLabel}>Rating (4+ stars)</Text>
                 </View>
                 <Checkbox.Android
                   status={hasRating ? 'checked' : 'unchecked'}
@@ -294,6 +340,32 @@ export const SearchScreen = () => {
                   color={colors.primary}
                   uncheckedColor="#D1D5DB"
                 />
+              </View>
+
+              <View style={{ marginTop: 24, gap: 12 }}>
+                <TouchableOpacity
+                  style={{ backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
+                  onPress={handleApplyAdvancedFilters}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: typography.body }}>Apply Filters</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
+                  onPress={() => {
+                    setMinPrice('');
+                    setMaxPrice('');
+                    setAvailability('All Items');
+                    setHasDateRange(false);
+                    setHasDistance(false);
+                    setHasRating(false);
+                    setIsAdvancedFilterModalVisible(false);
+                    setPage(1);
+                    const { minPrice: _min, maxPrice: _max, rating: _r, ...rest } = activeFilter;
+                    applyFilter(rest);
+                  }}
+                >
+                  <Text style={{ color: '#6B7280', fontWeight: '600', fontSize: typography.body }}>Reset Filters</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
