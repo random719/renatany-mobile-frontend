@@ -69,6 +69,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     borderWidth: 1,
     borderColor: '#F3F4F6', // Very subtle border
+    marginBottom: 5,
   },
   imageWrapper: {
     position: 'relative',
