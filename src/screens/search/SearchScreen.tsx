@@ -1,117 +1,172 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import React, { useCallback, useState } from 'react';
-import { FlatList, StyleSheet, TextInput, TouchableOpacity, View, Modal, Platform, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { FlatList, StyleSheet, TextInput, TouchableOpacity, View, Modal, ScrollView } from 'react-native';
 import { ActivityIndicator, Menu, Text, Checkbox } from 'react-native-paper';
+import { useUser } from '@clerk/expo';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { ListingCard } from '../../components/listing/ListingCard';
 import { useListingStore } from '../../store/listingStore';
 import { colors, typography } from '../../theme';
+import { ListingFilter } from '../../types/listing';
 import { SearchStackParamList } from '../../types/navigation';
 
 type Nav = StackNavigationProp<SearchStackParamList, 'Search'>;
 
 export const SearchScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { searchResults, listings, isLoading, search, toggleLike, clearSearch, categories, activeFilter, applyFilter } =
-    useListingStore();
+  const { user } = useUser();
+  const userEmail = user?.emailAddresses?.[0]?.emailAddress;
+  const {
+    searchResults,
+    listings,
+    isLoading,
+    isLoadingMore,
+    hasMoreListings,
+    toggleLike,
+    clearSearch,
+    categories,
+    activeFilter,
+    applyFilter,
+    fetchListings,
+    fetchMoreListings,
+    setActiveFilter,
+    fetchCategories,
+  } = useListingStore();
+
   const [query, setQuery] = useState(activeFilter.query || '');
   const [location, setLocation] = useState(activeFilter.location || '');
-  
-  // Pagination state
-  const [page, setPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
-  
+
   // Modal state
   const [isCategoryMenuVisible, setIsCategoryMenuVisible] = useState(false);
   const [isAdvancedFilterModalVisible, setIsAdvancedFilterModalVisible] = useState(false);
-  
+
   // Sort state
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const [isAvailabilityMenuVisible, setIsAvailabilityMenuVisible] = useState(false);
-  const [selectedSort, setSelectedSort] = useState<string>('Relevance');
-
-  const SORT_OPTIONS: { label: string; value?: 'newest' | 'price_low' | 'price_high' | 'rating' | 'popular' }[] = [
-    { label: 'Relevance', value: undefined },
-    { label: 'Newest', value: 'newest' },
-    { label: 'Price: Low', value: 'price_low' },
-    { label: 'Price: High', value: 'price_high' },
-    { label: 'Rating', value: 'rating' },
-    { label: 'Popular', value: 'popular' },
-  ];
+  const [selectedSort, setSelectedSort] = useState<string>(() => {
+    const match = SORT_OPTIONS.find((o) => o.value === activeFilter.sortBy);
+    return match?.label || 'Relevance';
+  });
 
   // Advanced Filter state
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const [availability, setAvailability] = useState('All Items');
+  const [minPrice, setMinPrice] = useState(activeFilter.minPrice?.toString() || '');
+  const [maxPrice, setMaxPrice] = useState(activeFilter.maxPrice?.toString() || '');
+  const [availability, setAvailability] = useState<string>(
+    activeFilter.availability === 'available' ? 'Available Now' :
+    activeFilter.availability === 'unavailable' ? 'Unavailable' : 'All Items'
+  );
   const [hasDateRange, setHasDateRange] = useState(false);
   const [hasDistance, setHasDistance] = useState(false);
-  const [hasRating, setHasRating] = useState(false);
+  const [hasRating, setHasRating] = useState(!!activeFilter.rating);
+
+  const hasActiveFilters = !!(
+    activeFilter.category ||
+    activeFilter.query ||
+    activeFilter.location ||
+    activeFilter.minPrice ||
+    activeFilter.maxPrice ||
+    activeFilter.rating ||
+    (activeFilter.availability && activeFilter.availability !== 'all')
+  );
+
+  // Load categories + initial listings on mount
+  useEffect(() => {
+    fetchCategories();
+    // If there are active filters, apply them to populate searchResults
+    if (hasActiveFilters) {
+      applyFilter(activeFilter);
+    } else {
+      fetchListings();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync local state when activeFilter changes externally (e.g. from HomeScreen)
+  useEffect(() => {
+    setQuery(activeFilter.query || '');
+    setLocation(activeFilter.location || '');
+    setMinPrice(activeFilter.minPrice?.toString() || '');
+    setMaxPrice(activeFilter.maxPrice?.toString() || '');
+    setHasRating(!!activeFilter.rating);
+    const sortMatch = SORT_OPTIONS.find((o) => o.value === activeFilter.sortBy);
+    setSelectedSort(sortMatch?.label || 'Relevance');
+    if (activeFilter.availability === 'available') setAvailability('Available Now');
+    else if (activeFilter.availability === 'unavailable') setAvailability('Unavailable');
+    else setAvailability('All Items');
+  }, [activeFilter.query, activeFilter.location, activeFilter.category, activeFilter.sortBy, activeFilter.minPrice, activeFilter.maxPrice, activeFilter.rating, activeFilter.availability]);
+
+  const dataSource = hasActiveFilters ? searchResults : listings;
 
   const handleSearch = useCallback(() => {
-    setPage(1); // Reset page on new search
-    if (query.trim() || location.trim()) {
-      applyFilter({
-        ...activeFilter,
-        query: query.trim() || undefined,
-        location: location.trim() || undefined
-      });
-    } else {
-      applyFilter({ ...activeFilter, query: undefined, location: undefined });
-    }
+    const filter: ListingFilter = { ...activeFilter };
+    if (query.trim()) filter.query = query.trim();
+    else delete filter.query;
+    if (location.trim()) filter.location = location.trim();
+    else delete filter.location;
+    applyFilter(filter);
   }, [query, location, activeFilter, applyFilter]);
 
   const handleClear = () => {
     setQuery('');
     setLocation('');
-    setPage(1); // Reset page on clear
-    applyFilter({}); // Clear all store filters
+    setMinPrice('');
+    setMaxPrice('');
+    setAvailability('All Items');
+    setHasDateRange(false);
+    setHasDistance(false);
+    setHasRating(false);
+    setSelectedSort('Relevance');
+    setActiveFilter({});
     clearSearch();
+    fetchListings();
   };
 
   const handleApplyAdvancedFilters = useCallback(() => {
     setIsAdvancedFilterModalVisible(false);
-    setPage(1);
-    const updatedFilter = { ...activeFilter };
+    const updatedFilter: ListingFilter = { ...activeFilter };
+
     if (minPrice.trim()) updatedFilter.minPrice = parseFloat(minPrice);
     else delete updatedFilter.minPrice;
     if (maxPrice.trim()) updatedFilter.maxPrice = parseFloat(maxPrice);
     else delete updatedFilter.maxPrice;
     if (hasRating) updatedFilter.rating = 4.0;
     else delete updatedFilter.rating;
-    applyFilter(updatedFilter);
-  }, [activeFilter, minPrice, maxPrice, hasRating, applyFilter]);
 
-  const handleSortSelect = useCallback((label: string, value?: 'newest' | 'price_low' | 'price_high' | 'rating' | 'popular') => {
-    setSortMenuVisible(false);
-    setSelectedSort(label);
-    setPage(1);
-    const updatedFilter = { ...activeFilter };
-    if (value) updatedFilter.sortBy = value;
-    else delete updatedFilter.sortBy;
+    // Availability
+    if (availability === 'Available Now') updatedFilter.availability = 'available';
+    else if (availability === 'Unavailable') updatedFilter.availability = 'unavailable';
+    else delete updatedFilter.availability;
+
     applyFilter(updatedFilter);
-  }, [activeFilter, applyFilter]);
+  }, [activeFilter, minPrice, maxPrice, hasRating, availability, applyFilter]);
+
+  const handleSortSelect = useCallback(
+    (label: string, value?: ListingFilter['sortBy']) => {
+      setSortMenuVisible(false);
+      setSelectedSort(label);
+      const updatedFilter: ListingFilter = { ...activeFilter };
+      if (value) updatedFilter.sortBy = value;
+      else delete updatedFilter.sortBy;
+      applyFilter(updatedFilter);
+    },
+    [activeFilter, applyFilter],
+  );
 
   const handleSelectCategory = (categoryName?: string) => {
     setIsCategoryMenuVisible(false);
-    setPage(1);
     if (categoryName) {
       applyFilter({ ...activeFilter, category: categoryName });
     } else {
-      // Clear category filter
-      applyFilter({ ...activeFilter, category: undefined });
+      const { category: _, ...rest } = activeFilter;
+      applyFilter(rest);
     }
   };
 
-  const hasActiveFilters = !!(
-    activeFilter.category || 
-    activeFilter.query || 
-    activeFilter.location || 
-    activeFilter.minPrice || 
-    activeFilter.maxPrice || 
-    activeFilter.rating
-  );
+  const handleLoadMore = () => {
+    if (hasActiveFilters) return; // filtered results come in one batch
+    fetchMoreListings();
+  };
 
   const getActiveFiltersCount = () => {
     let count = 0;
@@ -120,20 +175,10 @@ export const SearchScreen = () => {
     if (activeFilter.location) count++;
     if (activeFilter.minPrice || activeFilter.maxPrice) count++;
     if (activeFilter.rating) count++;
+    if (activeFilter.availability && activeFilter.availability !== 'all') count++;
     return count;
   };
-  
   const activeFiltersCount = getActiveFiltersCount();
-
-  const dataSource = hasActiveFilters ? searchResults : listings;
-
-  const handleLoadMore = () => {
-    // Only increment if we haven't loaded everything
-    if (page * ITEMS_PER_PAGE < dataSource.length) {
-      setPage(prev => prev + 1);
-    }
-  };
-  const paginatedData = dataSource.slice(0, page * ITEMS_PER_PAGE);
 
   const renderHeader = () => (
     <View style={styles.searchHeader}>
@@ -149,6 +194,7 @@ export const SearchScreen = () => {
         </View>
       </View>
 
+      {/* Search input */}
       <View style={styles.inputWrapper}>
         <MaterialCommunityIcons name="magnify" size={20} color="#9CA3AF" />
         <TextInput
@@ -158,9 +204,16 @@ export const SearchScreen = () => {
           value={query}
           onChangeText={setQuery}
           onSubmitEditing={handleSearch}
+          returnKeyType="search"
         />
+        {query.length > 0 && (
+          <TouchableOpacity onPress={() => { setQuery(''); }}>
+            <MaterialCommunityIcons name="close-circle" size={18} color="#9CA3AF" />
+          </TouchableOpacity>
+        )}
       </View>
 
+      {/* Location input */}
       <View style={styles.inputWrapper}>
         <MaterialCommunityIcons name="map-marker-outline" size={20} color="#9CA3AF" />
         <TextInput
@@ -170,16 +223,29 @@ export const SearchScreen = () => {
           value={location}
           onChangeText={setLocation}
           onSubmitEditing={handleSearch}
+          returnKeyType="search"
         />
+        {location.length > 0 && (
+          <TouchableOpacity onPress={() => { setLocation(''); }}>
+            <MaterialCommunityIcons name="close-circle" size={18} color="#9CA3AF" />
+          </TouchableOpacity>
+        )}
       </View>
 
+      {/* Search button */}
+      <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+        <MaterialCommunityIcons name="magnify" size={20} color="#FFFFFF" />
+        <Text style={styles.searchBtnText}>Search</Text>
+      </TouchableOpacity>
+
+      {/* Category dropdown */}
       <Menu
         visible={isCategoryMenuVisible}
         onDismiss={() => setIsCategoryMenuVisible(false)}
         anchorPosition="bottom"
         contentStyle={styles.menuContent}
         anchor={
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.dropdownBtn}
             onPress={() => setIsCategoryMenuVisible(true)}
           >
@@ -209,13 +275,19 @@ export const SearchScreen = () => {
         </ScrollView>
       </Menu>
 
+      {/* Filters row: Advanced Filters + Sort */}
       <View style={styles.filtersRow}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.actionBtnRow}
           onPress={() => setIsAdvancedFilterModalVisible(true)}
         >
           <MaterialCommunityIcons name="tune-variant" size={18} color={colors.textPrimary} />
           <Text style={styles.actionBtnText}>Advanced Filters</Text>
+          {activeFiltersCount > 0 && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{activeFiltersCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         <Menu
@@ -232,18 +304,24 @@ export const SearchScreen = () => {
           }
         >
           {SORT_OPTIONS.map((opt) => (
-            <Menu.Item key={opt.label} onPress={() => handleSortSelect(opt.label, opt.value)} title={opt.label} />
+            <Menu.Item
+              key={opt.label}
+              onPress={() => handleSortSelect(opt.label, opt.value)}
+              title={opt.label}
+              titleStyle={selectedSort === opt.label ? styles.menuItemActiveText : undefined}
+            />
           ))}
         </Menu>
       </View>
 
-      {hasActiveFilters ? (
+      {/* Active filter pills */}
+      {hasActiveFilters && (
         <View style={styles.activeFiltersContainer}>
           <TouchableOpacity onPress={handleClear} style={styles.clearAllBtn}>
             <MaterialCommunityIcons name="close" size={16} color="#6B7280" />
             <Text style={styles.clearAllText}>Clear ({activeFiltersCount})</Text>
           </TouchableOpacity>
-          
+
           <View style={styles.tagsContainer}>
             {activeFilter.category && (
               <View style={styles.filterTag}>
@@ -256,10 +334,13 @@ export const SearchScreen = () => {
             {activeFilter.query && (
               <View style={styles.filterTag}>
                 <Text style={styles.filterTagText}>"{activeFilter.query}"</Text>
-                <TouchableOpacity onPress={() => {
-                  setQuery('');
-                  applyFilter({ ...activeFilter, query: undefined });
-                }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setQuery('');
+                    const { query: _, ...rest } = activeFilter;
+                    applyFilter(rest);
+                  }}
+                >
                   <MaterialCommunityIcons name="close" size={14} color="#4B5563" />
                 </TouchableOpacity>
               </View>
@@ -267,10 +348,13 @@ export const SearchScreen = () => {
             {activeFilter.location && (
               <View style={styles.filterTag}>
                 <Text style={styles.filterTagText}>{activeFilter.location}</Text>
-                <TouchableOpacity onPress={() => {
-                  setLocation('');
-                  applyFilter({ ...activeFilter, location: undefined });
-                }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setLocation('');
+                    const { location: _, ...rest } = activeFilter;
+                    applyFilter(rest);
+                  }}
+                >
                   <MaterialCommunityIcons name="close" size={14} color="#4B5563" />
                 </TouchableOpacity>
               </View>
@@ -280,12 +364,30 @@ export const SearchScreen = () => {
                 <Text style={styles.filterTagText}>
                   ${activeFilter.minPrice || 0} - ${activeFilter.maxPrice || 'Any'}
                 </Text>
-                <TouchableOpacity onPress={() => {
-                  setMinPrice('');
-                  setMaxPrice('');
-                  const { minPrice: _min, maxPrice: _max, ...rest } = activeFilter;
-                  applyFilter(rest);
-                }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setMinPrice('');
+                    setMaxPrice('');
+                    const { minPrice: _min, maxPrice: _max, ...rest } = activeFilter;
+                    applyFilter(rest);
+                  }}
+                >
+                  <MaterialCommunityIcons name="close" size={14} color="#4B5563" />
+                </TouchableOpacity>
+              </View>
+            )}
+            {activeFilter.availability && activeFilter.availability !== 'all' && (
+              <View style={styles.filterTag}>
+                <Text style={styles.filterTagText}>
+                  {activeFilter.availability === 'available' ? 'Available' : 'Unavailable'}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setAvailability('All Items');
+                    const { availability: _, ...rest } = activeFilter;
+                    applyFilter(rest);
+                  }}
+                >
                   <MaterialCommunityIcons name="close" size={14} color="#4B5563" />
                 </TouchableOpacity>
               </View>
@@ -293,18 +395,28 @@ export const SearchScreen = () => {
             {activeFilter.rating && (
               <View style={styles.filterTag}>
                 <Text style={styles.filterTagText}>{activeFilter.rating}+ Stars</Text>
-                <TouchableOpacity onPress={() => {
-                  setHasRating(false);
-                  const { rating: _r, ...rest } = activeFilter;
-                  applyFilter(rest);
-                }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setHasRating(false);
+                    const { rating: _r, ...rest } = activeFilter;
+                    applyFilter(rest);
+                  }}
+                >
                   <MaterialCommunityIcons name="close" size={14} color="#4B5563" />
                 </TouchableOpacity>
               </View>
             )}
           </View>
         </View>
-      ) : null}
+      )}
+
+      {/* Results count */}
+      <View style={styles.resultsRow}>
+        <MaterialCommunityIcons name="star" size={18} color={colors.primary} />
+        <Text style={styles.resultsText}>
+          {hasActiveFilters ? `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''}` : 'All Items'}
+        </Text>
+      </View>
     </View>
   );
 
@@ -312,11 +424,16 @@ export const SearchScreen = () => {
     <View style={styles.container}>
       <GlobalHeader />
       <View style={styles.contentWrapper}>
-        {isLoading ? (
-          <ActivityIndicator style={styles.loader} size="large" />
+        {isLoading && dataSource.length === 0 ? (
+          <FlatList
+            data={[]}
+            ListHeaderComponent={renderHeader()}
+            ListEmptyComponent={<ActivityIndicator style={styles.loader} size="large" color={colors.primary} />}
+            renderItem={() => null}
+          />
         ) : (
           <FlatList
-            data={paginatedData}
+            data={dataSource}
             ListHeaderComponent={renderHeader()}
             numColumns={2}
             contentContainerStyle={styles.grid}
@@ -324,18 +441,32 @@ export const SearchScreen = () => {
             keyExtractor={(item) => item.id}
             onEndReached={handleLoadMore}
             onEndReachedThreshold={0.5}
-            // Add a bottom spacer for pagination loading indicator space
             ListFooterComponent={
-              page * ITEMS_PER_PAGE < dataSource.length ? (
-                <ActivityIndicator style={{ paddingVertical: 20 }} color={colors.primary} />
-              ) : <View style={{ height: 40 }} />
+              isLoadingMore ? (
+                <View style={styles.loadingMore}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.loadingMoreText}>Loading more items...</Text>
+                </View>
+              ) : !hasMoreListings && dataSource.length > 0 && !hasActiveFilters ? (
+                <Text style={styles.endText}>No more items to load</Text>
+              ) : (
+                <View style={{ height: 40 }} />
+              )
             }
             ListEmptyComponent={
-              hasActiveFilters ? (
+              !isLoading ? (
                 <View style={styles.empty}>
+                  <MaterialCommunityIcons name="magnify-close" size={48} color="#D1D5DB" />
                   <Text variant="bodyLarge" style={styles.emptyText}>
-                    No items found matching your filters.
+                    {hasActiveFilters
+                      ? 'No items found matching your filters.'
+                      : 'No items available yet.'}
                   </Text>
+                  {hasActiveFilters && (
+                    <TouchableOpacity style={styles.clearFiltersBtn} onPress={handleClear}>
+                      <Text style={styles.clearFiltersBtnText}>Clear Filters</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               ) : null
             }
@@ -344,7 +475,7 @@ export const SearchScreen = () => {
                 <ListingCard
                   listing={item}
                   onPress={() => navigation.navigate('ListingDetail', { listingId: item.id })}
-                  onToggleLike={() => toggleLike(item.id)}
+                  onToggleLike={() => toggleLike(item.id, userEmail)}
                 />
               </View>
             )}
@@ -352,6 +483,7 @@ export const SearchScreen = () => {
         )}
       </View>
 
+      {/* Advanced Filters Modal */}
       <Modal
         visible={isAdvancedFilterModalVisible}
         transparent
@@ -361,15 +493,19 @@ export const SearchScreen = () => {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, styles.advancedFilterModal]}>
             <View style={styles.modalHeader}>
-              <Text variant="titleMedium" style={styles.modalTitle}>Advanced Filters</Text>
+              <Text variant="titleMedium" style={styles.modalTitle}>
+                Advanced Filters
+              </Text>
               <TouchableOpacity onPress={() => setIsAdvancedFilterModalVisible(false)}>
                 <MaterialCommunityIcons name="close" size={24} color="#6B7280" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.advancedFilterBody}>
+            <ScrollView style={styles.advancedFilterBody}>
+              {/* Price Range */}
               <Text style={styles.advancedFilterLabel}>
-                <MaterialCommunityIcons name="currency-usd" size={16} color="#111827" /> Price Range ($/day)
+                <MaterialCommunityIcons name="currency-usd" size={16} color="#111827" /> Price Range
+                ($/day)
               </Text>
               <View style={styles.priceInputsRow}>
                 <View style={styles.priceInputWrapper}>
@@ -381,7 +517,6 @@ export const SearchScreen = () => {
                     onChangeText={setMinPrice}
                     keyboardType="numeric"
                   />
-                  <MaterialCommunityIcons name="swap-vertical" size={18} color="#9CA3AF" style={styles.stepperIcon} />
                 </View>
                 <View style={styles.priceInputWrapper}>
                   <TextInput
@@ -392,10 +527,10 @@ export const SearchScreen = () => {
                     onChangeText={setMaxPrice}
                     keyboardType="numeric"
                   />
-                  <MaterialCommunityIcons name="swap-vertical" size={18} color="#9CA3AF" style={styles.stepperIcon} />
                 </View>
               </View>
 
+              {/* Availability */}
               <Text style={styles.advancedFilterLabel}>Availability</Text>
               <Menu
                 visible={isAvailabilityMenuVisible}
@@ -403,7 +538,7 @@ export const SearchScreen = () => {
                 anchorPosition="bottom"
                 contentStyle={styles.menuContent}
                 anchor={
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.availabilityDropdown}
                     onPress={() => setIsAvailabilityMenuVisible(true)}
                   >
@@ -412,18 +547,22 @@ export const SearchScreen = () => {
                   </TouchableOpacity>
                 }
               >
-                {['All Items', 'Available Now', 'For Rent', 'For Sale'].map((opt) => (
-                  <Menu.Item 
-                    key={opt} 
-                    title={opt} 
-                    onPress={() => { setAvailability(opt); setIsAvailabilityMenuVisible(false); }} 
+                {['All Items', 'Available Now', 'Unavailable'].map((opt) => (
+                  <Menu.Item
+                    key={opt}
+                    title={opt}
+                    onPress={() => {
+                      setAvailability(opt);
+                      setIsAvailabilityMenuVisible(false);
+                    }}
                     titleStyle={availability === opt ? styles.menuItemActiveText : undefined}
                   />
                 ))}
               </Menu>
-              
+
               <View style={styles.filterDivider} />
 
+              {/* Date Range */}
               <View style={styles.checkboxRow}>
                 <View style={styles.checkboxLabelRow}>
                   <MaterialCommunityIcons name="calendar-range-outline" size={20} color="#111827" />
@@ -439,6 +578,7 @@ export const SearchScreen = () => {
 
               <View style={styles.filterDivider} />
 
+              {/* Distance */}
               <View style={styles.checkboxRow}>
                 <View style={styles.checkboxLabelRow}>
                   <MaterialCommunityIcons name="near-me" size={20} color="#111827" />
@@ -454,6 +594,7 @@ export const SearchScreen = () => {
 
               <View style={styles.filterDivider} />
 
+              {/* Rating */}
               <View style={styles.checkboxRow}>
                 <View style={styles.checkboxLabelRow}>
                   <MaterialCommunityIcons name="star-outline" size={20} color="#111827" />
@@ -467,15 +608,16 @@ export const SearchScreen = () => {
                 />
               </View>
 
-              <View style={{ marginTop: 24, gap: 12 }}>
+              {/* Apply / Reset buttons */}
+              <View style={{ marginTop: 24, gap: 12, paddingBottom: 20 }}>
                 <TouchableOpacity
-                  style={{ backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
+                  style={styles.applyBtn}
                   onPress={handleApplyAdvancedFilters}
                 >
-                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: typography.body }}>Apply Filters</Text>
+                  <Text style={styles.applyBtnText}>Apply Filters</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
+                  style={styles.resetBtn}
                   onPress={() => {
                     setMinPrice('');
                     setMaxPrice('');
@@ -484,21 +626,33 @@ export const SearchScreen = () => {
                     setHasDistance(false);
                     setHasRating(false);
                     setIsAdvancedFilterModalVisible(false);
-                    setPage(1);
-                    const { minPrice: _min, maxPrice: _max, rating: _r, ...rest } = activeFilter;
+                    const { minPrice: _min, maxPrice: _max, rating: _r, availability: _a, ...rest } =
+                      activeFilter;
                     applyFilter(rest);
                   }}
                 >
-                  <Text style={{ color: '#6B7280', fontWeight: '600', fontSize: typography.body }}>Reset Filters</Text>
+                  <Text style={styles.resetBtnText}>Reset Filters</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
     </View>
   );
 };
+
+const SORT_OPTIONS: {
+  label: string;
+  value?: 'newest' | 'price_low' | 'price_high' | 'rating' | 'popular';
+}[] = [
+  { label: 'Relevance', value: undefined },
+  { label: 'Newest', value: 'newest' },
+  { label: 'Price: Low', value: 'price_low' },
+  { label: 'Price: High', value: 'price_high' },
+  { label: 'Rating', value: 'rating' },
+  { label: 'Popular', value: 'popular' },
+];
 
 const styles = StyleSheet.create({
   container: {
@@ -508,8 +662,8 @@ const styles = StyleSheet.create({
   searchHeader: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 24,
-    marginBottom: 20,
+    paddingBottom: 16,
+    marginBottom: 8,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
@@ -560,6 +714,21 @@ const styles = StyleSheet.create({
     fontSize: typography.label,
     color: '#111827',
   },
+  searchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    height: 48,
+    marginBottom: 16,
+  },
+  searchBtnText: {
+    color: '#FFFFFF',
+    fontSize: typography.body,
+    fontWeight: '600',
+  },
   dropdownBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -598,12 +767,117 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#111827',
   },
-  categoryItemTextActive: {
+  filterBadge: {
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  filterBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  chevronIcon: {
+    marginLeft: 4,
+  },
+  resultsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  resultsText: {
+    fontSize: typography.body,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  contentWrapper: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
+  grid: {
+    padding: 16,
+  },
+  gridRow: {
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  cardWrapper: {
+    flex: 1,
+    maxWidth: '48%',
+  },
+  loader: {
+    marginTop: 48,
+  },
+  loadingMore: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 20,
+  },
+  loadingMoreText: {
+    color: '#6B7280',
+    fontSize: typography.body,
+  },
+  endText: {
+    textAlign: 'center',
+    color: '#9CA3AF',
+    fontSize: typography.caption,
+    paddingVertical: 20,
+  },
+  empty: {
+    alignItems: 'center',
+    paddingTop: 48,
+    gap: 12,
+  },
+  emptyText: {
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  clearFiltersBtn: {
+    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  clearFiltersBtnText: {
     color: colors.primary,
     fontWeight: '600',
+    fontSize: typography.body,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    paddingBottom: 40,
   },
   advancedFilterModal: {
     height: 'auto',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalTitle: {
+    fontWeight: '700',
+    color: '#111827',
   },
   advancedFilterBody: {
     padding: 20,
@@ -633,82 +907,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typography.body,
     color: '#111827',
-  },
-  stepperIcon: {
-    marginLeft: 8,
-  },
-  chevronIcon: {
-    marginLeft: 8,
-  },
-  contentWrapper: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  grid: {
-    padding: 16,
-  },
-  gridRow: {
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  cardWrapper: {
-    flex: 1,
-    maxWidth: '48%',
-  },
-  loader: {
-    marginTop: 48,
-  },
-  empty: {
-    alignItems: 'center',
-    paddingTop: 48,
-  },
-  emptyText: {
-    color: '#6B7280',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-    paddingBottom: 40,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  modalTitle: {
-    fontWeight: '700',
-    color: '#111827',
-  },
-  categoryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  categoryItemActive: {
-    backgroundColor: '#F9FAFB',
-  },
-  categoryItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  categoryItemText: {
-    fontSize: typography.body,
-    color: '#4B5563',
   },
   availabilityDropdown: {
     flexDirection: 'row',
@@ -745,6 +943,29 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#111827',
   },
+  applyBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  applyBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: typography.body,
+  },
+  resetBtn: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  resetBtnText: {
+    color: '#6B7280',
+    fontWeight: '600',
+    fontSize: typography.body,
+  },
   menuContent: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
@@ -758,6 +979,7 @@ const styles = StyleSheet.create({
   },
   activeFiltersContainer: {
     marginTop: 4,
+    marginBottom: 12,
   },
   clearAllBtn: {
     flexDirection: 'row',

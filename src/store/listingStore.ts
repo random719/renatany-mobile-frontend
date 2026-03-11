@@ -6,6 +6,10 @@ import { Category, Listing, ListingFilter } from '../types/listing';
 
 const ITEMS_PER_PAGE = 20;
 
+// Helper: mark isLiked on listings based on favoriteItemIds
+const markFavorites = (items: Listing[], favIds: Set<string>): Listing[] =>
+  items.map((item) => ({ ...item, isLiked: favIds.has(item.id) }));
+
 interface ListingState {
   listings: Listing[];
   recommended: Listing[];
@@ -13,6 +17,7 @@ interface ListingState {
   userItems: Listing[];
   categories: Category[];
   selectedListing: Listing | null;
+  selectedListingOwner: listingService.ItemOwner | null;
   searchResults: Listing[];
   categoryListings: Listing[];
   isLoading: boolean;
@@ -34,10 +39,14 @@ interface ListingState {
   search: (query: string) => Promise<void>;
   applyFilter: (filter: ListingFilter) => Promise<void>;
   fetchByCategory: (category: string) => Promise<void>;
-  toggleLike: (id: string) => void;
+  toggleLike: (id: string, userEmail?: string) => void;
   addToRecentlyViewed: (listing: Listing) => void;
   clearSearch: () => void;
   setActiveFilter: (filter: ListingFilter) => void;
+  favoriteItemIds: Set<string>;
+  fetchFavorites: (userEmail: string) => Promise<void>;
+  favoriteItems: Listing[];
+  isFavoritesLoading: boolean;
 }
 
 export const useListingStore = create<ListingState>()(
@@ -49,6 +58,7 @@ export const useListingStore = create<ListingState>()(
       userItems: [],
       categories: [],
       selectedListing: null,
+      selectedListingOwner: null,
       searchResults: [],
       categoryListings: [],
       isLoading: false,
@@ -57,6 +67,9 @@ export const useListingStore = create<ListingState>()(
       hasMoreListings: true,
       error: null,
       activeFilter: {},
+      favoriteItemIds: new Set<string>(),
+      favoriteItems: [],
+      isFavoritesLoading: false,
 
       fetchListings: async () => {
         const { activeFilter } = get();
@@ -69,8 +82,9 @@ export const useListingStore = create<ListingState>()(
           if (activeFilter.minPrice !== undefined) params.min_price = activeFilter.minPrice;
           if (activeFilter.maxPrice !== undefined) params.max_price = activeFilter.maxPrice;
           if (activeFilter.sortBy) params.sort_by = activeFilter.sortBy;
-          const listings = await listingService.getListings(params);
-          set({ listings, isLoading: false, hasMoreListings: listings.length >= ITEMS_PER_PAGE });
+          const raw = await listingService.getListings(params);
+          const listings = markFavorites(raw, get().favoriteItemIds);
+          set({ listings, isLoading: false, hasMoreListings: raw.length >= ITEMS_PER_PAGE });
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : 'Failed to fetch listings';
           set({ error: message, isLoading: false });
@@ -89,11 +103,12 @@ export const useListingStore = create<ListingState>()(
           if (activeFilter.minPrice !== undefined) params.min_price = activeFilter.minPrice;
           if (activeFilter.maxPrice !== undefined) params.max_price = activeFilter.maxPrice;
           if (activeFilter.sortBy) params.sort_by = activeFilter.sortBy;
-          const more = await listingService.getListings(params);
+          const raw = await listingService.getListings(params);
+          const more = markFavorites(raw, get().favoriteItemIds);
           set({
             listings: [...listings, ...more],
             isLoadingMore: false,
-            hasMoreListings: more.length >= ITEMS_PER_PAGE,
+            hasMoreListings: raw.length >= ITEMS_PER_PAGE,
           });
         } catch {
           set({ isLoadingMore: false });
@@ -102,7 +117,8 @@ export const useListingStore = create<ListingState>()(
 
       fetchRecommended: async () => {
         try {
-          const recommended = await listingService.getRecommendedListings();
+          const raw = await listingService.getRecommendedListings();
+          const recommended = markFavorites(raw, get().favoriteItemIds);
           set({ recommended });
         } catch {
           // silent fail for recommendations
@@ -111,9 +127,10 @@ export const useListingStore = create<ListingState>()(
 
       fetchRecentlyViewed: async () => {
         try {
-          const recentlyViewed = await listingService.getRecentlyViewedListings();
+          const raw = await listingService.getRecentlyViewedListings();
           // Only update if we actually get items from the server (e.g. for syncing)
-          if (recentlyViewed && recentlyViewed.length > 0) {
+          if (raw && raw.length > 0) {
+            const recentlyViewed = markFavorites(raw, get().favoriteItemIds);
             set({ recentlyViewed });
           }
         } catch {
@@ -133,8 +150,13 @@ export const useListingStore = create<ListingState>()(
       fetchListingById: async (id: string) => {
         set({ isLoading: true, error: null });
         try {
-          const listing = await listingService.getListingById(id);
-          set({ selectedListing: listing || null, isLoading: false });
+          const result = await listingService.getListingById(id);
+          const listing = result?.listing || null;
+          set({
+            selectedListing: listing ? { ...listing, isLiked: get().favoriteItemIds.has(listing.id) } : null,
+            selectedListingOwner: result?.owner || null,
+            isLoading: false,
+          });
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : 'Failed to fetch listing';
           set({ error: message, isLoading: false });
@@ -144,7 +166,8 @@ export const useListingStore = create<ListingState>()(
       search: async (query: string) => {
         set({ isLoading: true, error: null });
         try {
-          const searchResults = await listingService.searchListings(query);
+          const raw = await listingService.searchListings(query);
+          const searchResults = markFavorites(raw, get().favoriteItemIds);
           set({ searchResults, isLoading: false });
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : 'Search failed';
@@ -155,7 +178,8 @@ export const useListingStore = create<ListingState>()(
       applyFilter: async (filter: ListingFilter) => {
         set({ isLoading: true, error: null, activeFilter: filter });
         try {
-          const searchResults = await listingService.filterListings(filter);
+          const raw = await listingService.filterListings(filter);
+          const searchResults = markFavorites(raw, get().favoriteItemIds);
           set({ searchResults, isLoading: false });
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : 'Filter failed';
@@ -166,7 +190,8 @@ export const useListingStore = create<ListingState>()(
       fetchUserItems: async (ownerId: string) => {
         set({ isLoading: true, error: null });
         try {
-          const userItems = await listingService.getItemsByOwner(ownerId);
+          const raw = await listingService.getItemsByOwner(ownerId);
+          const userItems = markFavorites(raw, get().favoriteItemIds);
           set({ userItems, isLoading: false });
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : 'Failed to fetch your items';
@@ -240,7 +265,8 @@ export const useListingStore = create<ListingState>()(
       fetchByCategory: async (category: string) => {
         set({ isLoading: true, error: null });
         try {
-          const categoryListings = await listingService.getListingsByCategory(category);
+          const raw = await listingService.getListingsByCategory(category);
+          const categoryListings = markFavorites(raw, get().favoriteItemIds);
           set({ categoryListings, isLoading: false });
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : 'Failed to fetch category';
@@ -248,23 +274,64 @@ export const useListingStore = create<ListingState>()(
         }
       },
 
-      toggleLike: (id: string) => {
-        const { listings, recommended, recentlyViewed, searchResults, categoryListings, selectedListing } = get();
+      toggleLike: (id: string, userEmail?: string) => {
+        const { listings, recommended, recentlyViewed, searchResults, categoryListings, selectedListing, favoriteItemIds, favoriteItems } = get();
+        const isCurrentlyLiked = favoriteItemIds.has(id);
         const toggle = (list: Listing[]) =>
           list.map((l) =>
-            l.id === id ? { ...l, isLiked: !l.isLiked, likes: l.isLiked ? l.likes - 1 : l.likes + 1 } : l
+            l.id === id ? { ...l, isLiked: !isCurrentlyLiked, likes: isCurrentlyLiked ? l.likes - 1 : l.likes + 1 } : l
           );
+
+        // Optimistic update
+        const newFavoriteIds = new Set(favoriteItemIds);
+        let newFavoriteItems = [...favoriteItems];
+        if (isCurrentlyLiked) {
+          newFavoriteIds.delete(id);
+          newFavoriteItems = newFavoriteItems.filter((item) => item.id !== id);
+        } else {
+          newFavoriteIds.add(id);
+          // Find the item from any listing array to add to favoriteItems
+          const item = listings.find((l) => l.id === id)
+            || recommended.find((l) => l.id === id)
+            || searchResults.find((l) => l.id === id)
+            || categoryListings.find((l) => l.id === id)
+            || (selectedListing?.id === id ? selectedListing : null);
+          if (item) {
+            newFavoriteItems = [{ ...item, isLiked: true, likes: item.likes + 1 }, ...newFavoriteItems];
+          }
+        }
+
         set({
           listings: toggle(listings),
           recommended: toggle(recommended),
           recentlyViewed: toggle(recentlyViewed),
           searchResults: toggle(searchResults),
           categoryListings: toggle(categoryListings),
+          favoriteItemIds: newFavoriteIds,
+          favoriteItems: newFavoriteItems,
           selectedListing:
             selectedListing?.id === id
-              ? { ...selectedListing, isLiked: !selectedListing.isLiked, likes: selectedListing.isLiked ? selectedListing.likes - 1 : selectedListing.likes + 1 }
+              ? { ...selectedListing, isLiked: !isCurrentlyLiked, likes: isCurrentlyLiked ? selectedListing.likes - 1 : selectedListing.likes + 1 }
               : selectedListing,
         });
+
+        // Fire API call in background (don't await)
+        if (userEmail) {
+          if (isCurrentlyLiked) {
+            listingService.removeFavorite(id, userEmail).catch(() => {
+              // Revert on failure
+              const revert = new Set(get().favoriteItemIds);
+              revert.add(id);
+              set({ favoriteItemIds: revert });
+            });
+          } else {
+            listingService.addFavorite(id, userEmail).catch(() => {
+              const revert = new Set(get().favoriteItemIds);
+              revert.delete(id);
+              set({ favoriteItemIds: revert });
+            });
+          }
+        }
       },
 
       addToRecentlyViewed: (listing: Listing) => {
@@ -273,6 +340,44 @@ export const useListingStore = create<ListingState>()(
         const filtered = recentlyViewed.filter((item) => item.id !== listing.id);
         const updated = [listing, ...filtered].slice(0, 10);
         set({ recentlyViewed: updated });
+      },
+
+      fetchFavorites: async (userEmail: string) => {
+        set({ isFavoritesLoading: true });
+        try {
+          const favorites = await listingService.getFavorites(userEmail);
+          const itemIds = favorites.map((f) => f.item_id).filter(Boolean);
+          const favoriteItemIds = new Set<string>(itemIds);
+
+          // Fetch item details for each favorite
+          const itemPromises = itemIds.map(async (id) => {
+            try {
+              const result = await listingService.getListingById(id);
+              return result?.listing || null;
+            } catch {
+              return null;
+            }
+          });
+          const items = (await Promise.all(itemPromises)).filter((item): item is Listing => item !== null);
+
+          // Re-mark isLiked on all existing listing arrays
+          const state = get();
+          set({
+            favoriteItemIds,
+            favoriteItems: items.map((item) => ({ ...item, isLiked: true })),
+            isFavoritesLoading: false,
+            listings: markFavorites(state.listings, favoriteItemIds),
+            recommended: markFavorites(state.recommended, favoriteItemIds),
+            recentlyViewed: markFavorites(state.recentlyViewed, favoriteItemIds),
+            searchResults: markFavorites(state.searchResults, favoriteItemIds),
+            categoryListings: markFavorites(state.categoryListings, favoriteItemIds),
+            selectedListing: state.selectedListing
+              ? { ...state.selectedListing, isLiked: favoriteItemIds.has(state.selectedListing.id) }
+              : null,
+          });
+        } catch {
+          set({ isFavoritesLoading: false });
+        }
       },
 
       clearSearch: () => set({ searchResults: [], activeFilter: {} }),

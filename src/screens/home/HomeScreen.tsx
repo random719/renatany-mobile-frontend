@@ -25,6 +25,7 @@ import { HomeSearchFilter } from "../../components/home/HomeSearchFilter";
 import { HowItWorks } from "../../components/home/HowItWorks";
 import { Testimonials } from "../../components/home/Testimonials";
 import { ListingCard } from "../../components/listing/ListingCard";
+import { useUser } from "@clerk/expo";
 import { useListingStore } from "../../store/listingStore";
 import { useUIStore } from "../../store/uiStore";
 import { colors, typography } from "../../theme";
@@ -37,6 +38,7 @@ type Nav = StackNavigationProp<ExtendedHomeStackParamList, "Home">;
 
 export const HomeScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { user } = useUser();
   const openSidebar = useUIStore((s) => s.openSidebar);
   const {
     listings,
@@ -51,6 +53,7 @@ export const HomeScreen = () => {
     fetchRecommended,
     fetchRecentlyViewed,
     fetchCategories,
+    fetchFavorites,
     toggleLike,
     applyFilter,
     setActiveFilter,
@@ -74,12 +77,15 @@ export const HomeScreen = () => {
     { label: "Popular", value: "popular" as const },
   ];
 
+  const userEmail = user?.emailAddresses?.[0]?.emailAddress;
+
   const loadData = useCallback(() => {
+    if (userEmail) fetchFavorites(userEmail);
     fetchListings();
     fetchRecommended();
     fetchRecentlyViewed();
     fetchCategories();
-  }, [fetchListings, fetchRecommended, fetchRecentlyViewed, fetchCategories]);
+  }, [fetchListings, fetchRecommended, fetchRecentlyViewed, fetchCategories, fetchFavorites, userEmail]);
 
   useEffect(() => {
     loadData();
@@ -214,7 +220,7 @@ export const HomeScreen = () => {
               listing={item}
               style={{ width: 280 }} // Explicit strict width for horizon lists
               onPress={() => handleListingPress(item)}
-              onToggleLike={() => toggleLike(item.id)}
+              onToggleLike={() => toggleLike(item.id, userEmail)}
             />
           )}
         />
@@ -512,7 +518,7 @@ export const HomeScreen = () => {
                       <ListingCard
                         listing={item}
                         onPress={() => handleListingPress(item)}
-                        onToggleLike={() => toggleLike(item.id)}
+                        onToggleLike={() => toggleLike(item.id, userEmail)}
                       />
                     </View>
                   ))}

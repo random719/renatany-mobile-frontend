@@ -1,9 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import React, { useMemo, useState } from 'react';
-import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { ActivityIndicator, Text } from 'react-native-paper';
+import { useUser } from '@clerk/expo';
+import React, { useCallback, useMemo, useState } from 'react';
+import { FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Button, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { ListingCard } from '../../components/listing/ListingCard';
@@ -13,128 +14,223 @@ import { FavoritesStackParamList } from '../../types/navigation';
 
 type Nav = StackNavigationProp<FavoritesStackParamList, 'Favorites'>;
 
+const ITEMS_PER_PAGE = 20;
+
 export const FavoritesScreen = () => {
-    const navigation = useNavigation<Nav>();
-    const { listings, toggleLike } = useListingStore();
+  const navigation = useNavigation<Nav>();
+  const { user } = useUser();
+  const {
+    favoriteItems,
+    isFavoritesLoading,
+    fetchFavorites,
+    toggleLike,
+  } = useListingStore();
 
-    const [page, setPage] = useState(1);
-    const ITEMS_PER_PAGE = 20;
+  const [page, setPage] = useState(1);
+  const [refreshing, setRefreshing] = useState(false);
+  const userEmail = user?.emailAddresses?.[0]?.emailAddress;
 
-    const favoriteListings = useMemo(() => {
-        return listings.filter((l) => l.isLiked);
-    }, [listings]);
+  const loadFavorites = useCallback(() => {
+    if (userEmail) {
+      fetchFavorites(userEmail);
+    }
+  }, [userEmail, fetchFavorites]);
 
-    const paginatedData = useMemo(() => {
-        return favoriteListings.slice(0, page * ITEMS_PER_PAGE);
-    }, [favoriteListings, page]);
+  // Re-fetch every time the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadFavorites();
+    }, [loadFavorites]),
+  );
 
-    const handleLoadMore = () => {
-        if (page * ITEMS_PER_PAGE < favoriteListings.length) {
-            setPage((prev) => prev + 1);
+  const handleRefresh = useCallback(async () => {
+    if (!userEmail) return;
+    setRefreshing(true);
+    await fetchFavorites(userEmail);
+    setRefreshing(false);
+    setPage(1);
+  }, [userEmail, fetchFavorites]);
+
+  const paginatedData = useMemo(() => {
+    return favoriteItems.slice(0, page * ITEMS_PER_PAGE);
+  }, [favoriteItems, page]);
+
+  const handleLoadMore = () => {
+    if (page * ITEMS_PER_PAGE < favoriteItems.length) {
+      setPage((prev) => prev + 1);
+    }
+  };
+
+  const handleToggleLike = useCallback(
+    (id: string) => {
+      toggleLike(id, userEmail);
+    },
+    [toggleLike, userEmail],
+  );
+
+  const totalPages = Math.max(1, Math.ceil(favoriteItems.length / ITEMS_PER_PAGE));
+
+  return (
+    <View style={styles.container}>
+      <GlobalHeader />
+      <FlatList
+        data={paginatedData}
+        numColumns={2}
+        columnWrapperStyle={styles.gridRow}
+        keyExtractor={(item) => item.id}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        ListHeaderComponent={
+          <View style={styles.headerSection}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => navigation.goBack()}
+            >
+              <MaterialCommunityIcons name="arrow-left" size={20} color={colors.textSecondary} />
+              <Text style={styles.backBtnText}>Back to Browse</Text>
+            </TouchableOpacity>
+
+            <View style={styles.titleRow}>
+              <MaterialCommunityIcons name="heart" size={32} color="#EF4444" />
+              <Text variant="headlineMedium" style={styles.title}>
+                My Favorites
+              </Text>
+            </View>
+
+            <Text variant="bodyLarge" style={styles.countText}>
+              {isFavoritesLoading
+                ? 'Loading...'
+                : `${favoriteItems.length} ${favoriteItems.length === 1 ? 'item' : 'items'} saved${totalPages > 1 ? ` (Page ${Math.min(page, totalPages)} of ${totalPages})` : ''}`}
+            </Text>
+          </View>
         }
-    };
-
-    return (
-        <View style={styles.container}>
-            <GlobalHeader />
-            <FlatList
-                data={paginatedData}
-                keyExtractor={(item) => item.id}
-                onEndReached={handleLoadMore}
-                onEndReachedThreshold={0.5}
-                ListHeaderComponent={
-                    <>
-                        <View style={styles.headerSection}>
-                            <TouchableOpacity
-                                style={styles.backBtn}
-                                onPress={() => navigation.goBack()}
-                            >
-                                <MaterialCommunityIcons name="arrow-left" size={20} color={colors.textSecondary} />
-                                <Text style={styles.backBtnText}>Back to Browse</Text>
-                            </TouchableOpacity>
-
-                            <View style={styles.titleRow}>
-                                <Text variant="displaySmall" style={styles.heartIcon}>
-                                    ❤️
-                                </Text>
-                                <Text variant="displaySmall" style={styles.title}>
-                                    My Favorites
-                                </Text>
-                            </View>
-
-                            <Text variant="bodyLarge" style={styles.countText}>
-                                {favoriteListings.length} {favoriteListings.length === 1 ? 'item' : 'items'} saved
-                            </Text>
-                        </View>
-                    </>
-                }
-                renderItem={({ item }) => (
-                    <View style={styles.cardWrapper}>
-                        <ListingCard
-                            listing={item}
-                            onPress={() => navigation.navigate('ListingDetail', { listingId: item.id })}
-                            onToggleLike={() => toggleLike(item.id)}
-                        />
-                    </View>
-                )}
-                ListFooterComponent={
-                    <>
-                        {page * ITEMS_PER_PAGE < favoriteListings.length && (
-                            <ActivityIndicator style={{ paddingVertical: 20 }} color={colors.primary} />
-                        )}
-                        <Footer />
-                    </>
-                }
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          isFavoritesLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.loadingText}>Loading favorites...</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <MaterialCommunityIcons name="heart-outline" size={64} color="#D1D5DB" />
+              <Text variant="bodyLarge" style={styles.emptyTitle}>
+                No favorites yet.
+              </Text>
+              <Text variant="bodyMedium" style={styles.emptySubtitle}>
+                Start browsing to add items to your favorites!
+              </Text>
+              <Button
+                mode="contained"
+                onPress={() => navigation.getParent()?.navigate('HomeTab')}
+                style={styles.browseButton}
+              >
+                Browse Items
+              </Button>
+            </View>
+          )
+        }
+        renderItem={({ item }) => (
+          <View style={styles.cardWrapper}>
+            <ListingCard
+              listing={item}
+              onPress={() => navigation.navigate('ListingDetail', { listingId: item.id })}
+              onToggleLike={() => handleToggleLike(item.id)}
             />
-        </View>
-    );
+          </View>
+        )}
+        ListFooterComponent={
+          <>
+            {page * ITEMS_PER_PAGE < favoriteItems.length && (
+              <ActivityIndicator style={{ paddingVertical: 20 }} color={colors.primary} />
+            )}
+            <Footer />
+          </>
+        }
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[colors.primary]} />
+        }
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#FFFFFF',
-    },
-    listContent: {
-        paddingBottom: 24,
-    },
-    headerSection: {
-        paddingHorizontal: 24,
-        paddingTop: 32,
-        paddingBottom: 32,
-    },
-    backBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 32,
-    },
-    backBtnText: {
-        color: '#334155',
-        fontSize: typography.body,
-        fontWeight: '500',
-    },
-    titleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        marginBottom: 8,
-    },
-    heartIcon: {
-        fontSize: typography.displayXL,
-    },
-    title: {
-        fontWeight: '800',
-        color: '#111827',
-    },
-    countText: {
-        color: '#64748B',
-        fontSize: typography.tabLabel,
-    },
-    cardWrapper: {
-        paddingHorizontal: 16,
-        marginBottom: 20,
-    },
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  listContent: {
+    paddingBottom: 24,
+  },
+  headerSection: {
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 24,
+  },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 32,
+  },
+  backBtnText: {
+    color: '#334155',
+    fontSize: typography.body,
+    fontWeight: '500',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  title: {
+    fontWeight: '800',
+    color: '#111827',
+  },
+  countText: {
+    color: '#64748B',
+    fontSize: typography.tabLabel,
+  },
+  gridRow: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  cardWrapper: {
+    flex: 1,
+    maxWidth: '48%',
+    marginBottom: 16,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    gap: 12,
+  },
+  loadingText: {
+    color: colors.textSecondary,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+    marginHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 8,
+  },
+  emptyTitle: {
+    color: '#6B7280',
+    marginTop: 8,
+  },
+  emptySubtitle: {
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  browseButton: {
+    marginTop: 12,
+  },
 });

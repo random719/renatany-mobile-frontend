@@ -68,16 +68,25 @@ export const getListings = async (params?: {
   return mockListings;
 };
 
-export const getListingById = async (id: string): Promise<Listing | undefined> => {
+export interface ItemOwner {
+  username?: string;
+  full_name?: string;
+  profile_picture?: string;
+  email?: string;
+}
+
+export const getListingById = async (id: string): Promise<{ listing: Listing; owner: ItemOwner | null } | undefined> => {
   if (USE_API) {
     const res = await api.get(`/items/${id}`);
     const data = res.data.data || res.data;
     // Backend returns { item, owner } for single item
     const item = data.item || data;
-    return mapItem(item);
+    const owner: ItemOwner | null = data.owner || null;
+    return { listing: mapItem(item), owner };
   }
   await new Promise((r) => setTimeout(r, 300));
-  return mockListings.find((l) => l.id === id);
+  const found = mockListings.find((l) => l.id === id);
+  return found ? { listing: found, owner: null } : undefined;
 };
 
 export const searchListings = async (query: string): Promise<Listing[]> => {
@@ -100,9 +109,12 @@ export const filterListings = async (filter: ListingFilter): Promise<Listing[]> 
     const params: Record<string, any> = {};
     if (filter.query) params.search = filter.query;
     if (filter.category) params.category = filter.category;
+    if (filter.location) params.location = filter.location;
     if (filter.minPrice !== undefined) params.min_price = filter.minPrice;
     if (filter.maxPrice !== undefined) params.max_price = filter.maxPrice;
     if (filter.sortBy) params.sort_by = filter.sortBy;
+    if (filter.availability === 'available') params.availability = true;
+    else if (filter.availability === 'unavailable') params.availability = false;
     const res = await api.get('/items', { params });
     return (res.data.data || res.data).map(mapItem);
   }
@@ -253,4 +265,41 @@ export const uploadFile = async (uri: string, type: string = 'image'): Promise<s
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return response.data.data.file_url;
+};
+
+export const trackViewedItem = async (userEmail: string, itemId: string): Promise<void> => {
+  if (!USE_API) return;
+  try {
+    await api.post('/viewed-items', {
+      user_email: userEmail,
+      item_id: itemId,
+      viewed_date: new Date().toISOString(),
+    });
+  } catch {
+    // non-critical, silently fail
+  }
+};
+
+// ── Favorites API ──
+
+export interface FavoriteData {
+  id: string;
+  user_email: string;
+  item_id: string;
+  created_at: string;
+}
+
+export const getFavorites = async (userEmail: string): Promise<FavoriteData[]> => {
+  if (!USE_API) return [];
+  const res = await api.get('/favorites', { params: { user_email: userEmail } });
+  return res.data.data || res.data || [];
+};
+
+export const addFavorite = async (itemId: string, userEmail: string): Promise<FavoriteData> => {
+  const res = await api.post('/favorites', { item_id: itemId, user_email: userEmail });
+  return res.data.data || res.data;
+};
+
+export const removeFavorite = async (itemId: string, userEmail: string): Promise<void> => {
+  await api.delete('/favorites', { data: { item_id: itemId, user_email: userEmail } });
 };

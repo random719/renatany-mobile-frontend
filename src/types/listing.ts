@@ -85,4 +85,5 @@ export interface ListingFilter {
   sortBy?: 'newest' | 'price_low' | 'price_high' | 'rating' | 'popular';
   query?: string;
   location?: string;
+  availability?: 'all' | 'available' | 'unavailable';
 }
