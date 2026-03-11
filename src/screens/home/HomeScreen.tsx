@@ -143,6 +143,11 @@ export const HomeScreen = () => {
   };
 
   const handleAdvancedFilters = () => {
+    // Sync current filters to searchResults via applyFilter before navigating
+    const { activeFilter } = useListingStore.getState();
+    if (activeFilter.category || activeFilter.query || activeFilter.location || activeFilter.sortBy) {
+      applyFilter(activeFilter);
+    }
     navigation.navigate("SearchTab" as any);
   };
 
