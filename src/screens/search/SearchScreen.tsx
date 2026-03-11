@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useCallback, useState } from 'react';
-import { FlatList, StyleSheet, TextInput, TouchableOpacity, View, Modal, Platform } from 'react-native';
+import { FlatList, StyleSheet, TextInput, TouchableOpacity, View, Modal, Platform, ScrollView } from 'react-native';
 import { ActivityIndicator, Menu, Text, Checkbox } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { ListingCard } from '../../components/listing/ListingCard';
@@ -24,11 +24,12 @@ export const SearchScreen = () => {
   const ITEMS_PER_PAGE = 10;
   
   // Modal state
-  const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
+  const [isCategoryMenuVisible, setIsCategoryMenuVisible] = useState(false);
   const [isAdvancedFilterModalVisible, setIsAdvancedFilterModalVisible] = useState(false);
   
   // Sort state
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
+  const [isAvailabilityMenuVisible, setIsAvailabilityMenuVisible] = useState(false);
   const [selectedSort, setSelectedSort] = useState<string>('Relevance');
 
   const SORT_OPTIONS: { label: string; value?: 'newest' | 'price_low' | 'price_high' | 'rating' | 'popular' }[] = [
@@ -93,7 +94,7 @@ export const SearchScreen = () => {
   }, [activeFilter, applyFilter]);
 
   const handleSelectCategory = (categoryName?: string) => {
-    setIsCategoryModalVisible(false);
+    setIsCategoryMenuVisible(false);
     setPage(1);
     if (categoryName) {
       applyFilter({ ...activeFilter, category: categoryName });
@@ -103,13 +104,26 @@ export const SearchScreen = () => {
     }
   };
 
-  const hasActiveFilters = 
+  const hasActiveFilters = !!(
     activeFilter.category || 
     activeFilter.query || 
     activeFilter.location || 
     activeFilter.minPrice || 
     activeFilter.maxPrice || 
-    activeFilter.rating;
+    activeFilter.rating
+  );
+
+  const getActiveFiltersCount = () => {
+    let count = 0;
+    if (activeFilter.category) count++;
+    if (activeFilter.query) count++;
+    if (activeFilter.location) count++;
+    if (activeFilter.minPrice || activeFilter.maxPrice) count++;
+    if (activeFilter.rating) count++;
+    return count;
+  };
+  
+  const activeFiltersCount = getActiveFiltersCount();
 
   const dataSource = hasActiveFilters ? searchResults : listings;
 
@@ -128,12 +142,6 @@ export const SearchScreen = () => {
           Search & Filter
         </Text>
         <View style={styles.headerActions}>
-          {hasActiveFilters && (
-            <TouchableOpacity onPress={handleClear} style={[styles.saveBtn, { marginRight: 8, borderColor: 'transparent' }]}>
-              <MaterialCommunityIcons name="filter-remove-outline" size={18} color="#DC2626" />
-              <Text style={[styles.saveBtnText, { color: '#DC2626' }]}>Clear</Text>
-            </TouchableOpacity>
-          )}
           <TouchableOpacity style={styles.saveBtn}>
             <MaterialCommunityIcons name="bookmark-outline" size={18} color={colors.textPrimary} />
             <Text style={styles.saveBtnText}>Save Search</Text>
@@ -165,15 +173,41 @@ export const SearchScreen = () => {
         />
       </View>
 
-      <TouchableOpacity 
-        style={styles.dropdownBtn}
-        onPress={() => setIsCategoryModalVisible(true)}
+      <Menu
+        visible={isCategoryMenuVisible}
+        onDismiss={() => setIsCategoryMenuVisible(false)}
+        anchorPosition="bottom"
+        contentStyle={styles.menuContent}
+        anchor={
+          <TouchableOpacity 
+            style={styles.dropdownBtn}
+            onPress={() => setIsCategoryMenuVisible(true)}
+          >
+            <Text style={styles.dropdownText}>
+              {activeFilter.category || 'All Categories'}
+            </Text>
+            <MaterialCommunityIcons name="chevron-down" size={20} color="#6B7280" />
+          </TouchableOpacity>
+        }
       >
-        <Text style={styles.dropdownText}>
-          {activeFilter.category || 'All Categories'}
-        </Text>
-        <MaterialCommunityIcons name="chevron-down" size={20} color="#6B7280" />
-      </TouchableOpacity>
+        <ScrollView style={styles.menuScroll}>
+          <Menu.Item
+            title="All Categories"
+            leadingIcon="view-grid"
+            onPress={() => handleSelectCategory(undefined)}
+            titleStyle={!activeFilter.category ? styles.menuItemActiveText : undefined}
+          />
+          {categories.map((c) => (
+            <Menu.Item
+              key={c.id}
+              title={c.name}
+              leadingIcon={c.icon as any}
+              onPress={() => handleSelectCategory(c.name)}
+              titleStyle={activeFilter.category === c.name ? styles.menuItemActiveText : undefined}
+            />
+          ))}
+        </ScrollView>
+      </Menu>
 
       <View style={styles.filtersRow}>
         <TouchableOpacity 
@@ -187,6 +221,8 @@ export const SearchScreen = () => {
         <Menu
           visible={sortMenuVisible}
           onDismiss={() => setSortMenuVisible(false)}
+          anchorPosition="bottom"
+          contentStyle={styles.menuContent}
           anchor={
             <TouchableOpacity style={styles.actionBtnRow} onPress={() => setSortMenuVisible(true)}>
               <MaterialCommunityIcons name="swap-vertical" size={18} color={colors.textPrimary} />
@@ -200,6 +236,75 @@ export const SearchScreen = () => {
           ))}
         </Menu>
       </View>
+
+      {hasActiveFilters ? (
+        <View style={styles.activeFiltersContainer}>
+          <TouchableOpacity onPress={handleClear} style={styles.clearAllBtn}>
+            <MaterialCommunityIcons name="close" size={16} color="#6B7280" />
+            <Text style={styles.clearAllText}>Clear ({activeFiltersCount})</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.tagsContainer}>
+            {activeFilter.category && (
+              <View style={styles.filterTag}>
+                <Text style={styles.filterTagText}>{activeFilter.category}</Text>
+                <TouchableOpacity onPress={() => handleSelectCategory(undefined)}>
+                  <MaterialCommunityIcons name="close" size={14} color="#4B5563" />
+                </TouchableOpacity>
+              </View>
+            )}
+            {activeFilter.query && (
+              <View style={styles.filterTag}>
+                <Text style={styles.filterTagText}>"{activeFilter.query}"</Text>
+                <TouchableOpacity onPress={() => {
+                  setQuery('');
+                  applyFilter({ ...activeFilter, query: undefined });
+                }}>
+                  <MaterialCommunityIcons name="close" size={14} color="#4B5563" />
+                </TouchableOpacity>
+              </View>
+            )}
+            {activeFilter.location && (
+              <View style={styles.filterTag}>
+                <Text style={styles.filterTagText}>{activeFilter.location}</Text>
+                <TouchableOpacity onPress={() => {
+                  setLocation('');
+                  applyFilter({ ...activeFilter, location: undefined });
+                }}>
+                  <MaterialCommunityIcons name="close" size={14} color="#4B5563" />
+                </TouchableOpacity>
+              </View>
+            )}
+            {(activeFilter.minPrice || activeFilter.maxPrice) && (
+              <View style={styles.filterTag}>
+                <Text style={styles.filterTagText}>
+                  ${activeFilter.minPrice || 0} - ${activeFilter.maxPrice || 'Any'}
+                </Text>
+                <TouchableOpacity onPress={() => {
+                  setMinPrice('');
+                  setMaxPrice('');
+                  const { minPrice: _min, maxPrice: _max, ...rest } = activeFilter;
+                  applyFilter(rest);
+                }}>
+                  <MaterialCommunityIcons name="close" size={14} color="#4B5563" />
+                </TouchableOpacity>
+              </View>
+            )}
+            {activeFilter.rating && (
+              <View style={styles.filterTag}>
+                <Text style={styles.filterTagText}>{activeFilter.rating}+ Stars</Text>
+                <TouchableOpacity onPress={() => {
+                  setHasRating(false);
+                  const { rating: _r, ...rest } = activeFilter;
+                  applyFilter(rest);
+                }}>
+                  <MaterialCommunityIcons name="close" size={14} color="#4B5563" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 
@@ -292,10 +397,30 @@ export const SearchScreen = () => {
               </View>
 
               <Text style={styles.advancedFilterLabel}>Availability</Text>
-              <TouchableOpacity style={styles.availabilityDropdown}>
-                <Text style={styles.availabilityText}>{availability}</Text>
-                <MaterialCommunityIcons name="chevron-down" size={20} color="#9CA3AF" />
-              </TouchableOpacity>
+              <Menu
+                visible={isAvailabilityMenuVisible}
+                onDismiss={() => setIsAvailabilityMenuVisible(false)}
+                anchorPosition="bottom"
+                contentStyle={styles.menuContent}
+                anchor={
+                  <TouchableOpacity 
+                    style={styles.availabilityDropdown}
+                    onPress={() => setIsAvailabilityMenuVisible(true)}
+                  >
+                    <Text style={styles.availabilityText}>{availability}</Text>
+                    <MaterialCommunityIcons name="chevron-down" size={20} color="#9CA3AF" />
+                  </TouchableOpacity>
+                }
+              >
+                {['All Items', 'Available Now', 'For Rent', 'For Sale'].map((opt) => (
+                  <Menu.Item 
+                    key={opt} 
+                    title={opt} 
+                    onPress={() => { setAvailability(opt); setIsAvailabilityMenuVisible(false); }} 
+                    titleStyle={availability === opt ? styles.menuItemActiveText : undefined}
+                  />
+                ))}
+              </Menu>
               
               <View style={styles.filterDivider} />
 
@@ -368,56 +493,6 @@ export const SearchScreen = () => {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={isCategoryModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setIsCategoryModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text variant="titleMedium" style={styles.modalTitle}>Select Category</Text>
-              <TouchableOpacity onPress={() => setIsCategoryModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={[{ id: 'all', name: 'All Categories', icon: 'view-grid', count: 0 }, ...categories]}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.categoryItem,
-                    (item.id === 'all' && !activeFilter.category) || item.name === activeFilter.category
-                      ? styles.categoryItemActive
-                      : null
-                  ]}
-                  onPress={() => handleSelectCategory(item.id === 'all' ? undefined : item.name)}
-                >
-                  <View style={styles.categoryItemLeft}>
-                    <MaterialCommunityIcons 
-                      name={item.icon as any} 
-                      size={24} 
-                      color={(item.id === 'all' && !activeFilter.category) || item.name === activeFilter.category ? colors.primary : '#6B7280'} 
-                    />
-                    <Text style={[
-                      styles.categoryItemText,
-                      ((item.id === 'all' && !activeFilter.category) || item.name === activeFilter.category) && styles.categoryItemTextActive
-                    ]}>
-                      {item.name}
-                    </Text>
-                  </View>
-                  {((item.id === 'all' && !activeFilter.category) || item.name === activeFilter.category) && (
-                    <MaterialCommunityIcons name="check" size={20} color={colors.primary} />
-                  )}
-                </TouchableOpacity>
-              )}
-            />
           </View>
         </View>
       </Modal>
@@ -668,5 +743,50 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: '500',
     color: '#111827',
+  },
+  menuContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+  },
+  menuScroll: {
+    maxHeight: 300,
+  },
+  menuItemActiveText: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  activeFiltersContainer: {
+    marginTop: 4,
+  },
+  clearAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+    gap: 4,
+  },
+  clearAllText: {
+    color: '#6B7280',
+    fontSize: typography.body,
+    fontWeight: '500',
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 6,
+  },
+  filterTagText: {
+    fontSize: typography.caption,
+    color: '#111827',
+    fontWeight: '500',
   },
 });

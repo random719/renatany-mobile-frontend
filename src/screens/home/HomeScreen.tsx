@@ -13,6 +13,7 @@ import {
   View,
   Platform,
   useWindowDimensions,
+  ScrollView as RNScrollView,
 } from "react-native";
 import { WebView } from "react-native-webview";
 import { ActivityIndicator, Menu, Text } from "react-native-paper";
@@ -313,6 +314,8 @@ export const HomeScreen = () => {
               <Menu
                 visible={categoryMenuVisible}
                 onDismiss={() => setCategoryMenuVisible(false)}
+                anchorPosition="bottom"
+                contentStyle={styles.menuContent}
                 anchor={
                   <TouchableOpacity style={styles.dropdownBtn} onPress={() => setCategoryMenuVisible(true)}>
                     <Text style={styles.dropdownText}>{selectedCategory || "All Categories"}</Text>
@@ -324,10 +327,23 @@ export const HomeScreen = () => {
                   </TouchableOpacity>
                 }
               >
-                <Menu.Item onPress={() => handleCategorySelect(undefined)} title="All Categories" />
-                {categories.map((cat) => (
-                  <Menu.Item key={cat.id} onPress={() => handleCategorySelect(cat.name)} title={cat.name} />
-                ))}
+                <RNScrollView style={styles.menuScroll}>
+                  <Menu.Item 
+                    onPress={() => handleCategorySelect(undefined)} 
+                    title="All Categories" 
+                    leadingIcon="view-grid"
+                    titleStyle={!selectedCategory ? styles.menuItemActiveText : undefined}
+                  />
+                  {categories.map((cat) => (
+                    <Menu.Item 
+                      key={cat.id} 
+                      onPress={() => handleCategorySelect(cat.name)} 
+                      title={cat.name} 
+                      leadingIcon={cat.icon as any}
+                      titleStyle={selectedCategory === cat.name ? styles.menuItemActiveText : undefined}
+                    />
+                  ))}
+                </RNScrollView>
               </Menu>
 
               <View style={styles.filtersRow}>
@@ -343,6 +359,8 @@ export const HomeScreen = () => {
                 <Menu
                   visible={sortMenuVisible}
                   onDismiss={() => setSortMenuVisible(false)}
+                  anchorPosition="bottom"
+                  contentStyle={styles.menuContent}
                   anchor={
                     <TouchableOpacity style={styles.actionBtnRow} onPress={() => setSortMenuVisible(true)}>
                       <MaterialCommunityIcons
@@ -774,5 +792,16 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontWeight: "700",
     fontSize: typography.title,
+  },
+  menuContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+  },
+  menuScroll: {
+    maxHeight: 300,
+  },
+  menuItemActiveText: {
+    color: colors.primary,
+    fontWeight: '600',
   },
 });
