@@ -59,9 +59,17 @@ export const useListingStore = create<ListingState>()(
       activeFilter: {},
 
       fetchListings: async () => {
+        const { activeFilter } = get();
         set({ isLoading: true, error: null });
         try {
-          const listings = await listingService.getListings({ limit: ITEMS_PER_PAGE, offset: 0 });
+          const params: Record<string, any> = { limit: ITEMS_PER_PAGE, offset: 0 };
+          if (activeFilter.query) params.search = activeFilter.query;
+          if (activeFilter.category) params.category = activeFilter.category;
+          if (activeFilter.location) params.location = activeFilter.location;
+          if (activeFilter.minPrice !== undefined) params.min_price = activeFilter.minPrice;
+          if (activeFilter.maxPrice !== undefined) params.max_price = activeFilter.maxPrice;
+          if (activeFilter.sortBy) params.sort_by = activeFilter.sortBy;
+          const listings = await listingService.getListings(params);
           set({ listings, isLoading: false, hasMoreListings: listings.length >= ITEMS_PER_PAGE });
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : 'Failed to fetch listings';
@@ -70,11 +78,18 @@ export const useListingStore = create<ListingState>()(
       },
 
       fetchMoreListings: async () => {
-        const { isLoadingMore, hasMoreListings, listings } = get();
+        const { isLoadingMore, hasMoreListings, listings, activeFilter } = get();
         if (isLoadingMore || !hasMoreListings) return;
         set({ isLoadingMore: true });
         try {
-          const more = await listingService.getListings({ limit: ITEMS_PER_PAGE, offset: listings.length });
+          const params: Record<string, any> = { limit: ITEMS_PER_PAGE, offset: listings.length };
+          if (activeFilter.query) params.search = activeFilter.query;
+          if (activeFilter.category) params.category = activeFilter.category;
+          if (activeFilter.location) params.location = activeFilter.location;
+          if (activeFilter.minPrice !== undefined) params.min_price = activeFilter.minPrice;
+          if (activeFilter.maxPrice !== undefined) params.max_price = activeFilter.maxPrice;
+          if (activeFilter.sortBy) params.sort_by = activeFilter.sortBy;
+          const more = await listingService.getListings(params);
           set({
             listings: [...listings, ...more],
             isLoadingMore: false,

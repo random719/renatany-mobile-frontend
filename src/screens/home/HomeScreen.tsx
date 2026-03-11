@@ -28,7 +28,7 @@ import { ListingCard } from "../../components/listing/ListingCard";
 import { useListingStore } from "../../store/listingStore";
 import { useUIStore } from "../../store/uiStore";
 import { colors, typography } from "../../theme";
-import { Category, Listing } from "../../types/listing";
+import { Category, Listing, ListingFilter } from "../../types/listing";
 import { HomeStackParamList } from "../../types/navigation";
 
 // Extend the local type for this specific navigation call
@@ -97,26 +97,41 @@ export const HomeScreen = () => {
     navigation.navigate("Categories");
   };
 
-  const handleSearchSubmit = () => {
-    const filter: any = {};
-    if (query.trim()) filter.query = query.trim();
-    if (location.trim()) filter.location = location.trim();
-    if (selectedCategory) filter.category = selectedCategory;
-    const sortOption = SORT_OPTIONS.find((o) => o.label === selectedSort);
-    if (sortOption?.value) filter.sortBy = sortOption.value;
+  // Build filter from current UI state and re-fetch listings
+  const applyCurrentFilters = useCallback((overrides?: Partial<ListingFilter>) => {
+    const filter: ListingFilter = {};
+    const q = overrides?.query ?? query.trim();
+    const loc = overrides?.location ?? location.trim();
+    const cat = overrides?.category !== undefined ? overrides.category : selectedCategory;
+    const sort = overrides?.sortBy !== undefined ? overrides.sortBy : SORT_OPTIONS.find((o) => o.label === selectedSort)?.value;
+
+    if (q) filter.query = q;
+    if (loc) filter.location = loc;
+    if (cat) filter.category = cat;
+    if (sort) filter.sortBy = sort;
+
     setActiveFilter(filter);
-    applyFilter(filter);
-    navigation.navigate("SearchTab" as any);
+    // fetchListings reads from activeFilter, but setState is async in zustand
+    // so we set it directly and then call fetch
+    useListingStore.setState({ activeFilter: filter });
+    fetchListings();
+  }, [query, location, selectedCategory, selectedSort, setActiveFilter, fetchListings]);
+
+  const handleSearchSubmit = () => {
+    applyCurrentFilters();
   };
 
   const handleCategorySelect = (categoryName?: string) => {
     setCategoryMenuVisible(false);
     setSelectedCategory(categoryName);
+    applyCurrentFilters({ category: categoryName });
   };
 
   const handleSortSelect = (label: string) => {
     setSortMenuVisible(false);
     setSelectedSort(label);
+    const sortValue = SORT_OPTIONS.find((o) => o.label === label)?.value;
+    applyCurrentFilters({ sortBy: sortValue });
   };
 
   const handleSaveSearch = () => {

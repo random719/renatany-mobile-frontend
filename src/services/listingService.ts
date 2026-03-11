@@ -46,7 +46,16 @@ const mapItem = (item: any): Listing => ({
   createdAt: item.created_at ?? item.createdAt ?? new Date().toISOString(),
 });
 
-export const getListings = async (params?: { limit?: number; offset?: number }): Promise<Listing[]> => {
+export const getListings = async (params?: {
+  limit?: number;
+  offset?: number;
+  search?: string;
+  category?: string;
+  location?: string;
+  min_price?: number;
+  max_price?: number;
+  sort_by?: string;
+}): Promise<Listing[]> => {
   if (USE_API) {
     const res = await api.get('/items', { params });
     return (res.data.data || res.data).map(mapItem);
