@@ -1,7 +1,10 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as listingService from '../services/listingService';
 import { Category, Listing, ListingFilter } from '../types/listing';
+
+const ITEMS_PER_PAGE = 20;
 
 interface ListingState {
   listings: Listing[];
@@ -13,10 +16,13 @@ interface ListingState {
   searchResults: Listing[];
   categoryListings: Listing[];
   isLoading: boolean;
+  isLoadingMore: boolean;
   isSubmitting: boolean;
+  hasMoreListings: boolean;
   error: string | null;
   activeFilter: ListingFilter;
   fetchListings: () => Promise<void>;
+  fetchMoreListings: () => Promise<void>;
   fetchRecommended: () => Promise<void>;
   fetchRecentlyViewed: () => Promise<void>;
   fetchCategories: () => Promise<void>;
@@ -46,18 +52,36 @@ export const useListingStore = create<ListingState>()(
       searchResults: [],
       categoryListings: [],
       isLoading: false,
+      isLoadingMore: false,
       isSubmitting: false,
+      hasMoreListings: true,
       error: null,
       activeFilter: {},
 
       fetchListings: async () => {
         set({ isLoading: true, error: null });
         try {
-          const listings = await listingService.getListings();
-          set({ listings, isLoading: false });
+          const listings = await listingService.getListings({ limit: ITEMS_PER_PAGE, offset: 0 });
+          set({ listings, isLoading: false, hasMoreListings: listings.length >= ITEMS_PER_PAGE });
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : 'Failed to fetch listings';
           set({ error: message, isLoading: false });
+        }
+      },
+
+      fetchMoreListings: async () => {
+        const { isLoadingMore, hasMoreListings, listings } = get();
+        if (isLoadingMore || !hasMoreListings) return;
+        set({ isLoadingMore: true });
+        try {
+          const more = await listingService.getListings({ limit: ITEMS_PER_PAGE, offset: listings.length });
+          set({
+            listings: [...listings, ...more],
+            isLoadingMore: false,
+            hasMoreListings: more.length >= ITEMS_PER_PAGE,
+          });
+        } catch {
+          set({ isLoadingMore: false });
         }
       },
 
@@ -242,7 +266,7 @@ export const useListingStore = create<ListingState>()(
     }),
     {
       name: 'listing-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         recentlyViewed: state.recentlyViewed,
       }),

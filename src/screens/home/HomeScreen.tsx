@@ -44,7 +44,10 @@ export const HomeScreen = () => {
     recentlyViewed,
     categories,
     isLoading,
+    isLoadingMore,
+    hasMoreListings,
     fetchListings,
+    fetchMoreListings,
     fetchRecommended,
     fetchRecentlyViewed,
     fetchCategories,
@@ -206,6 +209,14 @@ export const HomeScreen = () => {
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={loadData} />
         }
+        onScroll={({ nativeEvent }) => {
+          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+          if (distanceFromBottom < 500 && viewMode === "grid") {
+            fetchMoreListings();
+          }
+        }}
+        scrollEventThrottle={400}
       >
         <HeroBanner itemCount={listings.length} onMenuPress={openSidebar} />
 
@@ -476,7 +487,7 @@ export const HomeScreen = () => {
                       All Items
                     </Text>
                   </View>
-                  {listings.slice(0, 4).map((item) => (
+                  {listings.map((item) => (
                     <View key={item.id} style={styles.gridItemWrapper}>
                       <ListingCard
                         listing={item}
@@ -485,22 +496,12 @@ export const HomeScreen = () => {
                       />
                     </View>
                   ))}
-                </View>
-              )}
-
-              {viewMode === "grid" && listings.length > 4 && (
-                <View style={styles.viewAllContainer}>
-                  <TouchableOpacity
-                    style={styles.viewAllButton}
-                    onPress={() => navigation.navigate("SearchTab")}
-                  >
-                    <Text style={styles.viewAllText}>View All</Text>
-                    <MaterialCommunityIcons
-                      name="arrow-right"
-                      size={16}
-                      color={colors.primary}
-                    />
-                  </TouchableOpacity>
+                  {isLoadingMore && (
+                    <ActivityIndicator style={{ marginVertical: 16 }} size="small" />
+                  )}
+                  {!hasMoreListings && listings.length > 0 && (
+                    <Text style={styles.endOfListText}>No more items to show</Text>
+                  )}
                 </View>
               )}
             </View>
@@ -622,29 +623,6 @@ const styles = StyleSheet.create({
   gridItemWrapper: {
     width: "100%", // Full width items
     marginBottom: 20, // Give them plenty of breathing room vertically
-  },
-  viewAllContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 24,
-    alignItems: "center",
-  },
-  viewAllButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    gap: 8,
-  },
-  viewAllText: {
-    color: colors.primary,
-    fontWeight: "600",
-    fontSize: typography.body,
   },
   loader: {
     marginTop: 48,
@@ -803,5 +781,11 @@ const styles = StyleSheet.create({
   menuItemActiveText: {
     color: colors.primary,
     fontWeight: '600',
+  },
+  endOfListText: {
+    textAlign: 'center',
+    color: '#9CA3AF',
+    fontSize: typography.body,
+    paddingVertical: 16,
   },
 });

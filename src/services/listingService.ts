@@ -46,12 +46,16 @@ const mapItem = (item: any): Listing => ({
   createdAt: item.created_at ?? item.createdAt ?? new Date().toISOString(),
 });
 
-export const getListings = async (): Promise<Listing[]> => {
+export const getListings = async (params?: { limit?: number; offset?: number }): Promise<Listing[]> => {
   if (USE_API) {
-    const res = await api.get('/items');
+    const res = await api.get('/items', { params });
     return (res.data.data || res.data).map(mapItem);
   }
   await new Promise((r) => setTimeout(r, 500));
+  if (params?.limit) {
+    const start = params.offset ?? 0;
+    return mockListings.slice(start, start + params.limit);
+  }
   return mockListings;
 };
 
