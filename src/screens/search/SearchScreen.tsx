@@ -233,10 +233,10 @@ export const SearchScreen = () => {
       </View>
 
       {/* Search button */}
-      <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+      {/* <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
         <MaterialCommunityIcons name="magnify" size={20} color="#FFFFFF" />
         <Text style={styles.searchBtnText}>Search</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
 
       {/* Category dropdown */}
       <Menu
@@ -426,6 +426,7 @@ export const SearchScreen = () => {
       <View style={styles.contentWrapper}>
         {isLoading && dataSource.length === 0 ? (
           <FlatList
+            key="loading"
             data={[]}
             ListHeaderComponent={renderHeader()}
             ListEmptyComponent={<ActivityIndicator style={styles.loader} size="large" color={colors.primary} />}
@@ -433,6 +434,7 @@ export const SearchScreen = () => {
           />
         ) : (
           <FlatList
+            key="grid"
             data={dataSource}
             ListHeaderComponent={renderHeader()}
             numColumns={2}

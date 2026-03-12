@@ -6,7 +6,7 @@ import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 're
 import { ActivityIndicator, Button, Checkbox, Menu, Text, TextInput, Surface } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 import { CreateListingFormData } from '../../types/listing';
 import { useListingStore } from '../../store/listingStore';
 import { useAuthStore } from '../../store/authStore';
@@ -14,16 +14,16 @@ import { uploadFile } from '../../services/listingService';
 import { geocodeLocation } from '../../utils/geocodeLocation';
 
 const CATEGORIES = [
-    { value: 'electronics', label: 'Electronics' },
-    { value: 'tools', label: 'Tools' },
-    { value: 'fashion', label: 'Fashion' },
-    { value: 'sports', label: 'Sports' },
-    { value: 'vehicles', label: 'Vehicles' },
-    { value: 'home', label: 'Home' },
-    { value: 'books', label: 'Books' },
-    { value: 'music', label: 'Music' },
-    { value: 'photography', label: 'Photography' },
-    { value: 'other', label: 'Other' },
+    { value: 'electronics', label: 'Electronics', icon: 'laptop' },
+    { value: 'tools', label: 'Tools', icon: 'hammer' },
+    { value: 'fashion', label: 'Fashion', icon: 'tshirt-crew' },
+    { value: 'sports', label: 'Sports', icon: 'soccer' },
+    { value: 'vehicles', label: 'Vehicles', icon: 'car' },
+    { value: 'home', label: 'Home', icon: 'home' },
+    { value: 'books', label: 'Books', icon: 'book' },
+    { value: 'music', label: 'Music', icon: 'music' },
+    { value: 'photography', label: 'Photography', icon: 'camera' },
+    { value: 'other', label: 'Other', icon: 'dots-horizontal' },
 ];
 
 const CONDITIONS = [
@@ -58,7 +58,7 @@ const INITIAL_FORM_DATA: CreateListingFormData = {
 
 export const CreateListingScreen = () => {
     const navigation = useNavigation();
-    const { createItem, isSubmitting } = useListingStore();
+    const { createItem, isSubmitting, categories, fetchCategories } = useListingStore();
     const { user } = useAuthStore();
 
     const [step, setStep] = useState(1);
@@ -259,8 +259,13 @@ export const CreateListingScreen = () => {
         }
     }, [formData, uploadedImages, uploadedVideos, createItem, navigation, isStepValid]);
 
-    const categoryLabel = CATEGORIES.find(c => c.value === formData.category)?.label || '';
+    const categoryLabel = categories.find(c => c.name === formData.category)?.name || 
+                        CATEGORIES.find(c => c.value === formData.category || c.label === formData.category)?.label || '';
     const conditionLabel = CONDITIONS.find(c => c.value === formData.condition)?.label || 'Good';
+    React.useEffect(() => {
+        fetchCategories();
+    }, [fetchCategories]);
+
     const dailyRate = parseFloat(formData.daily_rate) || 0;
     const depositAmount = parseFloat(formData.deposit) || 0;
 
@@ -329,8 +334,8 @@ export const CreateListingScreen = () => {
                                             placeholder="e.g., Canon EOS R5 Camera"
                                             value={formData.title}
                                             onChangeText={(text) => handleInputChange('title', text)}
-                                            outlineColor="#E2E8F0"
-                                            activeOutlineColor="#CBD5E1"
+                                            outlineColor={colors.border}
+                                            activeOutlineColor={colors.accentBlue}
                                             style={styles.input}
                                             contentStyle={styles.inputText}
                                         />
@@ -346,8 +351,8 @@ export const CreateListingScreen = () => {
                                             onChangeText={(text) => handleInputChange('description', text)}
                                             multiline
                                             numberOfLines={4}
-                                            outlineColor="#E2E8F0"
-                                            activeOutlineColor="#CBD5E1"
+                                            outlineColor={colors.border}
+                                            activeOutlineColor={colors.accentBlue}
                                             style={[styles.input, styles.textArea]}
                                             contentStyle={styles.inputText}
                                         />
@@ -359,23 +364,36 @@ export const CreateListingScreen = () => {
                                         <Menu
                                             visible={categoryMenuVisible}
                                             onDismiss={() => setCategoryMenuVisible(false)}
+                                            contentStyle={styles.menuContent}
                                             anchor={
                                                 <TouchableOpacity style={styles.dropdownContainer} onPress={() => setCategoryMenuVisible(true)}>
                                                     <Text style={formData.category ? styles.dropdownTextValue : styles.dropdownText}>
                                                         {categoryLabel || 'Choose a category'}
                                                     </Text>
-                                                    <MaterialCommunityIcons name="chevron-down" size={20} color="#64748B" />
+                                                    <MaterialCommunityIcons name="chevron-down" size={20} color="#6B7280" />
                                                 </TouchableOpacity>
                                             }
                                         >
-                                            {CATEGORIES.map(cat => (
+                                            {categories.length > 0 ? categories.map(cat => (
+                                                <Menu.Item
+                                                    key={cat.id}
+                                                    onPress={() => {
+                                                        handleInputChange('category', cat.name);
+                                                        setCategoryMenuVisible(false);
+                                                    }}
+                                                    title={cat.name}
+                                                    leadingIcon={cat.icon as any}
+                                                    titleStyle={formData.category === cat.name ? styles.menuItemActiveText : undefined}
+                                                />
+                                            )) : CATEGORIES.map(cat => (
                                                 <Menu.Item
                                                     key={cat.value}
                                                     onPress={() => {
-                                                        handleInputChange('category', cat.value);
+                                                        handleInputChange('category', cat.label);
                                                         setCategoryMenuVisible(false);
                                                     }}
                                                     title={cat.label}
+                                                    leadingIcon={cat.icon as any}
                                                 />
                                             ))}
                                         </Menu>
@@ -390,7 +408,7 @@ export const CreateListingScreen = () => {
                                             anchor={
                                                 <TouchableOpacity style={styles.dropdownContainer} onPress={() => setConditionMenuVisible(true)}>
                                                     <Text style={styles.dropdownTextValue}>{conditionLabel}</Text>
-                                                    <MaterialCommunityIcons name="chevron-down" size={20} color="#64748B" />
+                                                    <MaterialCommunityIcons name="chevron-down" size={20} color="#6B7280" />
                                                 </TouchableOpacity>
                                             }
                                         >
@@ -418,8 +436,8 @@ export const CreateListingScreen = () => {
                                             placeholder="e.g., Downtown Brooklyn, New York"
                                             value={formData.location}
                                             onChangeText={(text) => handleInputChange('location', text)}
-                                            outlineColor="#E2E8F0"
-                                            activeOutlineColor="#CBD5E1"
+                                            outlineColor={colors.border}
+                                            activeOutlineColor={colors.accentBlue}
                                             style={styles.input}
                                             contentStyle={styles.inputText}
                                         />
@@ -439,8 +457,8 @@ export const CreateListingScreen = () => {
                                             placeholder="Street address (optional)"
                                             value={formData.street_address}
                                             onChangeText={(text) => handleInputChange('street_address', text)}
-                                            outlineColor="#E2E8F0"
-                                            activeOutlineColor="#CBD5E1"
+                                            outlineColor={colors.border}
+                                            activeOutlineColor={colors.accentBlue}
                                             style={[styles.input, { marginBottom: 12 }]}
                                             contentStyle={styles.inputText}
                                         />
@@ -451,8 +469,8 @@ export const CreateListingScreen = () => {
                                                 placeholder="Postal/ZIP code"
                                                 value={formData.postcode}
                                                 onChangeText={(text) => handleInputChange('postcode', text)}
-                                                outlineColor="#E2E8F0"
-                                                activeOutlineColor="#CBD5E1"
+                                                outlineColor={colors.border}
+                                                activeOutlineColor={colors.accentBlue}
                                                 style={[styles.input, styles.flex1, { marginRight: 12 }]}
                                                 contentStyle={styles.inputText}
                                             />
@@ -461,8 +479,8 @@ export const CreateListingScreen = () => {
                                                 placeholder="Country (optional)"
                                                 value={formData.country}
                                                 onChangeText={(text) => handleInputChange('country', text)}
-                                                outlineColor="#E2E8F0"
-                                                activeOutlineColor="#CBD5E1"
+                                                outlineColor={colors.border}
+                                                activeOutlineColor={colors.accentBlue}
                                                 style={[styles.input, styles.flex1]}
                                                 contentStyle={styles.inputText}
                                             />
@@ -557,8 +575,8 @@ export const CreateListingScreen = () => {
                                                 placeholder="25.00"
                                                 value={formData.daily_rate}
                                                 onChangeText={(text) => handleInputChange('daily_rate', text)}
-                                                outlineColor="#E2E8F0"
-                                                activeOutlineColor="#CBD5E1"
+                                                outlineColor={colors.border}
+                                                activeOutlineColor={colors.accentBlue}
                                                 style={styles.numberInput}
                                                 contentStyle={styles.inputText}
                                                 keyboardType="numeric"
@@ -578,8 +596,8 @@ export const CreateListingScreen = () => {
                                                 placeholder="50.00"
                                                 value={formData.deposit}
                                                 onChangeText={(text) => handleInputChange('deposit', text)}
-                                                outlineColor="#E2E8F0"
-                                                activeOutlineColor="#CBD5E1"
+                                                outlineColor={colors.border}
+                                                activeOutlineColor={colors.accentBlue}
                                                 style={styles.numberInput}
                                                 contentStyle={styles.inputText}
                                                 keyboardType="numeric"
@@ -619,8 +637,8 @@ export const CreateListingScreen = () => {
                                                     placeholder="Days (e.g., 7)"
                                                     value={newTier.days}
                                                     onChangeText={(text) => setNewTier(prev => ({ ...prev, days: text }))}
-                                                    outlineColor="#E2E8F0"
-                                                    activeOutlineColor="#CBD5E1"
+                                                    outlineColor={colors.border}
+                                                    activeOutlineColor={colors.accentBlue}
                                                     style={styles.numberInput}
                                                     contentStyle={styles.inputText}
                                                     keyboardType="numeric"
@@ -635,8 +653,8 @@ export const CreateListingScreen = () => {
                                                     placeholder="Price (e.g., 150)"
                                                     value={newTier.price}
                                                     onChangeText={(text) => setNewTier(prev => ({ ...prev, price: text }))}
-                                                    outlineColor="#E2E8F0"
-                                                    activeOutlineColor="#CBD5E1"
+                                                    outlineColor={colors.border}
+                                                    activeOutlineColor={colors.accentBlue}
                                                     style={styles.numberInput}
                                                     contentStyle={styles.inputText}
                                                     keyboardType="numeric"
@@ -676,8 +694,8 @@ export const CreateListingScreen = () => {
                                                     placeholder="1"
                                                     value={formData.min_rental_days}
                                                     onChangeText={(text) => handleInputChange('min_rental_days', text)}
-                                                    outlineColor="#E2E8F0"
-                                                    activeOutlineColor="#CBD5E1"
+                                                    outlineColor={colors.border}
+                                                    activeOutlineColor={colors.accentBlue}
                                                     style={styles.numberInputSmall}
                                                     contentStyle={styles.inputText}
                                                     keyboardType="numeric"
@@ -696,8 +714,8 @@ export const CreateListingScreen = () => {
                                                     placeholder="30"
                                                     value={formData.max_rental_days}
                                                     onChangeText={(text) => handleInputChange('max_rental_days', text)}
-                                                    outlineColor="#E2E8F0"
-                                                    activeOutlineColor="#CBD5E1"
+                                                    outlineColor={colors.border}
+                                                    activeOutlineColor={colors.accentBlue}
                                                     style={styles.numberInputSmall}
                                                     contentStyle={styles.inputText}
                                                     keyboardType="numeric"
@@ -716,8 +734,8 @@ export const CreateListingScreen = () => {
                                                     placeholder="24"
                                                     value={formData.notice_period_hours}
                                                     onChangeText={(text) => handleInputChange('notice_period_hours', text)}
-                                                    outlineColor="#E2E8F0"
-                                                    activeOutlineColor="#CBD5E1"
+                                                    outlineColor={colors.border}
+                                                    activeOutlineColor={colors.accentBlue}
                                                     style={styles.numberInputSmall}
                                                     contentStyle={styles.inputText}
                                                     keyboardType="numeric"
@@ -802,8 +820,8 @@ export const CreateListingScreen = () => {
                                                     placeholder="0.00"
                                                     value={formData.delivery_fee}
                                                     onChangeText={(text) => handleInputChange('delivery_fee', text)}
-                                                    outlineColor="#E2E8F0"
-                                                    activeOutlineColor="#CBD5E1"
+                                                    outlineColor={colors.border}
+                                                    activeOutlineColor={colors.accentBlue}
                                                     style={styles.input}
                                                     contentStyle={styles.inputText}
                                                     keyboardType="numeric"
@@ -816,8 +834,8 @@ export const CreateListingScreen = () => {
                                                     placeholder="10"
                                                     value={formData.delivery_radius}
                                                     onChangeText={(text) => handleInputChange('delivery_radius', text)}
-                                                    outlineColor="#E2E8F0"
-                                                    activeOutlineColor="#CBD5E1"
+                                                    outlineColor={colors.border}
+                                                    activeOutlineColor={colors.accentBlue}
                                                     style={styles.input}
                                                     contentStyle={styles.inputText}
                                                     keyboardType="numeric"
@@ -1051,6 +1069,8 @@ const styles = StyleSheet.create({
     input: {
         backgroundColor: '#FFFFFF',
         fontSize: 15,
+        borderRadius: 12,
+        height: 48,
     },
     inputText: {
         color: '#334155',
@@ -1065,19 +1085,21 @@ const styles = StyleSheet.create({
     numberInput: {
         backgroundColor: '#FFFFFF',
         fontSize: 15,
-        height: 52,
+        height: 48,
         paddingRight: 40,
+        borderRadius: 12,
     },
     numberInputSmall: {
         backgroundColor: '#FFFFFF',
         fontSize: 15,
         height: 48,
         paddingRight: 40,
+        borderRadius: 12,
     },
     stepperIcons: {
         position: 'absolute',
         right: 12,
-        top: 14,
+        top: 12,
         width: 24,
         height: 24,
         backgroundColor: '#F1F5F9',
@@ -1090,19 +1112,19 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         borderWidth: 1,
-        borderColor: '#E2E8F0',
-        borderRadius: 8,
-        paddingHorizontal: 16,
+        borderColor: colors.border,
+        borderRadius: 12,
+        paddingHorizontal: 14,
         height: 48,
         backgroundColor: '#FFFFFF',
     },
     dropdownText: {
-        color: '#94A3B8',
-        fontSize: 15,
+        color: '#4B5563', // Darker gray for better consistency with Home Screen
+        fontSize: typography.label,
     },
     dropdownTextValue: {
-        color: '#334155',
-        fontSize: 15,
+        color: colors.textPrimary,
+        fontSize: typography.label,
     },
     divider: {
         height: 1,
@@ -1357,5 +1379,14 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
         color: '#FFFFFF',
+    },
+    menuContent: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        marginTop: 8,
+    },
+    menuItemActiveText: {
+        color: colors.primary,
+        fontWeight: '700',
     },
 });

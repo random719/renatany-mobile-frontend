@@ -2,18 +2,19 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import React from 'react';
+import { StyleSheet, View } from 'react-native';
 import { FAB } from 'react-native-paper';
-import { GlobalHeader } from '../components/common/GlobalHeader';
 import { CategoriesScreen } from '../screens/categories/CategoriesScreen';
 import { CategoryDetailScreen } from '../screens/categories/CategoryDetailScreen';
 import { FavoritesScreen } from '../screens/favorites/FavoritesScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { CreateListingScreen } from '../screens/listing/CreateListingScreen';
 import { ListingDetailScreen } from '../screens/listing/ListingDetailScreen';
+import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { FilterScreen } from '../screens/search/FilterScreen';
 import { SavedSearchesScreen } from '../screens/search/saved/SavedSearchesScreen';
 import { SearchScreen } from '../screens/search/SearchScreen';
-import { colors, typography } from '../theme';
+import { colors } from '../theme';
 import {
   FavoritesStackParamList,
   HomeStackParamList,
@@ -22,19 +23,6 @@ import {
   SearchStackParamList
 } from '../types/navigation';
 
-// Placeholder screens for tabs not yet built (Flow 3)
-import { View as RNView, View, StyleSheet } from 'react-native';
-import { Button, Text } from 'react-native-paper';
-import { ProfileScreen } from '../screens/profile/ProfileScreen';
-
-const PlaceholderFavorites = () => (
-  <RNView style={styles.placeholder}>
-    <Text variant="headlineSmall">Favorites</Text>
-    <Text variant="bodyMedium" style={{ color: colors.textSecondary, marginTop: 8 }}>
-      Coming in Flow 3
-    </Text>
-  </RNView>
-);
 
 // --- Home Stack ---
 const HomeStack = createStackNavigator<HomeStackParamList>();
@@ -142,8 +130,8 @@ export const MainTabNavigator = () => (
       tabBarStyle: {
         backgroundColor: colors.cardLight,
         borderTopColor: colors.border,
-        height: 60,
-        paddingBottom: 8,
+        height: 70,
+        paddingBottom: 4,
         paddingTop: 4,
       },
     }}

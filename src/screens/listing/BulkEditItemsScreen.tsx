@@ -5,7 +5,7 @@ import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, Image } from 're
 import { ActivityIndicator, Button, Checkbox, Menu, Text, TextInput, Surface } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
-import { colors } from '../../theme';
+import { colors, typography } from '../../theme';
 import { BulkEditChanges, Listing } from '../../types/listing';
 import { useListingStore } from '../../store/listingStore';
 import { useAuthStore } from '../../store/authStore';
@@ -255,18 +255,26 @@ export const BulkEditItemsScreen = () => {
                                 <Menu
                                     visible={availabilityMenuVisible}
                                     onDismiss={() => setAvailabilityMenuVisible(false)}
+                                    contentStyle={styles.menuContent}
                                     anchor={
                                         <TouchableOpacity style={styles.dropdownContainer} onPress={() => setAvailabilityMenuVisible(true)}>
-                                            <Text style={styles.dropdownTextValue}>{getTriStateLabel(bulkChanges.availability)}</Text>
+                                            <Text style={bulkChanges.availability !== null ? styles.dropdownTextValue : styles.dropdownTextPlaceholder}>
+                                                {getTriStateLabel(bulkChanges.availability)}
+                                            </Text>
                                             <MaterialCommunityIcons name="chevron-down" size={20} color="#64748B" />
                                         </TouchableOpacity>
                                     }
                                 >
                                     {TRISTATE_OPTIONS.map((opt, idx) => (
-                                        <Menu.Item key={idx} title={opt.label} onPress={() => {
-                                            setBulkChanges(prev => ({ ...prev, availability: opt.value }));
-                                            setAvailabilityMenuVisible(false);
-                                        }} />
+                                        <Menu.Item 
+                                            key={idx} 
+                                            title={opt.label} 
+                                            titleStyle={bulkChanges.availability === opt.value ? styles.menuItemActiveText : undefined}
+                                            onPress={() => {
+                                                setBulkChanges(prev => ({ ...prev, availability: opt.value }));
+                                                setAvailabilityMenuVisible(false);
+                                            }} 
+                                        />
                                     ))}
                                 </Menu>
                             </View>
@@ -280,8 +288,8 @@ export const BulkEditItemsScreen = () => {
                                             placeholder="No change"
                                             value={bulkChanges.min_rental_days}
                                             onChangeText={(text) => setBulkChanges(prev => ({ ...prev, min_rental_days: text }))}
-                                            outlineColor="#E2E8F0"
-                                            activeOutlineColor="#CBD5E1"
+                                            outlineColor={colors.border}
+                                            activeOutlineColor={colors.accentBlue}
                                             style={styles.numberInput}
                                             contentStyle={styles.inputTextPlaceholder}
                                             keyboardType="numeric"
@@ -300,8 +308,8 @@ export const BulkEditItemsScreen = () => {
                                             placeholder="No change"
                                             value={bulkChanges.max_rental_days}
                                             onChangeText={(text) => setBulkChanges(prev => ({ ...prev, max_rental_days: text }))}
-                                            outlineColor="#E2E8F0"
-                                            activeOutlineColor="#CBD5E1"
+                                            outlineColor={colors.border}
+                                            activeOutlineColor={colors.accentBlue}
                                             style={styles.numberInput}
                                             contentStyle={styles.inputTextPlaceholder}
                                             keyboardType="numeric"
@@ -321,8 +329,8 @@ export const BulkEditItemsScreen = () => {
                                         placeholder="No change"
                                         value={bulkChanges.notice_period_hours}
                                         onChangeText={(text) => setBulkChanges(prev => ({ ...prev, notice_period_hours: text }))}
-                                        outlineColor="#E2E8F0"
-                                        activeOutlineColor="#CBD5E1"
+                                        outlineColor={colors.border}
+                                        activeOutlineColor={colors.accentBlue}
                                         style={styles.numberInput}
                                         contentStyle={styles.inputTextPlaceholder}
                                         keyboardType="numeric"
@@ -341,8 +349,8 @@ export const BulkEditItemsScreen = () => {
                                         placeholder="e.g., 1.2 for 20% increase"
                                         value={bulkChanges.daily_rate_multiplier}
                                         onChangeText={(text) => setBulkChanges(prev => ({ ...prev, daily_rate_multiplier: text }))}
-                                        outlineColor="#E2E8F0"
-                                        activeOutlineColor="#CBD5E1"
+                                        outlineColor={colors.border}
+                                        activeOutlineColor={colors.accentBlue}
                                         style={styles.numberInput}
                                         contentStyle={styles.inputTextPlaceholder}
                                         keyboardType="numeric"
@@ -362,8 +370,8 @@ export const BulkEditItemsScreen = () => {
                                         placeholder="No change"
                                         value={bulkChanges.deposit}
                                         onChangeText={(text) => setBulkChanges(prev => ({ ...prev, deposit: text }))}
-                                        outlineColor="#E2E8F0"
-                                        activeOutlineColor="#CBD5E1"
+                                        outlineColor={colors.border}
+                                        activeOutlineColor={colors.accentBlue}
                                         style={styles.numberInput}
                                         contentStyle={styles.inputTextPlaceholder}
                                         keyboardType="numeric"
@@ -380,18 +388,26 @@ export const BulkEditItemsScreen = () => {
                                     <Menu
                                         visible={instantBookingMenuVisible}
                                         onDismiss={() => setInstantBookingMenuVisible(false)}
+                                        contentStyle={styles.menuContent}
                                         anchor={
                                             <TouchableOpacity style={styles.smallDropdownContainer} onPress={() => setInstantBookingMenuVisible(true)}>
-                                                <Text style={styles.dropdownTextValueSmall}>{getTriStateLabel(bulkChanges.instant_booking)}</Text>
+                                                <Text style={bulkChanges.instant_booking !== null ? styles.dropdownTextValueSmall : styles.dropdownTextPlaceholderSmall}>
+                                                    {getTriStateLabel(bulkChanges.instant_booking)}
+                                                </Text>
                                                 <MaterialCommunityIcons name="chevron-down" size={18} color="#64748B" />
                                             </TouchableOpacity>
                                         }
                                     >
                                         {TRISTATE_OPTIONS.map((opt, idx) => (
-                                            <Menu.Item key={idx} title={opt.label} onPress={() => {
-                                                setBulkChanges(prev => ({ ...prev, instant_booking: opt.value }));
-                                                setInstantBookingMenuVisible(false);
-                                            }} />
+                                            <Menu.Item 
+                                                key={idx} 
+                                                title={opt.label} 
+                                                titleStyle={bulkChanges.instant_booking === opt.value ? styles.menuItemActiveText : undefined}
+                                                onPress={() => {
+                                                    setBulkChanges(prev => ({ ...prev, instant_booking: opt.value }));
+                                                    setInstantBookingMenuVisible(false);
+                                                }} 
+                                            />
                                         ))}
                                     </Menu>
                                 </View>
@@ -632,15 +648,19 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         borderWidth: 1,
-        borderColor: '#E2E8F0',
-        borderRadius: 8,
-        paddingHorizontal: 16,
+        borderColor: colors.border,
+        borderRadius: 12,
+        paddingHorizontal: 14,
         height: 48,
         backgroundColor: '#FFFFFF',
     },
+    dropdownTextPlaceholder: {
+        color: '#4B5563', // Consistent darker gray placeholder
+        fontSize: typography.label,
+    },
     dropdownTextValue: {
-        color: '#64748B',
-        fontSize: 15,
+        color: colors.textPrimary, // Consistent active text color
+        fontSize: typography.label,
     },
     rowInputs: {
         flexDirection: 'row',
@@ -654,12 +674,13 @@ const styles = StyleSheet.create({
     },
     numberInput: {
         backgroundColor: '#FFFFFF',
-        fontSize: 15,
+        fontSize: typography.label,
         height: 48,
         paddingRight: 40,
+        borderRadius: 12,
     },
     inputTextPlaceholder: {
-        color: '#94A3B8',
+        color: '#4B5563',
     },
     stepperIcons: {
         position: 'absolute',
@@ -696,15 +717,19 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         borderWidth: 1,
-        borderColor: '#E2E8F0',
-        borderRadius: 8,
+        borderColor: colors.border,
+        borderRadius: 12,
         paddingHorizontal: 12,
-        height: 40,
+        height: 48,
         width: 140,
         backgroundColor: '#FFFFFF',
     },
+    dropdownTextPlaceholderSmall: {
+        color: '#4B5563',
+        fontSize: 14,
+    },
     dropdownTextValueSmall: {
-        color: '#64748B',
+        color: colors.textPrimary,
         fontSize: 14,
     },
     applyBtn: {
@@ -717,5 +742,14 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
         color: '#FFFFFF',
+    },
+    menuContent: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        marginTop: 8,
+    },
+    menuItemActiveText: {
+        color: colors.primary,
+        fontWeight: '700',
     },
 });
