@@ -10,18 +10,20 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { ActivityIndicator, Button, Text } from "react-native-paper";
+import { ActivityIndicator, Text } from "react-native-paper";
 import { GlobalHeader } from "../../components/common/GlobalHeader";
 import {
   getPendingRequests,
   RentalRequest,
   updateRentalRequestStatus,
 } from "../../services/adminService";
+import { getListings } from "../../services/listingService";
 import { colors, typography } from "../../theme";
 
 export const AdminModerationScreen = () => {
   const navigation = useNavigation();
   const [requests, setRequests] = useState<RentalRequest[]>([]);
+  const [items, setItems] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -31,6 +33,24 @@ export const AdminModerationScreen = () => {
     try {
       const data = await getPendingRequests();
       setRequests(data);
+
+      if (data.length > 0) {
+        const itemIds = [...new Set(data.map(r => r.item_id).filter(Boolean))];
+        if (itemIds.length > 0) {
+          try {
+            // Using getListings with params if supported, or falling back to individual fetches if needed
+            // For now, let's try to fetch them or at least prepare the mapping
+            const fetchedItems = await getListings({ limit: 100 }); // Simple approach for now
+            const itemsMap: Record<string, string> = {};
+            fetchedItems.forEach(item => {
+              itemsMap[item.id] = item.title;
+            });
+            setItems(itemsMap);
+          } catch (e) {
+            console.error("Error fetching items for requests:", e);
+          }
+        }
+      }
     } catch (e) {
       // API not connected yet — show empty state
       setRequests([]);
@@ -108,6 +128,15 @@ export const AdminModerationScreen = () => {
             />
             <Text style={styles.infoLabel}>Renter:</Text>
             <Text style={styles.infoValue}>{item.renter_email}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons
+              name="package-variant-closed"
+              size={16}
+              color="#64748B"
+            />
+            <Text style={styles.infoLabel}>Item:</Text>
+            <Text style={styles.infoValue}>{items[item.item_id] || 'Loading Item...'}</Text>
           </View>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons
@@ -239,6 +268,18 @@ export const AdminModerationScreen = () => {
                 {requests.length} Pending
               </Text>
             </View>
+            <TouchableOpacity
+              style={styles.refreshBtn}
+              onPress={loadData}
+              disabled={isLoading}
+            >
+              <MaterialCommunityIcons
+                name="refresh"
+                size={20}
+                color={colors.textPrimary}
+                style={isLoading ? { transform: [{ rotate: '45deg' }] } : {}}
+              />
+            </TouchableOpacity>
           </View>
         }
         ListEmptyComponent={
@@ -283,6 +324,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   backBtn: {
+    padding: 10,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  refreshBtn: {
     padding: 10,
     backgroundColor: "#FFFFFF",
     borderRadius: 12,

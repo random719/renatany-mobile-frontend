@@ -57,6 +57,8 @@ export const HomeScreen = () => {
     toggleLike,
     applyFilter,
     setActiveFilter,
+    availableCount,
+    fetchItemsStats,
   } = useListingStore();
 
   const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
@@ -67,6 +69,8 @@ export const HomeScreen = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
   const [selectedSort, setSelectedSort] = useState<string>("Relevance");
   const { height: screenHeight } = useWindowDimensions();
+  const scrollViewRef = React.useRef<RNScrollView>(null);
+  const allItemsRef = React.useRef<View>(null);
 
   const SORT_OPTIONS = [
     { label: "Relevance", value: undefined },
@@ -85,7 +89,8 @@ export const HomeScreen = () => {
     fetchRecommended();
     fetchRecentlyViewed();
     fetchCategories();
-  }, [fetchListings, fetchRecommended, fetchRecentlyViewed, fetchCategories, fetchFavorites, userEmail]);
+    fetchItemsStats();
+  }, [fetchListings, fetchRecommended, fetchRecentlyViewed, fetchCategories, fetchFavorites, fetchItemsStats, userEmail]);
 
   useEffect(() => {
     loadData();
@@ -156,7 +161,45 @@ export const HomeScreen = () => {
     }
     navigation.navigate("SearchTab" as any);
   };
+ 
+  const handleShowAvailableItems = () => {
+    applyCurrentFilters({ availability: 'available' });
+    // Scroll to the "All Items" section
+    // In React Native, we can use measure to get the position if needed, 
+    // or just scroll to a specific offset if we know the layout.
+    // For now, let's scroll to the middle of the page to show results.
+    scrollViewRef.current?.scrollTo({ y: 300 * 2, animated: true });
+  };
+ 
+  const handleGrowingCommunityPress = () => {
+    Alert.alert("Growing Community", "Join thousands of users sharing items in your neighborhood!");
+  };
 
+  const getActiveFiltersCount = () => {
+    const { activeFilter } = useListingStore.getState();
+    let count = 0;
+    if (activeFilter.category) count++;
+    if (activeFilter.query) count++;
+    if (activeFilter.location) count++;
+    if (activeFilter.sortBy) count++;
+    if (activeFilter.minPrice || activeFilter.maxPrice) count++;
+    if (activeFilter.rating) count++;
+    if (activeFilter.availability && activeFilter.availability !== 'all') count++;
+    return count;
+  };
+ 
+  const activeFiltersCount = getActiveFiltersCount();
+  const hasActiveFilters = activeFiltersCount > 0;
+ 
+  const handleClear = () => {
+    setQuery('');
+    setLocation('');
+    setSelectedCategory(undefined);
+    setSelectedSort('Relevance');
+    useListingStore.setState({ activeFilter: {} });
+    fetchListings();
+  };
+ 
   const renderSection = (
     title: string,
     data: Listing[],
@@ -231,6 +274,7 @@ export const HomeScreen = () => {
   return (
     <View style={styles.container}>
       <ScrollView
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={loadData} />
@@ -244,7 +288,12 @@ export const HomeScreen = () => {
         }}
         scrollEventThrottle={400}
       >
-        <HeroBanner itemCount={listings.length} onMenuPress={openSidebar} />
+        <HeroBanner 
+          availableCount={availableCount} 
+          onMenuPress={openSidebar}
+          onItemsAvailablePress={handleShowAvailableItems}
+          onGrowingCommunityPress={handleGrowingCommunityPress}
+        />
 
         {/* Trust Badges - Card Style Grid */}
         <View style={styles.trustSectionContainer}>
@@ -391,6 +440,11 @@ export const HomeScreen = () => {
                     color={colors.textPrimary}
                   />
                   <Text style={styles.actionBtnText}>Advanced Filters</Text>
+                  {activeFiltersCount > 0 && (
+                    <View style={styles.filterBadge}>
+                      <Text style={styles.filterBadgeText}>{activeFiltersCount}</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
 
                 <Menu
@@ -457,7 +511,54 @@ export const HomeScreen = () => {
                   </TouchableOpacity>
                 </View>
               </View>
-
+ 
+              {/* Active filter pills */}
+              {hasActiveFilters && (
+                <View style={styles.activeFiltersContainer}>
+                  <TouchableOpacity onPress={handleClear} style={styles.clearAllBtn}>
+                    <MaterialCommunityIcons name="close" size={16} color="#6B7280" />
+                    <Text style={styles.clearAllText}>Clear ({activeFiltersCount})</Text>
+                  </TouchableOpacity>
+ 
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagsContainer}>
+                    {selectedCategory && (
+                      <View style={styles.filterTag}>
+                        <Text style={styles.filterTagText}>{selectedCategory}</Text>
+                        <TouchableOpacity onPress={() => handleCategorySelect(undefined)}>
+                          <MaterialCommunityIcons name="close" size={14} color="#4B5563" />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    {query.trim() !== '' && (
+                      <View style={styles.filterTag}>
+                        <Text style={styles.filterTagText}>"{query}"</Text>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setQuery('');
+                            applyCurrentFilters({ query: '' });
+                          }}
+                        >
+                          <MaterialCommunityIcons name="close" size={14} color="#4B5563" />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    {location.trim() !== '' && (
+                      <View style={styles.filterTag}>
+                        <Text style={styles.filterTagText}>{location}</Text>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setLocation('');
+                            applyCurrentFilters({ location: '' });
+                          }}
+                        >
+                          <MaterialCommunityIcons name="close" size={14} color="#4B5563" />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </ScrollView>
+                </View>
+              )}
+ 
               {viewMode === "map" ? (
                 <View style={styles.mapContainer}>
                   {Platform.OS === "web" ? (
@@ -506,7 +607,7 @@ export const HomeScreen = () => {
                   </View>
                 </View>
               ) : (
-                <View style={styles.gridContainer}>
+                <View style={styles.gridContainer} ref={allItemsRef}>
                   <View style={styles.allItemsHeader}>
                     <MaterialCommunityIcons name="star" size={24} color="#8B5CF6" />
                     <Text variant="headlineSmall" style={styles.allItemsTitle}>
@@ -652,6 +753,58 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: 48,
+  },
+  activeFiltersContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 16,
+    gap: 12,
+  },
+  clearAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingRight: 12,
+    borderRightWidth: 1,
+    borderRightColor: '#E5E7EB',
+  },
+  clearAllText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  tagsContainer: {
+    flex: 1,
+  },
+  filterTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginRight: 8,
+    gap: 6,
+  },
+  filterTagText: {
+    fontSize: 12,
+    color: '#4B5563',
+    fontWeight: '500',
+  },
+  filterBadge: {
+    backgroundColor: '#8B5CF6',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    marginLeft: 4,
+  },
+  filterBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   searchHeader: {
     paddingHorizontal: 20,

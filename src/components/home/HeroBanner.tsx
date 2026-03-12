@@ -6,12 +6,20 @@ import { colors, typography } from '../../theme';
 import { GlobalHeader } from '../common/GlobalHeader';
 
 interface HeroBannerProps {
-  itemCount: number;
+  availableCount: number | null;
   onMenuPress?: () => void;
   onNotificationPress?: () => void;
+  onItemsAvailablePress?: () => void;
+  onGrowingCommunityPress?: () => void;
 }
 
-export const HeroBanner = ({ itemCount, onMenuPress, onNotificationPress }: HeroBannerProps) => (
+export const HeroBanner = ({ 
+  availableCount, 
+  onMenuPress, 
+  onNotificationPress,
+  onItemsAvailablePress,
+  onGrowingCommunityPress
+}: HeroBannerProps) => (
   <View style={styles.container}>
     <GlobalHeader onMenuPress={onMenuPress} onNotificationPress={onNotificationPress} />
 
@@ -34,13 +42,13 @@ export const HeroBanner = ({ itemCount, onMenuPress, onNotificationPress }: Hero
 
         {/* Stat Badges */}
         <View style={styles.statsRow}>
-          <TouchableOpacity style={styles.statBadge}>
+          <TouchableOpacity style={styles.statBadge} onPress={onItemsAvailablePress}>
             <MaterialCommunityIcons name="creation" size={20} color="#FFFFFF" />
             <Text variant="labelLarge" style={styles.statText}>
-              {itemCount} items available
+              {availableCount !== null ? `${availableCount} items available` : 'Loading...'}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.statBadge}>
+          <TouchableOpacity style={styles.statBadge} onPress={onGrowingCommunityPress}>
             <MaterialCommunityIcons name="trending-up" size={20} color="#FFFFFF" />
             <Text variant="labelLarge" style={styles.statText}>
               Growing community

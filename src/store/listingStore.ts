@@ -26,6 +26,7 @@ interface ListingState {
   hasMoreListings: boolean;
   error: string | null;
   activeFilter: ListingFilter;
+  availableCount: number | null;
   fetchListings: () => Promise<void>;
   fetchMoreListings: () => Promise<void>;
   fetchRecommended: () => Promise<void>;
@@ -47,6 +48,7 @@ interface ListingState {
   fetchFavorites: (userEmail: string) => Promise<void>;
   favoriteItems: Listing[];
   isFavoritesLoading: boolean;
+  fetchItemsStats: () => Promise<void>;
 }
 
 export const useListingStore = create<ListingState>()(
@@ -67,6 +69,7 @@ export const useListingStore = create<ListingState>()(
       hasMoreListings: true,
       error: null,
       activeFilter: {},
+      availableCount: null,
       favoriteItemIds: new Set<string>(),
       favoriteItems: [],
       isFavoritesLoading: false,
@@ -146,7 +149,16 @@ export const useListingStore = create<ListingState>()(
           // silent fail
         }
       },
-
+ 
+      fetchItemsStats: async () => {
+        try {
+          const res = await listingService.getItemsStats();
+          set({ availableCount: res.total_available });
+        } catch {
+          // silent fail
+        }
+      },
+ 
       fetchListingById: async (id: string) => {
         set({ isLoading: true, error: null });
         try {

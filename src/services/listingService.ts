@@ -68,6 +68,15 @@ export const getListings = async (params?: {
   return mockListings;
 };
 
+export const getItemsStats = async (): Promise<{ total_available: number }> => {
+  if (USE_API) {
+    const res = await api.get('/items/stats');
+    return res.data.data || res.data;
+  }
+  await new Promise((r) => setTimeout(r, 200));
+  return { total_available: mockListings.length };
+};
+
 export interface ItemOwner {
   username?: string;
   full_name?: string;
@@ -171,9 +180,55 @@ export const getListingsByCategory = async (category: string): Promise<Listing[]
   return mockListings.filter((l) => l.category === category);
 };
 
+const CATEGORY_ICONS: Record<string, string> = {
+  Electronics: 'monitor',
+  Tools: 'wrench',
+  Fashion: 'tshirt-crew',
+  Sports: 'run',
+  Vehicles: 'car',
+  Home: 'home',
+  Books: 'book-open-variant',
+  Music: 'music',
+  Photography: 'camera',
+  Other: 'dots-grid',
+};
+
 export const getCategories = async (): Promise<Category[]> => {
-  // Backend has no /categories endpoint — use local categories
-  await new Promise((r) => setTimeout(r, 100));
+  if (USE_API) {
+    try {
+      const res = await api.get('/categories');
+      const data = res.data.data || res.data;
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((c: any, idx: number) => ({
+          id: c.id ?? String(idx + 1),
+          name: c.name ?? c.category ?? '',
+          icon: CATEGORY_ICONS[c.name ?? c.category] ?? 'dots-grid',
+          count: c.count ?? c.item_count ?? 0,
+        }));
+      }
+    } catch {
+      // /categories not yet available, derive from items
+    }
+    try {
+      const res = await api.get('/items', { params: { limit: 100 } });
+      const items: any[] = res.data.data || res.data || [];
+      const counts = new Map<string, number>();
+      items.forEach((item: any) => {
+        const cat = item.category || 'Other';
+        counts.set(cat, (counts.get(cat) || 0) + 1);
+      });
+      if (counts.size > 0) {
+        return [...counts.entries()].map(([name, count], idx) => ({
+          id: String(idx + 1),
+          name,
+          icon: CATEGORY_ICONS[name] ?? 'dots-grid',
+          count,
+        }));
+      }
+    } catch {
+      // fall through to mock
+    }
+  }
   return mockCategories;
 };
 

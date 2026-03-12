@@ -103,6 +103,7 @@ export interface AdminDashboardData {
   userGrowthPct: number;
   userReportsCount: number;
   fraudReportsCount: number;
+  listingReportsCount: number;
   pendingModerationCount: number;
   openDisputesCount: number;
   pendingRequestsCount: number;

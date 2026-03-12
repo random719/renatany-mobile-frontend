@@ -53,3 +53,19 @@ export type ProfileStackParamList = {
   EditProfile: undefined;
   Settings: undefined;
 };
+
+export type RootStackParamList = {
+  Auth: undefined;
+  Main: undefined;
+  RentalHistory: undefined;
+  MyConversations: undefined;
+  Disputes: undefined;
+  SavedSearches: undefined;
+  AdminDashboard: undefined;
+  AdminModeration: undefined;
+  AdminDisputes: undefined;
+  AdminUserReports: undefined;
+  AdminFraudReports: undefined;
+  AdminListingReports: undefined;
+  BulkEditItems: undefined;
+};
