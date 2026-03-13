@@ -44,3 +44,14 @@ export interface Message {
   is_read: boolean;
   read_at?: string;
 }
+
+export interface AppNotification {
+  id: string;
+  user_email: string;
+  type: 'booking_update' | 'new_message' | 'review' | 'promotion' | 'system' | 'dispute';
+  title: string;
+  body: string;
+  data?: Record<string, string>;
+  is_read: boolean;
+  created_date: string;
+}

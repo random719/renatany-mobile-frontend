@@ -679,6 +679,10 @@ export const AdminDashboardScreen = () => {
                 <MaterialCommunityIcons name="clock-outline" size={iconSize.md} color="#2563EB" />
                 <Text style={styles.quickActionText}>Review Pending Requests ({dashboardData.pendingRequestsCount})</Text>
               </TouchableOpacity>
+              <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('CreateListing')}>
+                <MaterialCommunityIcons name="plus-circle-outline" size={iconSize.md} color="#16A34A" />
+                <Text style={styles.quickActionText}>Create New Listing</Text>
+              </TouchableOpacity>
             </View>
           </View>
           <View style={styles.userManagementCard}>

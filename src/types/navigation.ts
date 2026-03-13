@@ -60,6 +60,7 @@ export type RootStackParamList = {
   RentalHistory: undefined;
   MyConversations: undefined;
   Disputes: undefined;
+  DisputeDetail: { disputeId: string };
   SavedSearches: undefined;
   AdminDashboard: undefined;
   AdminModeration: undefined;
@@ -68,4 +69,11 @@ export type RootStackParamList = {
   AdminFraudReports: undefined;
   AdminListingReports: undefined;
   BulkEditItems: undefined;
+  CreateListing: undefined;
+  Booking: { listingId: string; listingTitle: string; pricePerDay: number; ownerEmail: string };
+  BookingConfirm: { listingId: string; listingTitle: string; pricePerDay: number; ownerEmail: string; startDate: string; endDate: string; totalDays: number; dailyRate: number; platformFee: number; deposit: number; totalAmount: number; message: string };
+  BookingSuccess: { rentalRequestId: string; listingTitle: string };
+  Chat: { rentalRequestId: string; otherUserEmail: string; itemId: string };
+  Notifications: undefined;
+  RentalDetail: { rentalId: string };
 };

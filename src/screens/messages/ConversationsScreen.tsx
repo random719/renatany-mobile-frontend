@@ -1,4 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
@@ -7,8 +9,10 @@ import { getRentalRequests } from '../../services/rentalService';
 import { useAuthStore } from '../../store/authStore';
 import { colors, typography } from '../../theme';
 import { RentalRequest } from '../../types/models';
+import { RootStackParamList } from '../../types/navigation';
 
 export const ConversationsScreen = () => {
+    const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const { user } = useAuthStore();
     const [conversations, setConversations] = useState<RentalRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -109,7 +113,16 @@ export const ConversationsScreen = () => {
                     ) : (
                         <View style={styles.listContainer}>
                             {displayedConversations.map(conv => (
-                                <View key={conv.id} style={styles.convCard}>
+                                <TouchableOpacity
+                                    key={conv.id}
+                                    style={styles.convCard}
+                                    onPress={() => navigation.navigate('Chat', {
+                                        rentalRequestId: conv.id,
+                                        otherUserEmail: activeTab === 'sent' ? conv.owner_email : conv.renter_email,
+                                        itemId: conv.item_id,
+                                    })}
+                                    activeOpacity={0.7}
+                                >
                                     <View style={styles.convHeader}>
                                         <Text style={styles.convStatus}>{conv.status.toUpperCase()}</Text>
                                         <Text style={styles.convDate}>{new Date(conv.updated_date).toLocaleDateString()}</Text>
@@ -123,7 +136,11 @@ export const ConversationsScreen = () => {
                                             <Text style={styles.convMessage} numberOfLines={2}>"{conv.message}"</Text>
                                         </View>
                                     )}
-                                </View>
+                                    <View style={styles.chatCta}>
+                                        <MaterialCommunityIcons name="message-outline" size={14} color={colors.accentBlue} />
+                                        <Text style={styles.chatCtaText}>Open Chat</Text>
+                                    </View>
+                                </TouchableOpacity>
                             ))}
                         </View>
                     )}
@@ -323,6 +340,17 @@ const styles = StyleSheet.create({
         fontSize: typography.body,
         fontStyle: 'italic',
         color: '#475569',
+    },
+    chatCta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginTop: 8,
+    },
+    chatCtaText: {
+        fontSize: typography.small,
+        color: colors.accentBlue,
+        fontWeight: '600',
     },
 });
 

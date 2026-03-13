@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useUser } from '@clerk/expo';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import React from 'react';
@@ -118,25 +119,25 @@ const ProfileStackNavigator = () => (
   </ProfileStack.Navigator>
 );
 
-// --- Main Tabs ---
-const Tab = createBottomTabNavigator<MainTabParamList>();
+// --- Shared tab screen options ---
+const TAB_SCREEN_OPTIONS = {
+  headerShown: false,
+  tabBarActiveTintColor: colors.primary,
+  tabBarInactiveTintColor: colors.textSecondary,
+  tabBarStyle: {
+    backgroundColor: colors.cardLight,
+    borderTopColor: colors.border,
+    height: 70,
+    paddingBottom: 4,
+    paddingTop: 4,
+  },
+};
 
-export const MainTabNavigator = () => (
-  <Tab.Navigator
-    screenOptions={{
-      headerShown: false,
-      tabBarActiveTintColor: colors.primary,
-      tabBarInactiveTintColor: colors.textSecondary,
-      tabBarStyle: {
-        backgroundColor: colors.cardLight,
-        borderTopColor: colors.border,
-        height: 70,
-        paddingBottom: 4,
-        paddingTop: 4,
-      },
-    }}
-  >
-    <Tab.Screen
+// --- Admin Tab (no + button) ---
+const AdminTab = createBottomTabNavigator<MainTabParamList>();
+const AdminTabNavigator = () => (
+  <AdminTab.Navigator screenOptions={TAB_SCREEN_OPTIONS}>
+    <AdminTab.Screen
       name="HomeTab"
       component={HomeStackNavigator}
       options={{
@@ -146,7 +147,7 @@ export const MainTabNavigator = () => (
         ),
       }}
     />
-    <Tab.Screen
+    <AdminTab.Screen
       name="SearchTab"
       component={SearchStackNavigator}
       options={{
@@ -156,7 +157,44 @@ export const MainTabNavigator = () => (
         ),
       }}
     />
-    <Tab.Screen
+    <AdminTab.Screen
+      name="ProfileTab"
+      component={ProfileStackNavigator}
+      options={{
+        tabBarLabel: 'Profile',
+        tabBarIcon: ({ color, size }) => (
+          <MaterialCommunityIcons name="account-outline" size={size} color={color} />
+        ),
+      }}
+    />
+  </AdminTab.Navigator>
+);
+
+// --- User Tab (with + button) ---
+const UserTab = createBottomTabNavigator<MainTabParamList>();
+const UserTabNavigator = () => (
+  <UserTab.Navigator screenOptions={TAB_SCREEN_OPTIONS}>
+    <UserTab.Screen
+      name="HomeTab"
+      component={HomeStackNavigator}
+      options={{
+        tabBarLabel: 'Home',
+        tabBarIcon: ({ color, size }) => (
+          <MaterialCommunityIcons name="home" size={size} color={color} />
+        ),
+      }}
+    />
+    <UserTab.Screen
+      name="SearchTab"
+      component={SearchStackNavigator}
+      options={{
+        tabBarLabel: 'Search',
+        tabBarIcon: ({ color, size }) => (
+          <MaterialCommunityIcons name="magnify" size={size} color={color} />
+        ),
+      }}
+    />
+    <UserTab.Screen
       name="ListItemTab"
       component={ListItemStackNavigator}
       options={{
@@ -173,7 +211,7 @@ export const MainTabNavigator = () => (
         ),
       }}
     />
-    <Tab.Screen
+    <UserTab.Screen
       name="FavoritesTab"
       component={FavoritesStackNavigator}
       options={{
@@ -183,7 +221,7 @@ export const MainTabNavigator = () => (
         ),
       }}
     />
-    <Tab.Screen
+    <UserTab.Screen
       name="ProfileTab"
       component={ProfileStackNavigator}
       options={{
@@ -193,8 +231,21 @@ export const MainTabNavigator = () => (
         ),
       }}
     />
-  </Tab.Navigator>
+  </UserTab.Navigator>
 );
+
+// --- Main Tab Navigator ---
+const ADMIN_EMAILS = new Set(['collegeworks0910@gmail.com', 'admin@rentany.fr']);
+
+export const MainTabNavigator = () => {
+  const { user: clerkUser } = useUser();
+  const primaryEmail = clerkUser?.primaryEmailAddress?.emailAddress?.toLowerCase() || '';
+  const metadataRole = typeof clerkUser?.publicMetadata?.role === 'string'
+    ? clerkUser.publicMetadata.role.toLowerCase() : '';
+  const isAdmin = metadataRole === 'admin' || ADMIN_EMAILS.has(primaryEmail);
+
+  return isAdmin ? <AdminTabNavigator /> : <UserTabNavigator />;
+};
 
 const styles = StyleSheet.create({
   placeholder: {

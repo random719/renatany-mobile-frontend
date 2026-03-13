@@ -6,12 +6,20 @@ import { SidebarMenu } from '../components/common/SidebarMenu';
 import { AdminDashboardScreen } from '../screens/admin/AdminDashboardScreen';
 import { AdminDisputesScreen } from '../screens/admin/AdminDisputesScreen';
 import { AdminFraudReportsScreen } from '../screens/admin/AdminFraudReportsScreen';
+import { AdminListingReportsScreen } from '../screens/admin/AdminListingReportsScreen';
 import { AdminModerationScreen } from '../screens/admin/AdminModerationScreen';
 import { AdminUserReportsScreen } from '../screens/admin/AdminUserReportsScreen';
-import { AdminListingReportsScreen } from '../screens/admin/AdminListingReportsScreen';
+import { BookingConfirmScreen } from '../screens/booking/BookingConfirmScreen';
+import { BookingScreen } from '../screens/booking/BookingScreen';
+import { BookingSuccessScreen } from '../screens/booking/BookingSuccessScreen';
+import { ChatScreen } from '../screens/chat/ChatScreen';
+import { DisputeDetailScreen } from '../screens/disputes/DisputeDetailScreen';
 import { DisputesScreen } from '../screens/disputes/DisputesScreen';
 import { BulkEditItemsScreen } from '../screens/listing/BulkEditItemsScreen';
+import { CreateListingScreen } from '../screens/listing/CreateListingScreen';
 import { ConversationsScreen } from '../screens/messages/ConversationsScreen';
+import { NotificationsScreen } from '../screens/notifications/NotificationsScreen';
+import { RentalDetailScreen } from '../screens/rentals/RentalDetailScreen';
 import { RentalHistoryScreen } from '../screens/rentals/RentalHistoryScreen';
 import { SavedSearchesScreen } from '../screens/search/saved/SavedSearchesScreen';
 import { useAuthStore } from '../store/authStore';
@@ -51,9 +59,16 @@ export const AppNavigator = () => {
           <>
             <Stack.Screen name="Main" component={MainTabNavigator} />
             <Stack.Screen name="RentalHistory" component={RentalHistoryScreen} />
+            <Stack.Screen name="RentalDetail" component={RentalDetailScreen} />
             <Stack.Screen name="MyConversations" component={ConversationsScreen} />
             <Stack.Screen name="Disputes" component={DisputesScreen} />
+            <Stack.Screen name="DisputeDetail" component={DisputeDetailScreen} />
             <Stack.Screen name="SavedSearches" component={SavedSearchesScreen} />
+            <Stack.Screen name="Booking" component={BookingScreen} />
+            <Stack.Screen name="BookingConfirm" component={BookingConfirmScreen} />
+            <Stack.Screen name="BookingSuccess" component={BookingSuccessScreen} />
+            <Stack.Screen name="Chat" component={ChatScreen} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
             <Stack.Screen name="AdminModeration" component={AdminModerationScreen} />
             <Stack.Screen name="AdminDisputes" component={AdminDisputesScreen} />
@@ -61,6 +76,7 @@ export const AppNavigator = () => {
             <Stack.Screen name="AdminFraudReports" component={AdminFraudReportsScreen} />
             <Stack.Screen name="AdminListingReports" component={AdminListingReportsScreen} />
             <Stack.Screen name="BulkEditItems" component={BulkEditItemsScreen} />
+            <Stack.Screen name="CreateListing" component={CreateListingScreen} />
           </>
         ) : (
           <Stack.Screen name="Auth" component={AuthNavigator} />

@@ -1,14 +1,18 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
-import { useAuthStore } from '../../store/authStore';
 import { getDisputes } from '../../services/disputeService';
-import { Dispute } from '../../types/models';
+import { useAuthStore } from '../../store/authStore';
 import { colors, typography } from '../../theme';
+import { Dispute } from '../../types/models';
+import { RootStackParamList } from '../../types/navigation';
 
 export const DisputesScreen = () => {
+    const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const { user } = useAuthStore();
     const [disputes, setDisputes] = useState<Dispute[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -43,7 +47,16 @@ export const DisputesScreen = () => {
             <GlobalHeader />
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                 <View style={styles.header}>
-                    <Text variant="displaySmall" style={styles.title}>Disputes</Text>
+                    <View style={styles.titleRow}>
+                        <Text variant="displaySmall" style={styles.title}>Disputes</Text>
+                        <TouchableOpacity
+                            style={styles.fileBtn}
+                            onPress={() => navigation.navigate('DisputeDetail', { disputeId: 'new' })}
+                        >
+                            <MaterialCommunityIcons name="plus" size={16} color="#FFFFFF" />
+                            <Text style={styles.fileBtnText}>File Dispute</Text>
+                        </TouchableOpacity>
+                    </View>
                     <Text variant="bodyMedium" style={styles.subtitle}>
                         Manage rental disputes and resolutions
                     </Text>
@@ -82,14 +95,23 @@ export const DisputesScreen = () => {
                     ) : (
                         <View style={styles.listContainer}>
                             {displayedDisputes.map(dispute => (
-                                <View key={dispute.id} style={styles.disputeCard}>
+                                <TouchableOpacity
+                                    key={dispute.id}
+                                    style={styles.disputeCard}
+                                    onPress={() => navigation.navigate('DisputeDetail', { disputeId: dispute.id })}
+                                    activeOpacity={0.7}
+                                >
                                     <View style={styles.disputeHeader}>
                                         <Text style={styles.disputeStatus}>{dispute.status.toUpperCase()}</Text>
                                         <Text style={styles.disputeDate}>{new Date(dispute.created_date).toLocaleDateString()}</Text>
                                     </View>
                                     <Text style={styles.disputeReason}>{dispute.reason}</Text>
                                     <Text style={styles.disputeDescription} numberOfLines={2}>{dispute.description}</Text>
-                                </View>
+                                    <View style={styles.viewDetails}>
+                                        <Text style={styles.viewDetailsText}>View Details</Text>
+                                        <MaterialCommunityIcons name="chevron-right" size={14} color={colors.accentBlue} />
+                                    </View>
+                                </TouchableOpacity>
                             ))}
                         </View>
                     )}
@@ -112,10 +134,29 @@ const styles = StyleSheet.create({
         paddingTop: 32,
         paddingBottom: 24,
     },
+    titleRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
     title: {
         fontWeight: '800',
         color: '#0F172A',
-        marginBottom: 8,
+    },
+    fileBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: colors.primary,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+    fileBtnText: {
+        color: '#FFFFFF',
+        fontWeight: '600',
+        fontSize: typography.small,
     },
     subtitle: {
         color: '#64748B',
@@ -223,5 +264,16 @@ const styles = StyleSheet.create({
         fontSize: typography.body,
         color: '#64748B',
         lineHeight: 20,
+        marginBottom: 8,
+    },
+    viewDetails: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+    },
+    viewDetailsText: {
+        fontSize: typography.small,
+        color: colors.accentBlue,
+        fontWeight: '600',
     },
 });

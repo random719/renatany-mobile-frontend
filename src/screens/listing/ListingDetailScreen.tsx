@@ -102,8 +102,18 @@ export const ListingDetailScreen = () => {
     ]);
   };
 
-  const handleAskQuestion = () => {
-    Alert.alert('Ask a Question', 'Messaging functionality coming soon.');
+  const handleRentNow = () => {
+    if (!listing) return;
+    (navigation as any).navigate('Booking', {
+      listingId: listing.id,
+      listingTitle: listing.title,
+      pricePerDay: listing.pricePerDay,
+      ownerEmail: owner?.email ?? listing.ownerId,
+    });
+  };
+
+  const handleChatOwner = () => {
+    (navigation as any).navigate('MyConversations');
   };
 
   const handleToggleAvailability = () => {
@@ -153,13 +163,6 @@ export const ListingDetailScreen = () => {
     );
   };
 
-  const handleConnectCard = () => {
-    Alert.alert('Connect Card', 'Stripe payment setup coming soon.');
-  };
-
-  const handleConnectBank = () => {
-    Alert.alert('Connect Bank', 'Stripe Connect onboarding coming soon.');
-  };
 
   if (isLoading || !listing) {
     return (
@@ -312,7 +315,7 @@ export const ListingDetailScreen = () => {
 
           {/* Ask Question - only for non-owners */}
           {!isOwner && (
-            <TouchableOpacity style={styles.askQuestionBtn} onPress={handleAskQuestion}>
+            <TouchableOpacity style={styles.askQuestionBtn} onPress={handleChatOwner}>
               <MaterialCommunityIcons name="chat-outline" size={20} color={colors.textPrimary} />
               <Text style={styles.askQuestionText}>Ask a Question</Text>
             </TouchableOpacity>
@@ -473,62 +476,25 @@ export const ListingDetailScreen = () => {
           </View>
         )}
 
-        {/* Connect Card Section - for non-owners when item is available */}
+        {/* CTA Section - for non-owners when item is available */}
         {!isOwner && listing.availability !== false && (
           <View style={styles.sectionCard}>
-            <View style={styles.connectHeader}>
-              <View style={styles.infoIconContainer}>
-                <MaterialCommunityIcons name="information-outline" size={24} color="#3B82F6" />
-              </View>
-              <Text variant="titleLarge" style={styles.connectTitle}>
-                Connect card to rent
-              </Text>
-              <Text style={styles.connectDescription}>
-                Connect your payment card to make rental payments and start renting items.
-              </Text>
-            </View>
-
-            <View style={styles.statusBadges}>
-              <View style={styles.statusBadge}>
-                <MaterialCommunityIcons name="shield-outline" size={16} color={colors.textSecondary} />
-                <Text style={styles.statusBadgeText}>Card not connected</Text>
-              </View>
-              <View style={styles.statusBadge}>
-                <MaterialCommunityIcons name="shield-outline" size={16} color={colors.textSecondary} />
-                <Text style={styles.statusBadgeText}>Bank not connected</Text>
-              </View>
-            </View>
-
-            <Text style={styles.connectPrompt}>Connect your card to rent this item</Text>
-
-            <View style={styles.blueInfoBox}>
-              <Text style={styles.blueInfoText}>
-                Connect your card to make rental payments.
-              </Text>
-            </View>
-
             <Button
               mode="contained"
               style={styles.connectCardBtn}
-              icon="shield-outline"
-              onPress={handleConnectCard}
+              icon="calendar-check"
+              onPress={handleRentNow}
             >
-              Connect Card (to Rent)
+              Request to Rent
             </Button>
-
             <Button
               mode="outlined"
               style={styles.connectBankBtn}
-              icon="shield-outline"
-              onPress={handleConnectBank}
+              icon="message-outline"
+              onPress={handleChatOwner}
             >
-              Connect Bank Account (to Lend)
+              My Conversations
             </Button>
-
-            <Text style={styles.stripeDisclaimer}>
-              We use Stripe to securely process payments. Your payment information is encrypted and
-              securely handled by Stripe.
-            </Text>
           </View>
         )}
 

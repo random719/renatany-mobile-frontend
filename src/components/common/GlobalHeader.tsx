@@ -1,9 +1,12 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useUIStore } from '../../store/uiStore';
 import { colors, typography } from '../../theme';
+import { RootStackParamList } from '../../types/navigation';
 
 interface GlobalHeaderProps {
     onMenuPress?: () => void;
@@ -12,6 +15,9 @@ interface GlobalHeaderProps {
 
 export const GlobalHeader = ({ onMenuPress, onNotificationPress }: GlobalHeaderProps) => {
     const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+    const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+
+    const handleBellPress = onNotificationPress ?? (() => navigation.navigate('Notifications'));
 
     return (
         <View style={styles.topHeader}>
@@ -25,7 +31,7 @@ export const GlobalHeader = ({ onMenuPress, onNotificationPress }: GlobalHeaderP
                 <MaterialCommunityIcons name="earth" size={20} color={colors.textPrimary} />
                 <Text style={styles.languageText}>GB English</Text>
             </View>
-            <TouchableOpacity style={styles.iconButton} onPress={onNotificationPress}>
+            <TouchableOpacity style={styles.iconButton} onPress={handleBellPress}>
                 <MaterialCommunityIcons name="bell-outline" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
         </View>

@@ -6,6 +6,11 @@ export const getDisputes = async (params?: { rental_request_id?: string; filed_b
   return response.data.data;
 };
 
+export const getDisputeById = async (id: string): Promise<Dispute> => {
+  const response = await api.get(`/disputes/${id}`);
+  return response.data.data;
+};
+
 export const createDispute = async (data: {
   rental_request_id: string;
   filed_by_email: string;
