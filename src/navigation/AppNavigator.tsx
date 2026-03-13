@@ -77,6 +77,7 @@ export const AppNavigator = () => {
             <Stack.Screen name="AdminListingReports" component={AdminListingReportsScreen} />
             <Stack.Screen name="BulkEditItems" component={BulkEditItemsScreen} />
             <Stack.Screen name="CreateListing" component={CreateListingScreen} />
+            <Stack.Screen name="EditItem" component={CreateListingScreen} />
           </>
         ) : (
           <Stack.Screen name="Auth" component={AuthNavigator} />

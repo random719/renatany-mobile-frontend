@@ -5,6 +5,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  AppState,
+  AppStateStatus,
   FlatList,
   Image,
   Linking,
@@ -41,6 +43,9 @@ interface BackendUser {
   preferred_language?: string;
   notification_preferences?: Record<string, boolean>;
   documents?: string[];
+  stripe_payment_method_id?: string;
+  stripe_account_id?: string;
+  payouts_enabled?: boolean;
 }
 
 interface WalletData {
@@ -437,12 +442,60 @@ export const ProfileScreen = () => {
     { key: 'settings', label: 'Settings', icon: 'cog-outline' },
   ];
 
-  const handleAddPayment = () => {
-    Alert.alert('Add Payment Method', 'Stripe SetupIntent integration will be available when connected.');
+  const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://172.28.145.1:5000/api').replace(/\/api$/, '');
+
+  const refreshPaymentStatus = async () => {
+    try {
+      await api.post('/stripe/payment-method/retrieve').catch(() => {});
+      await api.get('/stripe/connect/status').catch(() => {});
+      const res = await api.get('/users/me');
+      setBackendUser(res.data?.data || res.data);
+    } catch (_) {}
   };
 
-  const handleConnectBank = () => {
-    Alert.alert('Connect Bank Account', 'Stripe Connect onboarding will be available when connected.');
+  const handleAddPayment = async () => {
+    try {
+      const res = await api.post('/stripe/payment-method/setup', {
+        mobile_success_url: `${API_BASE}/api/stripe/app-return/profile`,
+      });
+      const url = res.data?.data?.url || res.data?.url;
+      if (!url) return;
+      let wentBackground = false;
+      const sub = AppState.addEventListener('change', async (state: AppStateStatus) => {
+        if (state === 'background') wentBackground = true;
+        if (state === 'active' && wentBackground) {
+          sub.remove();
+          await refreshPaymentStatus();
+        }
+      });
+      await Linking.openURL(url);
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.error || 'Failed to start card setup.');
+    }
+  };
+
+  const handleConnectBank = async () => {
+    try {
+      const mobileReturnUrl = `${API_BASE}/api/stripe/app-return/stripe/confirm`;
+      const res = await api.post('/stripe/connect/onboarding', {
+        origin: API_BASE,
+        return_path: '/profile',
+        mobile_return_url: mobileReturnUrl,
+      });
+      const url = res.data?.data?.url || res.data?.url;
+      if (!url) return;
+      let wentBackground = false;
+      const sub = AppState.addEventListener('change', async (state: AppStateStatus) => {
+        if (state === 'background') wentBackground = true;
+        if (state === 'active' && wentBackground) {
+          sub.remove();
+          await refreshPaymentStatus();
+        }
+      });
+      await Linking.openURL(url);
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.error || 'Failed to start bank setup.');
+    }
   };
 
   if (isLoading && !refreshing) {
@@ -529,41 +582,65 @@ export const ProfileScreen = () => {
           <Surface style={styles.card} elevation={0}>
             <Text style={styles.cardTitle}>Payment setup</Text>
 
+            {/* Card status */}
             <View style={styles.badgeRow}>
-              <View style={styles.badgeError}>
-                <MaterialCommunityIcons name="close-circle-outline" size={16} color="#DC2626" />
-                <Text style={styles.badgeErrorText}>Card not connected</Text>
-              </View>
+              {backendUser?.stripe_payment_method_id ? (
+                <View style={styles.badgeSuccess}>
+                  <MaterialCommunityIcons name="check-circle-outline" size={16} color="#16A34A" />
+                  <Text style={styles.badgeSuccessText}>Card connected</Text>
+                </View>
+              ) : (
+                <View style={styles.badgeError}>
+                  <MaterialCommunityIcons name="close-circle-outline" size={16} color="#DC2626" />
+                  <Text style={styles.badgeErrorText}>Card not connected</Text>
+                </View>
+              )}
             </View>
 
+            {/* Bank status */}
             <View style={styles.badgeRow}>
-              <View style={styles.badgeError}>
-                <MaterialCommunityIcons name="close-circle-outline" size={16} color="#DC2626" />
-                <Text style={styles.badgeErrorText}>Bank not connected</Text>
-              </View>
+              {backendUser?.stripe_account_id ? (
+                <View style={styles.badgeSuccess}>
+                  <MaterialCommunityIcons name="check-circle-outline" size={16} color="#16A34A" />
+                  <Text style={styles.badgeSuccessText}>Bank connected</Text>
+                </View>
+              ) : (
+                <View style={styles.badgeError}>
+                  <MaterialCommunityIcons name="close-circle-outline" size={16} color="#DC2626" />
+                  <Text style={styles.badgeErrorText}>Bank not connected</Text>
+                </View>
+              )}
             </View>
 
-            <Button
-              mode="contained"
-              icon="credit-card-outline"
-              style={styles.addPaymentBtn}
-              labelStyle={styles.addPaymentBtnLabel}
-              onPress={handleAddPayment}
-            >
-              Add payment method
-            </Button>
-            <Text style={styles.helperText}>Required to rent items</Text>
+            {!backendUser?.stripe_payment_method_id && (
+              <>
+                <Button
+                  mode="contained"
+                  icon="credit-card-outline"
+                  style={styles.addPaymentBtn}
+                  labelStyle={styles.addPaymentBtnLabel}
+                  onPress={handleAddPayment}
+                >
+                  Add payment method
+                </Button>
+                <Text style={styles.helperText}>Required to rent items</Text>
+              </>
+            )}
 
-            <Button
-              mode="contained"
-              icon="bank-outline"
-              style={styles.connectBankBtn}
-              labelStyle={styles.connectBankBtnLabel}
-              onPress={handleConnectBank}
-            >
-              Connect bank account
-            </Button>
-            <Text style={styles.helperText}>Required to receive payouts</Text>
+            {!backendUser?.stripe_account_id && (
+              <>
+                <Button
+                  mode="contained"
+                  icon="bank-outline"
+                  style={styles.connectBankBtn}
+                  labelStyle={styles.connectBankBtnLabel}
+                  onPress={handleConnectBank}
+                >
+                  Connect bank account
+                </Button>
+                <Text style={styles.helperText}>Required to receive payouts</Text>
+              </>
+            )}
           </Surface>
 
           {/* Tabs Grid */}
@@ -1484,6 +1561,22 @@ const styles = StyleSheet.create({
   badgeRow: {
     alignItems: 'center',
     marginBottom: 12,
+  },
+  badgeSuccess: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  badgeSuccessText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#16A34A',
+    marginLeft: 6,
   },
   badgeError: {
     flexDirection: 'row',

@@ -46,10 +46,7 @@ export const HomeScreen = () => {
     recentlyViewed,
     categories,
     isLoading,
-    isLoadingMore,
-    hasMoreListings,
     fetchListings,
-    fetchMoreListings,
     fetchRecommended,
     fetchRecentlyViewed,
     fetchCategories,
@@ -279,14 +276,6 @@ export const HomeScreen = () => {
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={loadData} />
         }
-        onScroll={({ nativeEvent }) => {
-          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-          const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
-          if (distanceFromBottom < 500 && viewMode === "grid") {
-            fetchMoreListings();
-          }
-        }}
-        scrollEventThrottle={400}
       >
         <HeroBanner 
           availableCount={availableCount} 
@@ -613,6 +602,13 @@ export const HomeScreen = () => {
                     <Text variant="headlineSmall" style={styles.allItemsTitle}>
                       All Items
                     </Text>
+                    <TouchableOpacity
+                      style={styles.viewAllBtn}
+                      onPress={() => navigation.navigate('SearchTab' as any)}
+                    >
+                      <Text style={styles.viewAllText}>View All</Text>
+                      <MaterialCommunityIcons name="chevron-right" size={16} color={colors.primary} />
+                    </TouchableOpacity>
                   </View>
                   {listings.map((item) => (
                     <View key={item.id} style={styles.gridItemWrapper}>
@@ -623,12 +619,6 @@ export const HomeScreen = () => {
                       />
                     </View>
                   ))}
-                  {isLoadingMore && (
-                    <ActivityIndicator style={{ marginVertical: 16 }} size="small" />
-                  )}
-                  {!hasMoreListings && listings.length > 0 && (
-                    <Text style={styles.endOfListText}>No more items to show</Text>
-                  )}
                 </View>
               )}
             </View>
@@ -946,9 +936,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   allItemsTitle: {
+    flex: 1,
     color: "#111827",
     fontWeight: "700",
     fontSize: typography.title,
+  },
+  viewAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  viewAllText: {
+    fontSize: typography.body,
+    fontWeight: '600',
+    color: colors.primary,
   },
   menuContent: {
     backgroundColor: '#FFFFFF',

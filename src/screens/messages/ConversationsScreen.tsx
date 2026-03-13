@@ -1,45 +1,75 @@
+import { useUser } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
+import { api } from '../../services/api';
 import { getRentalRequests } from '../../services/rentalService';
-import { useAuthStore } from '../../store/authStore';
 import { colors, typography } from '../../theme';
+import { Listing } from '../../types/listing';
 import { RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
 
+const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
+    pending:   { label: 'PENDING',   bg: '#FEF9C3', text: '#854D0E' },
+    approved:  { label: 'APPROVED',  bg: '#DCFCE7', text: '#166534' },
+    paid:      { label: 'PAID',      bg: '#F3E8FF', text: '#6B21A8' },
+    inquiry:   { label: 'INQUIRY',   bg: '#E0F2FE', text: '#075985' },
+    completed: { label: 'COMPLETED', bg: '#F1F5F9', text: '#334155' },
+    declined:  { label: 'DECLINED',  bg: '#FEE2E2', text: '#991B1B' },
+    cancelled: { label: 'CANCELLED', bg: '#F1F5F9', text: '#64748B' },
+};
+
+const fmt = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
 export const ConversationsScreen = () => {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-    const { user } = useAuthStore();
+    const { user } = useUser();
+    const userEmail = user?.emailAddresses?.[0]?.emailAddress;
     const [conversations, setConversations] = useState<RentalRequest[]>([]);
+    const [itemsMap, setItemsMap] = useState<Record<string, Listing>>({});
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'sent' | 'inbox'>('sent');
 
     useEffect(() => {
         const fetchConversations = async () => {
-            if (!user?.email) {
+            if (!userEmail) {
                 setIsLoading(false);
                 return;
             }
             try {
                 setIsLoading(true);
                 const [asRenter, asOwner] = await Promise.all([
-                    getRentalRequests({ renter_email: user.email }),
-                    getRentalRequests({ owner_email: user.email })
+                    getRentalRequests({ renter_email: userEmail }),
+                    getRentalRequests({ owner_email: userEmail })
                 ]);
-                
+
                 const allRentals = [...asRenter, ...asOwner];
-                // Deduplicate by ID
-                const uniqueRentals = Array.from(new Map(allRentals.map(item => [item.id, item])).values());
-                // Filter for active ('pending', 'approved', 'paid')
-                const activeRentals = uniqueRentals.filter(r => ['pending', 'approved', 'paid'].includes(r.status));
-                // Sort by updated_date descending
+                const uniqueRentals = Array.from(new Map(allRentals.map(r => [r.id, r])).values());
+                const activeRentals = uniqueRentals.filter(r => ['pending', 'approved', 'paid', 'inquiry'].includes(r.status));
                 activeRentals.sort((a, b) => new Date(b.updated_date).getTime() - new Date(a.updated_date).getTime());
-                
                 setConversations(activeRentals);
+
+                // Fetch item details in background
+                const uniqueItemIds = [...new Set(activeRentals.map(r => r.item_id))];
+                const itemEntries = await Promise.all(
+                    uniqueItemIds.map(async id => {
+                        try {
+                            const res = await api.get(`/items/${id}`);
+                            const data = res.data.data || res.data;
+                            const item = data.item || data;
+                            return [id, item] as [string, Listing];
+                        } catch {
+                            return null;
+                        }
+                    })
+                );
+                const map: Record<string, Listing> = {};
+                itemEntries.forEach(entry => { if (entry) map[entry[0]] = entry[1]; });
+                setItemsMap(map);
             } catch (error) {
                 console.error('Error fetching conversations:', error);
             } finally {
@@ -48,53 +78,149 @@ export const ConversationsScreen = () => {
         };
 
         fetchConversations();
-    }, [user?.email]);
+    }, [userEmail]);
 
-    const sentByMe = conversations.filter(c => c.renter_email === user?.email);
-    const inInbox = conversations.filter(c => c.owner_email === user?.email);
+    const sentByMe = conversations.filter(c => c.renter_email === userEmail);
+    const inInbox = conversations.filter(c => c.owner_email === userEmail);
     const displayedConversations = activeTab === 'sent' ? sentByMe : inInbox;
+    const totalActive = conversations.length;
+
+    const renderCard = (conv: RentalRequest) => {
+        const item = itemsMap[conv.item_id];
+        const status = STATUS_CONFIG[conv.status] ?? { label: conv.status.toUpperCase(), bg: '#F1F5F9', text: '#334155' };
+        const otherEmail = activeTab === 'sent' ? conv.owner_email : conv.renter_email;
+        const isInquiry = conv.status === 'inquiry';
+
+        const rentalCost = conv.total_amount || 0;
+        const platformFee = typeof conv.platform_fee === 'number' ? conv.platform_fee : rentalCost * 0.15;
+        const securityDeposit = typeof conv.security_deposit === 'number' ? conv.security_deposit : 0;
+        const totalPaid = typeof conv.total_paid === 'number' ? conv.total_paid : rentalCost + platformFee + securityDeposit;
+
+        const itemImage = item?.images?.[0] || item?.videos?.[0];
+
+        return (
+            <View key={conv.id} style={styles.convCard}>
+                {/* Card header: image + title/meta */}
+                <View style={styles.cardTop}>
+                    <View style={styles.thumbContainer}>
+                        {itemImage ? (
+                            <Image source={{ uri: itemImage }} style={styles.thumb} resizeMode="cover" />
+                        ) : (
+                            <View style={[styles.thumb, styles.thumbPlaceholder]}>
+                                <MaterialCommunityIcons name="image-outline" size={24} color="#CBD5E1" />
+                            </View>
+                        )}
+                    </View>
+
+                    <View style={styles.cardMeta}>
+                        <View style={styles.cardTitleRow}>
+                            <Text style={styles.cardTitle} numberOfLines={2}>
+                                {item ? (item.title || 'Untitled Item') : 'Loading...'}
+                            </Text>
+                            <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
+                                <Text style={[styles.statusText, { color: status.text }]}>{status.label}</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.cardInfoRow}>
+                            <MaterialCommunityIcons name="account-outline" size={13} color="#64748B" />
+                            <Text style={styles.cardInfoText} numberOfLines={1}>
+                                {activeTab === 'sent' ? 'To: ' : 'From: '}
+                                <Text style={styles.cardInfoBold}>{otherEmail}</Text>
+                            </Text>
+                        </View>
+
+                        {!isInquiry && (
+                            <>
+                                <View style={styles.cardInfoRow}>
+                                    <MaterialCommunityIcons name="calendar-outline" size={13} color="#64748B" />
+                                    <Text style={styles.cardInfoText}>
+                                        {fmt(conv.start_date)} – {fmt(conv.end_date)}
+                                    </Text>
+                                </View>
+                                <View style={styles.cardInfoRow}>
+                                    <MaterialCommunityIcons name="currency-usd" size={13} color="#64748B" />
+                                    <View>
+                                        <Text style={[styles.cardInfoText, styles.cardInfoBold]}>
+                                            ${totalPaid.toFixed(2)}
+                                        </Text>
+                                        <Text style={styles.cardAmountBreakdown}>
+                                            Rental ${rentalCost.toFixed(2)} · Fee ${platformFee.toFixed(2)} · Deposit ${securityDeposit.toFixed(2)}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </>
+                        )}
+                    </View>
+                </View>
+
+                {/* Message preview */}
+                {conv.message ? (
+                    <View style={styles.messageBox}>
+                        <Text style={styles.messageText} numberOfLines={3}>"{conv.message}"</Text>
+                    </View>
+                ) : null}
+
+                {/* Actions */}
+                <View style={styles.actions}>
+                    <TouchableOpacity
+                        style={styles.btnOutline}
+                        onPress={() => navigation.navigate('Chat', {
+                            rentalRequestId: conv.id,
+                            otherUserEmail: otherEmail,
+                            itemId: conv.item_id,
+                        })}
+                        activeOpacity={0.7}
+                    >
+                        <MaterialCommunityIcons name="message-outline" size={15} color="#475569" />
+                        <Text style={styles.btnOutlineText}>Open Chat</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Submitted date */}
+                <Text style={styles.submittedDate}>
+                    Submitted {new Date(conv.created_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </Text>
+            </View>
+        );
+    };
 
     return (
         <View style={styles.container}>
             <GlobalHeader />
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                 <View style={styles.header}>
-                    <View style={styles.titleRow}>
-                        <Text variant="displaySmall" style={styles.title}>My{'\n'}Conversations</Text>
-                        <View style={styles.actionButtons}>
-                            <TouchableOpacity style={styles.loadingBtn} disabled>
-                                <ActivityIndicator size={16} color={colors.primary} style={styles.loadingSpinner} />
-                                <View>
-                                    <Text style={styles.loadingText}>Loading</Text>
-                                    <Text style={styles.loadingText}>details...</Text>
-                                </View>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.stripeBtn}>
-                                <MaterialCommunityIcons name="alert-circle-outline" size={18} color={colors.primary} />
-                                <Text style={styles.stripeText}>Test Stripe</Text>
-                            </TouchableOpacity>
-                        </View>
+                    <Text variant="displaySmall" style={styles.title}>My Conversations</Text>
+                    <View style={styles.subtitleRow}>
+                        <Text variant="bodyMedium" style={styles.subtitle}>Active conversations only (last 7 days)</Text>
+                        {totalActive > 0 && (
+                            <View style={styles.activeBadge}>
+                                <MaterialCommunityIcons name="clock-outline" size={12} color="#475569" />
+                                <Text style={styles.activeBadgeText}>{totalActive} active</Text>
+                            </View>
+                        )}
                     </View>
-                    <Text variant="bodyMedium" style={styles.subtitle}>
-                        Active conversations only (last 7 days)
-                    </Text>
                 </View>
 
                 <View style={styles.mainCard}>
                     <View style={styles.tabs}>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={[styles.tab, activeTab === 'sent' && styles.activeTab]}
                             onPress={() => setActiveTab('sent')}
                         >
-                            <MaterialCommunityIcons name="message-outline" size={18} color={activeTab === 'sent' ? "#1E293B" : "#64748B"} />
-                            <Text style={activeTab === 'sent' ? styles.activeTabText : styles.tabText}>Sent ({sentByMe.length})</Text>
+                            <MaterialCommunityIcons name="message-outline" size={16} color={activeTab === 'sent' ? '#1E293B' : '#64748B'} />
+                            <Text style={activeTab === 'sent' ? styles.activeTabText : styles.tabText}>
+                                My Requests ({sentByMe.length})
+                            </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={[styles.tab, activeTab === 'inbox' && styles.activeTab]}
                             onPress={() => setActiveTab('inbox')}
                         >
-                            <MaterialCommunityIcons name="package-variant" size={18} color={activeTab === 'inbox' ? "#1E293B" : "#64748B"} />
-                            <Text style={activeTab === 'inbox' ? styles.activeTabText : styles.tabText}>Inbox ({inInbox.length})</Text>
+                            <MaterialCommunityIcons name="package-variant" size={16} color={activeTab === 'inbox' ? '#1E293B' : '#64748B'} />
+                            <Text style={activeTab === 'inbox' ? styles.activeTabText : styles.tabText}>
+                                Received ({inInbox.length})
+                            </Text>
                         </TouchableOpacity>
                     </View>
 
@@ -104,44 +230,22 @@ export const ConversationsScreen = () => {
                         </View>
                     ) : displayedConversations.length === 0 ? (
                         <View style={styles.emptyContainer}>
-                            <MaterialCommunityIcons name="chat-outline" size={80} color="#94A3B8" style={styles.emptyIcon} />
+                            <MaterialCommunityIcons
+                                name={activeTab === 'sent' ? 'chat-outline' : 'package-variant'}
+                                size={64}
+                                color="#94A3B8"
+                                style={styles.emptyIcon}
+                            />
                             <Text variant="titleLarge" style={styles.emptyTitle}>No active requests</Text>
                             <Text variant="bodyMedium" style={styles.emptySubtitle}>
-                                {activeTab === 'sent' ? "You haven't sent any rental requests recently" : "You have no incoming rental requests"}
+                                {activeTab === 'sent'
+                                    ? "You haven't sent any rental requests recently"
+                                    : "You haven't received any rental requests recently"}
                             </Text>
                         </View>
                     ) : (
                         <View style={styles.listContainer}>
-                            {displayedConversations.map(conv => (
-                                <TouchableOpacity
-                                    key={conv.id}
-                                    style={styles.convCard}
-                                    onPress={() => navigation.navigate('Chat', {
-                                        rentalRequestId: conv.id,
-                                        otherUserEmail: activeTab === 'sent' ? conv.owner_email : conv.renter_email,
-                                        itemId: conv.item_id,
-                                    })}
-                                    activeOpacity={0.7}
-                                >
-                                    <View style={styles.convHeader}>
-                                        <Text style={styles.convStatus}>{conv.status.toUpperCase()}</Text>
-                                        <Text style={styles.convDate}>{new Date(conv.updated_date).toLocaleDateString()}</Text>
-                                    </View>
-                                    <Text style={styles.convTitle}>Request for Item ID: {conv.item_id}</Text>
-                                    <Text style={styles.convSubtitle}>
-                                        {activeTab === 'sent' ? `To: ${conv.owner_email}` : `From: ${conv.renter_email}`}
-                                    </Text>
-                                    {conv.message && (
-                                        <View style={styles.convMessageContainer}>
-                                            <Text style={styles.convMessage} numberOfLines={2}>"{conv.message}"</Text>
-                                        </View>
-                                    )}
-                                    <View style={styles.chatCta}>
-                                        <MaterialCommunityIcons name="message-outline" size={14} color={colors.accentBlue} />
-                                        <Text style={styles.chatCtaText}>Open Chat</Text>
-                                    </View>
-                                </TouchableOpacity>
-                            ))}
+                            {displayedConversations.map(renderCard)}
                         </View>
                     )}
                 </View>
@@ -163,67 +267,39 @@ const styles = StyleSheet.create({
         paddingTop: 32,
         paddingBottom: 24,
     },
-    titleRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 12,
-    },
     title: {
         fontWeight: '800',
         color: '#0F172A',
-        flex: 1,
-        lineHeight: 40,
+        marginBottom: 8,
     },
-    actionButtons: {
+    subtitleRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-    },
-    loadingBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#EFF6FF',
-        borderWidth: 1,
-        borderColor: '#DBEAFE',
-        borderRadius: 20,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        gap: 8,
-    },
-    loadingSpinner: {
-        marginRight: 4,
-    },
-    loadingText: {
-        color: '#475569',
-        fontSize: 10,
-        fontWeight: '500',
-        lineHeight: 12,
-    },
-    stripeBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#DBEAFE',
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-    },
-    stripeText: {
-        color: colors.primary,
-        fontWeight: '600',
-        fontSize: typography.body,
     },
     subtitle: {
         color: '#64748B',
+    },
+    activeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 12,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+    },
+    activeBadgeText: {
+        fontSize: 11,
+        color: '#475569',
+        fontWeight: '500',
     },
     mainCard: {
         backgroundColor: '#FFFFFF',
         borderRadius: 16,
         marginHorizontal: 16,
-        paddingBottom: 48,
+        paddingBottom: 24,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.05,
@@ -243,7 +319,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
+        gap: 6,
         height: 40,
         borderRadius: 8,
     },
@@ -258,19 +334,26 @@ const styles = StyleSheet.create({
     tabText: {
         color: '#64748B',
         fontWeight: '500',
+        fontSize: typography.small,
     },
     activeTabText: {
         color: '#1E293B',
         fontWeight: '600',
+        fontSize: typography.small,
+    },
+    loadingContainer: {
+        marginTop: 64,
+        marginBottom: 64,
+        alignItems: 'center',
     },
     emptyContainer: {
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingTop: 64,
+        paddingTop: 48,
+        paddingBottom: 48,
         paddingHorizontal: 24,
     },
     emptyIcon: {
-        marginBottom: 24,
+        marginBottom: 16,
     },
     emptyTitle: {
         fontWeight: '700',
@@ -283,74 +366,123 @@ const styles = StyleSheet.create({
         lineHeight: 22,
         fontSize: typography.body,
     },
-    loadingContainer: {
-        marginTop: 64,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
     listContainer: {
         padding: 16,
         gap: 12,
     },
+    // Card
     convCard: {
         backgroundColor: '#FFFFFF',
         borderRadius: 12,
         padding: 16,
         borderWidth: 1,
         borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 1,
+        marginBottom: 4,
     },
-    convHeader: {
+    cardTop: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        gap: 12,
+        marginBottom: 10,
+    },
+    thumbContainer: {
+        flexShrink: 0,
+    },
+    thumb: {
+        width: 72,
+        height: 72,
+        borderRadius: 8,
+    },
+    thumbPlaceholder: {
+        backgroundColor: '#F1F5F9',
         alignItems: 'center',
-        marginBottom: 8,
+        justifyContent: 'center',
     },
-    convStatus: {
-        fontSize: typography.small,
-        fontWeight: '700',
-        color: colors.primary,
-        backgroundColor: colors.primary + '15',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4,
-        overflow: 'hidden',
+    cardMeta: {
+        flex: 1,
+        gap: 4,
     },
-    convDate: {
-        fontSize: typography.small,
-        color: '#64748B',
+    cardTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: 8,
+        marginBottom: 4,
     },
-    convTitle: {
+    cardTitle: {
+        flex: 1,
         fontSize: typography.tabLabel,
         fontWeight: '600',
         color: '#1E293B',
-        marginBottom: 4,
+        lineHeight: 20,
     },
-    convSubtitle: {
-        fontSize: typography.body,
+    statusBadge: {
+        borderRadius: 4,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        flexShrink: 0,
+    },
+    statusText: {
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    cardInfoRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 4,
+    },
+    cardInfoText: {
+        fontSize: 12,
         color: '#64748B',
-        marginBottom: 8,
+        flex: 1,
     },
-    convMessageContainer: {
+    cardInfoBold: {
+        fontWeight: '600',
+        color: '#334155',
+    },
+    cardAmountBreakdown: {
+        fontSize: 10,
+        color: '#94A3B8',
+        marginTop: 1,
+    },
+    messageBox: {
         backgroundColor: '#F8FAFC',
-        padding: 12,
         borderRadius: 8,
-        marginTop: 4,
+        padding: 10,
+        marginBottom: 10,
     },
-    convMessage: {
+    messageText: {
         fontSize: typography.body,
         fontStyle: 'italic',
         color: '#475569',
+        lineHeight: 18,
     },
-    chatCta: {
+    actions: {
+        gap: 8,
+        marginBottom: 8,
+    },
+    btnOutline: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        marginTop: 8,
+        justifyContent: 'center',
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+        borderRadius: 8,
+        paddingVertical: 10,
     },
-    chatCtaText: {
-        fontSize: typography.small,
-        color: colors.accentBlue,
-        fontWeight: '600',
+    btnOutlineText: {
+        fontSize: typography.body,
+        fontWeight: '500',
+        color: '#475569',
+    },
+    submittedDate: {
+        fontSize: 10,
+        color: '#94A3B8',
+        marginTop: 4,
     },
 });
-

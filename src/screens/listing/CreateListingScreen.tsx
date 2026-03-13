@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Button, Checkbox, Menu, Text, TextInput, Surface } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
@@ -12,6 +12,7 @@ import { useListingStore } from '../../store/listingStore';
 import { useAuthStore } from '../../store/authStore';
 import { uploadFile } from '../../services/listingService';
 import { geocodeLocation } from '../../utils/geocodeLocation';
+import { RootStackParamList } from '../../types/navigation';
 
 const CATEGORIES = [
     { value: 'electronics', label: 'Electronics', icon: 'laptop' },
@@ -58,11 +59,50 @@ const INITIAL_FORM_DATA: CreateListingFormData = {
 
 export const CreateListingScreen = () => {
     const navigation = useNavigation();
-    const { createItem, isSubmitting, categories, fetchCategories } = useListingStore();
+    const route = useRoute<RouteProp<RootStackParamList, 'EditItem'>>();
+    const itemId = (route.params as any)?.itemId as string | undefined;
+    const isEditMode = !!itemId;
+
+    const { createItem, updateItem, isSubmitting, categories, fetchCategories, selectedListing, fetchListingById } = useListingStore();
     const { user } = useAuthStore();
 
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState<CreateListingFormData>(INITIAL_FORM_DATA);
+
+    // In edit mode: load existing listing data into form
+    useEffect(() => {
+        if (!isEditMode || !itemId) return;
+        fetchListingById(itemId).then(() => {}).catch(() => {});
+    }, [itemId, isEditMode]);
+
+    useEffect(() => {
+        if (!isEditMode || !selectedListing || selectedListing.id !== itemId) return;
+        const l = selectedListing as any;
+        setFormData({
+            title: l.title || '',
+            description: l.description || '',
+            category: l.category || '',
+            daily_rate: String(l.pricePerDay || l.daily_rate || ''),
+            pricing_tiers: l.pricingTiers || l.pricing_tiers || [],
+            deposit: String(l.deposit || ''),
+            condition: l.condition || 'good',
+            location: typeof l.location === 'object' ? (l.location?.address || l.location?.city || '') : (l.location || ''),
+            street_address: l.street_address || '',
+            postcode: l.postcode || '',
+            country: l.country || '',
+            show_on_map: l.show_on_map ?? true,
+            min_rental_days: String(l.min_rental_days || '1'),
+            max_rental_days: String(l.max_rental_days || '30'),
+            notice_period_hours: String(l.notice_period_hours ?? '24'),
+            instant_booking: l.instant_booking ?? false,
+            same_day_pickup: l.same_day_pickup ?? false,
+            delivery_options: l.delivery_options || ['pickup'],
+            delivery_fee: String(l.delivery_fee || ''),
+            delivery_radius: String(l.delivery_radius || ''),
+        });
+        if (l.images?.length) setUploadedImages(l.images);
+        if (l.videos?.length) setUploadedVideos(l.videos);
+    }, [selectedListing?.id, isEditMode, itemId]);
     const [uploadedImages, setUploadedImages] = useState<string[]>([]);
     const [uploadedVideos, setUploadedVideos] = useState<string[]>([]);
     const [isUploading, setIsUploading] = useState(false);
@@ -249,15 +289,22 @@ export const CreateListingScreen = () => {
                 availability: true,
             };
 
-            await createItem(payload);
-            Alert.alert('Success', 'Your item has been listed!', [
-                { text: 'OK', onPress: () => navigation.goBack() },
-            ]);
+            if (isEditMode && itemId) {
+                await updateItem(itemId, payload);
+                Alert.alert('Success', 'Your item has been updated!', [
+                    { text: 'OK', onPress: () => navigation.goBack() },
+                ]);
+            } else {
+                await createItem(payload);
+                Alert.alert('Success', 'Your item has been listed!', [
+                    { text: 'OK', onPress: () => navigation.goBack() },
+                ]);
+            }
         } catch (error) {
-            console.error('Error creating item:', error);
-            Alert.alert('Error', 'Failed to create listing. Please try again.');
+            console.error('Error saving item:', error);
+            Alert.alert('Error', 'Failed to save listing. Please try again.');
         }
-    }, [formData, uploadedImages, uploadedVideos, createItem, navigation, isStepValid]);
+    }, [formData, uploadedImages, uploadedVideos, createItem, updateItem, navigation, isStepValid, isEditMode, itemId]);
 
     const categoryLabel = categories.find(c => c.name === formData.category)?.name || 
                         CATEGORIES.find(c => c.value === formData.category || c.label === formData.category)?.label || '';
