@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { navigationRef } from "../../navigation/AppNavigator";
 import { useClerk, useUser } from "@clerk/expo";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   Animated,
   Dimensions,
@@ -29,7 +30,6 @@ export const SidebarMenu = () => {
   const { isSidebarVisible: isVisible, closeSidebar: onClose } = useUIStore();
   const { logout } = useAuthStore();
   const { activeFilter, applyFilter } = useListingStore();
-  const [currentRouteName, setCurrentRouteName] = useState("HomeTab"); // Default to Browse All
   const primaryEmail =
     clerkUser?.primaryEmailAddress?.emailAddress?.toLowerCase() || "";
   const metadataRole =
@@ -37,38 +37,28 @@ export const SidebarMenu = () => {
       ? clerkUser.publicMetadata.role.toLowerCase()
       : "";
   const isAdmin = metadataRole === "admin" || ADMIN_EMAILS.has(primaryEmail);
-  const isAdminDashboard = currentRouteName === "AdminDashboard";
   const derivedHandle =
     clerkUser?.username ||
     (primaryEmail.includes("@") ? primaryEmail.split("@")[0] : "");
 
-  // Helper to resolve the deepest route name from navigation state
-  const resolveRouteName = useCallback(() => {
+  // Resolve the deepest active route name from the navigation ref
+  const getActiveRouteName = (): string => {
     try {
-      const state = navigation.getState();
-      if (!state) return;
+      const state = navigationRef.current?.getRootState();
+      if (!state) return "Home";
       let route: any = state.routes[state.index];
       while (route.state) {
         route = route.state.routes[route.state.index];
       }
-      setCurrentRouteName(route.name);
-    } catch (e) {
-      console.log("Error getting navigation state:", e);
+      return route.name as string;
+    } catch {
+      return "Home";
     }
-  }, [navigation]);
+  };
 
-  // Track route changes continuously so active state is always up to date
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("state", resolveRouteName);
-    return unsubscribe;
-  }, [navigation, resolveRouteName]);
-
-  // Also resolve when sidebar opens (in case state event already fired)
-  useEffect(() => {
-    if (isVisible) {
-      resolveRouteName();
-    }
-  }, [isVisible, resolveRouteName]);
+  // Resolve fresh on every render when sidebar is visible
+  const latestRoute = isVisible ? getActiveRouteName() : "Home";
+  const isAdminDashboard = latestRoute === "AdminDashboard";
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [isMounted, setIsMounted] = React.useState(isVisible);
@@ -207,31 +197,15 @@ export const SidebarMenu = () => {
         >
           <Text style={styles.sectionTitle}>NAVIGATE</Text>
           {(() => {
-            const isFavorites = ["Favorites", "FavoritesTab"].includes(
-              currentRouteName,
-            );
-            const isProfile = [
-              "Profile",
-              "ProfileTab",
-              "EditProfile",
-              "Settings",
-            ].includes(currentRouteName);
-            const isListItem = currentRouteName === "ListItemTab";
-            const isRentalHistory = currentRouteName === "RentalHistory";
-            const isConversations = currentRouteName === "MyConversations";
-            const isDisputes = currentRouteName === "Disputes";
-            const isSavedSearches = currentRouteName === "SavedSearches";
-            const isBulkEditItems = currentRouteName === "BulkEditItems";
-            const isBrowseAll =
-              !isFavorites &&
-              !isProfile &&
-              !isListItem &&
-              !isRentalHistory &&
-              !isConversations &&
-              !isDisputes &&
-              !isSavedSearches &&
-              !isBulkEditItems &&
-              !isAdminDashboard;
+            const isFavorites = ["Favorites", "FavoritesTab"].includes(latestRoute);
+            const isProfile = ["Profile", "ProfileTab", "EditProfile", "Settings"].includes(latestRoute);
+            const isListItem = ["ListItemTab", "CreateListing"].includes(latestRoute);
+            const isRentalHistory = ["RentalHistory", "RentalDetail"].includes(latestRoute);
+            const isConversations = ["MyConversations", "Chat"].includes(latestRoute);
+            const isDisputes = ["Disputes", "DisputeDetail"].includes(latestRoute);
+            const isSavedSearches = latestRoute === "SavedSearches";
+            const isBulkEditItems = ["BulkEditItems", "EditItem"].includes(latestRoute);
+            const isBrowseAll = ["Home", "HomeTab", "ListingDetail", "Search", "SearchTab", "Categories", "CategoryDetail"].includes(latestRoute);
 
             return (
               <>

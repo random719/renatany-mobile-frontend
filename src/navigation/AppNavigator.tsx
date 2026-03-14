@@ -1,7 +1,9 @@
 import { useAuth } from '@clerk/expo';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import React, { useEffect } from 'react';
+
+export const navigationRef = createNavigationContainerRef();
 import { SidebarMenu } from '../components/common/SidebarMenu';
 import { AdminDashboardScreen } from '../screens/admin/AdminDashboardScreen';
 import { AdminDisputesScreen } from '../screens/admin/AdminDisputesScreen';
@@ -53,7 +55,7 @@ export const AppNavigator = () => {
   }, [isSignedIn, getToken, setToken]);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <SidebarMenu />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isSignedIn ? (
