@@ -5,7 +5,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { GlobalHeader } from '../../components/common/GlobalHeader';
+import { ScreenLayout } from '../../components/common/ScreenLayout';
 import { api } from '../../services/api';
 import { getRentalRequests } from '../../services/rentalService';
 import { colors, typography } from '../../theme';
@@ -186,13 +186,19 @@ export const ConversationsScreen = () => {
     };
 
     return (
-        <View style={styles.container}>
-            <GlobalHeader />
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                <View style={styles.header}>
-                    <Text variant="displaySmall" style={styles.title}>My Conversations</Text>
+        <ScreenLayout showBottomNav bottomNavActiveKey="none">
+                <View style={styles.contentWrapper}>
+                    <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+                        <MaterialCommunityIcons name="arrow-left" size={20} color="#475569" />
+                        <Text style={styles.backBtnText}>Back</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.titleRow}>
+                        <MaterialCommunityIcons name="message-text-outline" size={32} color="#2563EB" />
+                        <Text style={styles.title}>My Conversations</Text>
+                    </View>
                     <View style={styles.subtitleRow}>
-                        <Text variant="bodyMedium" style={styles.subtitle}>Active conversations only (last 7 days)</Text>
+                        <Text style={styles.subtitle}>Active conversations only (last 7 days)</Text>
                         {totalActive > 0 && (
                             <View style={styles.activeBadge}>
                                 <MaterialCommunityIcons name="clock-outline" size={12} color="#475569" />
@@ -200,7 +206,6 @@ export const ConversationsScreen = () => {
                             </View>
                         )}
                     </View>
-                </View>
 
                 <View style={styles.mainCard}>
                     <View style={styles.tabs}>
@@ -249,36 +254,53 @@ export const ConversationsScreen = () => {
                         </View>
                     )}
                 </View>
-            </ScrollView>
-        </View>
+                </View>
+        </ScreenLayout>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
+    contentWrapper: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
-    },
-    scrollContent: {
-        paddingBottom: 40,
-    },
-    header: {
-        paddingHorizontal: 24,
+        paddingHorizontal: 20,
         paddingTop: 32,
-        paddingBottom: 24,
+        paddingBottom: 48,
+        maxWidth: 768,
+        width: '100%',
+        alignSelf: 'center',
+    },
+    backBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 28,
+    },
+    backBtnText: {
+        color: '#475569',
+        fontSize: 15,
+        fontWeight: '500',
+    },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 8,
     },
     title: {
-        fontWeight: '800',
+        fontSize: 30,
+        fontWeight: 'bold',
         color: '#0F172A',
-        marginBottom: 8,
+        letterSpacing: -0.5,
     },
     subtitleRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
+        marginBottom: 24,
     },
     subtitle: {
         color: '#64748B',
+        fontSize: 16,
     },
     activeBadge: {
         flexDirection: 'row',
@@ -297,8 +319,9 @@ const styles = StyleSheet.create({
     },
     mainCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        marginHorizontal: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
         paddingBottom: 24,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },

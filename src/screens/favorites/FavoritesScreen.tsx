@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   listContent: {
-    paddingBottom: 24,
+    paddingBottom: 0,
   },
   headerSection: {
     paddingHorizontal: 24,

@@ -71,6 +71,7 @@ export type RootStackParamList = {
   BulkEditItems: undefined;
   CreateListing: undefined;
   EditItem: { itemId: string };
+  ManageAvailability: { itemId: string; itemTitle: string };
   Booking: { listingId: string; listingTitle: string; pricePerDay: number; ownerEmail: string };
   BookingConfirm: { listingId: string; listingTitle: string; pricePerDay: number; ownerEmail: string; startDate: string; endDate: string; totalDays: number; dailyRate: number; platformFee: number; deposit: number; totalAmount: number; message: string };
   BookingSuccess: { rentalRequestId: string; listingTitle: string };

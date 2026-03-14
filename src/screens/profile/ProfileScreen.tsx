@@ -325,14 +325,15 @@ export const ProfileScreen = () => {
     setIsSaving(true);
     setSaveMessage(null);
     try {
-      await api.put('/users/me', {
+      const res = await api.put('/users/me', {
         full_name: settingsForm.full_name,
         bio: settingsForm.bio,
         preferred_language: settingsForm.preferred_language,
         notification_preferences: settingsForm.notification_preferences,
       });
+      const updatedUser = res.data?.data || res.data;
+      setBackendUser(updatedUser);
       setSaveMessage({ type: 'success', text: 'Settings saved successfully!' });
-      await loadProfile();
       setTimeout(() => setSaveMessage(null), 3000);
     } catch {
       setSaveMessage({ type: 'error', text: 'Failed to save settings.' });

@@ -1,14 +1,13 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, Image } from 'react-native';
+import { Alert, StyleSheet, TouchableOpacity, View, Image } from 'react-native';
 import { ActivityIndicator, Button, Checkbox, Menu, Text, TextInput, Surface } from 'react-native-paper';
-import { GlobalHeader } from '../../components/common/GlobalHeader';
-import { Footer } from '../../components/home/Footer';
+import { useUser } from '@clerk/expo';
+import { ScreenLayout } from '../../components/common/ScreenLayout';
 import { colors, typography } from '../../theme';
 import { BulkEditChanges, Listing } from '../../types/listing';
 import { useListingStore } from '../../store/listingStore';
-import { useAuthStore } from '../../store/authStore';
 
 const TRISTATE_OPTIONS = [
     { value: null, label: 'No change' },
@@ -29,7 +28,7 @@ const INITIAL_BULK_CHANGES: BulkEditChanges = {
 
 export const BulkEditItemsScreen = () => {
     const navigation = useNavigation();
-    const { user } = useAuthStore();
+    const { user } = useUser();
     const { userItems, isLoading, isSubmitting, fetchUserItems, updateItem, deleteItem } = useListingStore();
 
     const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -37,10 +36,22 @@ export const BulkEditItemsScreen = () => {
     const [availabilityMenuVisible, setAvailabilityMenuVisible] = useState(false);
     const [instantBookingMenuVisible, setInstantBookingMenuVisible] = useState(false);
     const [sameDayPickupMenuVisible, setSameDayPickupMenuVisible] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         if (user?.id) {
             fetchUserItems(user.id);
+        }
+    }, [user?.id, fetchUserItems]);
+
+    const onRefresh = useCallback(async () => {
+        if (!user?.id) return;
+        setRefreshing(true);
+        try {
+            await fetchUserItems(user.id);
+        } finally {
+            setRefreshing(false);
         }
     }, [user?.id, fetchUserItems]);
 
@@ -64,14 +75,15 @@ export const BulkEditItemsScreen = () => {
             return;
         }
         Alert.alert(
-            'Confirm Delete',
-            `Delete ${selectedItems.length} item(s)? This cannot be undone.`,
+            `Delete ${selectedItems.length} Item(s)?`,
+            'This will permanently delete the selected items and all associated data:\n\n• Item listings and photos\n• Rental history\n• Reviews and ratings\n• Availability calendars\n\nThis action cannot be undone!',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Delete',
+                    text: `Yes, Delete ${selectedItems.length} Item(s)`,
                     style: 'destructive',
                     onPress: async () => {
+                        setIsDeleting(true);
                         try {
                             for (const itemId of selectedItems) {
                                 await deleteItem(itemId);
@@ -82,6 +94,8 @@ export const BulkEditItemsScreen = () => {
                         } catch (error) {
                             console.error('Bulk delete error:', error);
                             Alert.alert('Error', 'Failed to delete some items. Please try again.');
+                        } finally {
+                            setIsDeleting(false);
                         }
                     },
                 },
@@ -148,9 +162,7 @@ export const BulkEditItemsScreen = () => {
         TRISTATE_OPTIONS.find(o => o.value === value)?.label || 'No change';
 
     return (
-        <View style={styles.mainContainer}>
-            <GlobalHeader />
-            <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
+        <ScreenLayout onRefresh={onRefresh} refreshing={refreshing} showBottomNav bottomNavActiveKey="none">
                 <View style={styles.contentWrapper}>
                     {/* Header Section */}
                     <View style={styles.headerRow}>
@@ -177,13 +189,14 @@ export const BulkEditItemsScreen = () => {
                             <View style={styles.actionButtonsRow}>
                                 <Button
                                     mode="contained"
-                                    icon="trash-can-outline"
+                                    icon={isDeleting ? undefined : "trash-can-outline"}
                                     style={styles.deleteBtn}
                                     labelStyle={styles.deleteBtnLabel}
                                     onPress={handleBulkDelete}
-                                    disabled={selectedItems.length === 0 || isSubmitting}
+                                    disabled={selectedItems.length === 0 || isSubmitting || isDeleting}
+                                    loading={isDeleting}
                                 >
-                                    Delete Selected ({selectedItems.length})
+                                    {isDeleting ? 'Deleting...' : `Delete Selected (${selectedItems.length})`}
                                 </Button>
                                 <Button
                                     mode="outlined"
@@ -201,9 +214,15 @@ export const BulkEditItemsScreen = () => {
                             {isLoading ? (
                                 <ActivityIndicator size="large" style={{ padding: 24 }} />
                             ) : userItems.length === 0 ? (
-                                <Text style={{ padding: 24, color: '#64748B', textAlign: 'center' }}>No items found.</Text>
+                                <View style={styles.emptyState}>
+                                    <MaterialCommunityIcons name="calendar-blank-outline" size={56} color="#CBD5E1" />
+                                    <Text style={styles.emptyStateTitle}>No items yet</Text>
+                                    <Text style={styles.emptyStateSubtitle}>Create some items to use bulk editing</Text>
+                                </View>
                             ) : (
-                                userItems.map(item => (
+                                userItems.map(item => {
+                                    const isAvailable = item.isActive !== false && (item as any).availability !== false;
+                                    return (
                                     <TouchableOpacity
                                         key={item.id}
                                         style={[styles.itemRow, selectedItems.includes(item.id) && styles.itemRowSelected, { marginBottom: 8 }]}
@@ -229,15 +248,24 @@ export const BulkEditItemsScreen = () => {
                                                 <View style={styles.priceTag}>
                                                     <Text style={styles.priceText}>${item.daily_rate ?? item.pricePerDay}/day</Text>
                                                 </View>
-                                                <View style={styles.statusTag}>
-                                                    <Text style={styles.statusText}>
-                                                        {item.isActive !== false ? 'Available' : 'Unavailable'}
+                                                <View style={[styles.statusTag, !isAvailable && styles.statusTagUnavailable]}>
+                                                    <Text style={[styles.statusText, !isAvailable && styles.statusTextUnavailable]}>
+                                                        {isAvailable ? 'Available' : 'Unavailable'}
                                                     </Text>
                                                 </View>
+                                                {item.category ? (
+                                                    <View style={styles.categoryTag}>
+                                                        <Text style={styles.categoryText}>{item.category}</Text>
+                                                    </View>
+                                                ) : null}
                                             </View>
                                         </View>
+                                        {selectedItems.includes(item.id) && (
+                                            <MaterialCommunityIcons name="check-circle" size={20} color="#7C3AED" style={{ marginLeft: 4 }} />
+                                        )}
                                     </TouchableOpacity>
-                                ))
+                                    );
+                                })
                             )}
                         </View>
                     </Surface>
@@ -450,23 +478,11 @@ export const BulkEditItemsScreen = () => {
                     </Surface>
 
                 </View>
-                <Footer />
-            </ScrollView>
-        </View>
+        </ScreenLayout>
     );
 };
 
 const styles = StyleSheet.create({
-    mainContainer: {
-        flex: 1,
-        backgroundColor: '#F8FAFC',
-    },
-    scrollContainer: {
-        flex: 1,
-    },
-    scrollContent: {
-        flexGrow: 1,
-    },
     contentWrapper: {
         width: '100%',
         maxWidth: 768,
@@ -599,7 +615,8 @@ const styles = StyleSheet.create({
     },
     itemTags: {
         flexDirection: 'row',
-        gap: 8,
+        flexWrap: 'wrap',
+        gap: 6,
     },
     priceTag: {
         borderWidth: 1,
@@ -624,6 +641,40 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         color: '#16A34A',
+    },
+    statusTagUnavailable: {
+        borderColor: '#FCA5A5',
+    },
+    statusTextUnavailable: {
+        color: '#DC2626',
+    },
+    categoryTag: {
+        borderWidth: 1,
+        borderColor: '#93C5FD',
+        borderRadius: 16,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+    },
+    categoryText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#2563EB',
+        textTransform: 'capitalize',
+    },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: 48,
+    },
+    emptyStateTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#0F172A',
+        marginTop: 16,
+        marginBottom: 8,
+    },
+    emptyStateSubtitle: {
+        fontSize: 14,
+        color: '#64748B',
     },
     bulkChangesHeader: {
         padding: 24,

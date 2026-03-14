@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useClerk, useUser } from "@clerk/expo";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -42,24 +42,33 @@ export const SidebarMenu = () => {
     clerkUser?.username ||
     (primaryEmail.includes("@") ? primaryEmail.split("@")[0] : "");
 
-  // Safely get current route name when sidebar opens
+  // Helper to resolve the deepest route name from navigation state
+  const resolveRouteName = useCallback(() => {
+    try {
+      const state = navigation.getState();
+      if (!state) return;
+      let route: any = state.routes[state.index];
+      while (route.state) {
+        route = route.state.routes[route.state.index];
+      }
+      setCurrentRouteName(route.name);
+    } catch (e) {
+      console.log("Error getting navigation state:", e);
+    }
+  }, [navigation]);
+
+  // Track route changes continuously so active state is always up to date
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("state", resolveRouteName);
+    return unsubscribe;
+  }, [navigation, resolveRouteName]);
+
+  // Also resolve when sidebar opens (in case state event already fired)
   useEffect(() => {
     if (isVisible) {
-      try {
-        const state = navigation.getState();
-        if (state) {
-          // Navigate through nested states if necessary
-          let route = state.routes[state.index];
-          while (route.state) {
-            route = route.state.routes[route.state.index];
-          }
-          setCurrentRouteName(route.name);
-        }
-      } catch (e) {
-        console.log("Error getting navigation state:", e);
-      }
+      resolveRouteName();
     }
-  }, [isVisible, navigation]);
+  }, [isVisible, resolveRouteName]);
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [isMounted, setIsMounted] = React.useState(isVisible);
@@ -282,8 +291,11 @@ export const SidebarMenu = () => {
                     isConversations,
                   )}
                 {!isAdmin &&
-                  renderNavItem("alert-outline", "Disputes", () =>
-                    navigation.navigate("Disputes"),
+                  renderNavItem(
+                    "alert-outline",
+                    "Disputes",
+                    () => navigation.navigate("Disputes"),
+                    isDisputes,
                   )}
               </>
             );
@@ -307,13 +319,23 @@ export const SidebarMenu = () => {
               {renderAdminNavItem(
                 "file-document-outline",
                 "Admin: Reports Listing",
+                () => navigation.navigate("AdminListingReports"),
               )}
-              {renderAdminNavItem("alert-outline", "Admin: Disputes")}
+              {renderAdminNavItem(
+                "alert-outline",
+                "Admin: Disputes",
+                () => navigation.navigate("AdminDisputes"),
+              )}
               {renderAdminNavItem(
                 "alert-rhombus-outline",
                 "Admin: User Reports",
+                () => navigation.navigate("AdminUserReports"),
               )}
-              {renderAdminNavItem("shield-check-outline", "Admin: Security")}
+              {renderAdminNavItem(
+                "shield-check-outline",
+                "Admin: Fraud Reports",
+                () => navigation.navigate("AdminFraudReports"),
+              )}
             </>
           )}
 

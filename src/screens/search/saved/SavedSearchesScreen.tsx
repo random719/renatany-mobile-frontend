@@ -1,21 +1,15 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View, ScrollView } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
-import { GlobalHeader } from '../../../components/common/GlobalHeader';
-import { Footer } from '../../../components/home/Footer';
+import { ScreenLayout } from '../../../components/common/ScreenLayout';
 
 export const SavedSearchesScreen = () => {
     const navigation = useNavigation();
 
     return (
-        <View style={styles.mainContainer}>
-            <GlobalHeader />
-            <ScrollView 
-                style={styles.scrollContainer} 
-                contentContainerStyle={styles.scrollContent}
-            >
+        <ScreenLayout>
                 <View style={styles.contentWrapper}>
                     <TouchableOpacity
                         style={styles.backBtn}
@@ -51,24 +45,11 @@ export const SavedSearchesScreen = () => {
                         </Button>
                     </View>
                 </View>
-                <Footer />
-            </ScrollView>
-        </View>
+        </ScreenLayout>
     );
 };
 
 const styles = StyleSheet.create({
-    mainContainer: {
-        flex: 1,
-        backgroundColor: '#FFFFFF',
-    },
-    scrollContainer: {
-        flex: 1,
-    },
-    scrollContent: {
-        flexGrow: 1,
-        backgroundColor: '#FFFFFF',
-    },
     contentWrapper: {
         flex: 1,
         paddingHorizontal: 20,

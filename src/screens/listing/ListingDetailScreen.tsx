@@ -13,6 +13,7 @@ import {
   Linking,
   Modal,
   Platform,
+  RefreshControl,
   ScrollView,
   Share,
   StyleSheet,
@@ -80,6 +81,16 @@ export const ListingDetailScreen = () => {
   const [isStartingKyc, setIsStartingKyc] = useState(false);
   // Image zoom
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchListingById(listingId);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [listingId, fetchListingById]);
 
   // Fetch item details
   useEffect(() => {
@@ -571,7 +582,13 @@ export const ListingDetailScreen = () => {
   return (
     <View style={styles.mainContainer}>
       <GlobalHeader />
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />
+        }
+      >
         {/* Secondary Header */}
         <View style={styles.secondaryHeader}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
@@ -839,7 +856,7 @@ export const ListingDetailScreen = () => {
               {/* Manage Availability */}
               <TouchableOpacity
                 style={styles.manageBtn}
-                onPress={handleToggleAvailability}
+                onPress={() => (navigation as any).navigate('ManageAvailability', { itemId: listing.id, itemTitle: listing.title })}
               >
                 <MaterialCommunityIcons name="calendar-month-outline" size={20} color="#475569" />
                 <Text style={styles.manageBtnText}>Manage Availability</Text>

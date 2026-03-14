@@ -1,12 +1,13 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
+import { useUser } from '@clerk/expo';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { createDispute, getDisputeById } from '../../services/disputeService';
-import { useAuthStore } from '../../store/authStore';
+import { api } from '../../services/api';
 import { colors, typography } from '../../theme';
 import { Dispute } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
@@ -33,19 +34,68 @@ export const DisputeDetailScreen = () => {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { disputeId } = route.params;
-  const { user } = useAuthStore();
+  const { user: clerkUser } = useUser();
+  const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress;
   const isNew = disputeId === 'new';
 
   const [dispute, setDispute] = useState<Dispute | null>(null);
   const [isLoading, setIsLoading] = useState(!isNew);
 
   // Create form state
-  const [rentalRequestId, setRentalRequestId] = useState('');
-  const [againstEmail, setAgainstEmail] = useState('');
+  const [rentalRequests, setRentalRequests] = useState<any[]>([]);
+  const [itemsMap, setItemsMap] = useState<Record<string, any>>({});
+  const [isLoadingRentals, setIsLoadingRentals] = useState(isNew);
+  const [selectedRentalId, setSelectedRentalId] = useState('');
+  const [showRentalPicker, setShowRentalPicker] = useState(false);
   const [reason, setReason] = useState('');
   const [showReasonPicker, setShowReasonPicker] = useState(false);
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const fieldPositions = useRef<Record<string, number>>({});
+
+  const scrollToField = (field: string) => {
+    setTimeout(() => {
+      const y = fieldPositions.current[field];
+      if (y !== undefined) {
+        scrollRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true });
+      }
+    }, 250);
+  };
+
+  // Fetch rental requests for dispute filing
+  useEffect(() => {
+    if (!isNew || !userEmail) return;
+    (async () => {
+      try {
+        const [renterRes, ownerRes] = await Promise.all([
+          api.get('/rental-requests', { params: { renter_email: userEmail } }).catch(() => ({ data: { data: [] } })),
+          api.get('/rental-requests', { params: { owner_email: userEmail } }).catch(() => ({ data: { data: [] } })),
+        ]);
+        const renterReqs = renterRes.data?.data || [];
+        const ownerReqs = ownerRes.data?.data || [];
+        const all = [...renterReqs, ...ownerReqs];
+        const unique = Array.from(new Map(all.map((r: any) => [r.id || r._id, r])).values());
+        // Only show paid/completed rentals (eligible for disputes)
+        const eligible = unique.filter((r: any) => ['paid', 'completed'].includes(r.status));
+        setRentalRequests(eligible);
+
+        // Fetch item titles
+        const itemIds = [...new Set(eligible.map((r: any) => r.item_id).filter(Boolean))];
+        if (itemIds.length > 0) {
+          const itemsRes = await api.get('/items', { params: { ids: itemIds.join(',') } }).catch(() => ({ data: { data: [] } }));
+          const fetched = itemsRes.data?.data || [];
+          const map: Record<string, any> = {};
+          fetched.forEach((item: any) => { map[item.id || item._id] = item; });
+          setItemsMap(map);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setIsLoadingRentals(false);
+      }
+    })();
+  }, [isNew, userEmail]);
 
   useEffect(() => {
     if (!isNew) {
@@ -62,21 +112,34 @@ export const DisputeDetailScreen = () => {
     }
   }, [disputeId, isNew]);
 
+  const selectedRental = rentalRequests.find((r: any) => (r.id || r._id) === selectedRentalId);
+  const againstEmail = selectedRental
+    ? (selectedRental.renter_email === userEmail ? selectedRental.owner_email : selectedRental.renter_email)
+    : '';
+
+  const getRentalLabel = (r: any) => {
+    const id = r.id || r._id;
+    const item = itemsMap[r.item_id];
+    const itemTitle = item?.title || 'Unknown item';
+    const date = new Date(r.created_date || r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${itemTitle} — ${date}`;
+  };
+
   const handleSubmit = async () => {
-    if (!rentalRequestId.trim() || !againstEmail.trim() || !reason || !description.trim()) {
-      Alert.alert('Missing fields', 'Please fill in all required fields.');
+    if (!selectedRentalId || !reason || !description.trim()) {
+      Alert.alert('Missing fields', 'Please select a rental, reason, and provide a description.');
       return;
     }
-    if (!user?.email) {
+    if (!userEmail) {
       Alert.alert('Error', 'You must be logged in.');
       return;
     }
     setIsSubmitting(true);
     try {
       await createDispute({
-        rental_request_id: rentalRequestId.trim(),
-        filed_by_email: user.email,
-        against_email: againstEmail.trim(),
+        rental_request_id: selectedRentalId,
+        filed_by_email: userEmail,
+        against_email: againstEmail,
         reason,
         description: description.trim(),
       });
@@ -102,7 +165,16 @@ export const DisputeDetailScreen = () => {
   return (
     <View style={styles.container}>
       <GlobalHeader />
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+      >
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textPrimary} />
@@ -114,28 +186,59 @@ export const DisputeDetailScreen = () => {
 
         {isNew ? (
           <>
-            <View style={styles.card}>
-              <Text style={styles.sectionLabel}>Rental Request ID *</Text>
-              <TextInput
-                value={rentalRequestId}
-                onChangeText={setRentalRequestId}
-                mode="outlined"
-                placeholder="Enter the rental request ID"
-                style={styles.input}
-              />
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.sectionLabel}>Against (email) *</Text>
-              <TextInput
-                value={againstEmail}
-                onChangeText={setAgainstEmail}
-                mode="outlined"
-                placeholder="owner@example.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                style={styles.input}
-              />
+            {/* Rental Request Picker */}
+            <View style={styles.card} onLayout={(e) => { fieldPositions.current.rental = e.nativeEvent.layout.y; }}>
+              <Text style={styles.sectionLabel}>Select Rental *</Text>
+              {isLoadingRentals ? (
+                <ActivityIndicator size="small" color={colors.primary} style={{ paddingVertical: 12 }} />
+              ) : rentalRequests.length === 0 ? (
+                <View style={styles.emptyRentalsBox}>
+                  <MaterialCommunityIcons name="inbox-outline" size={28} color="#94A3B8" />
+                  <Text style={styles.emptyRentalsText}>No eligible rentals found. Only paid or completed rentals can be disputed.</Text>
+                </View>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={styles.reasonSelector}
+                    onPress={() => setShowRentalPicker(!showRentalPicker)}
+                  >
+                    <Text style={selectedRentalId ? styles.reasonSelected : styles.reasonPlaceholder} numberOfLines={1}>
+                      {selectedRental ? getRentalLabel(selectedRental) : 'Select a rental'}
+                    </Text>
+                    <MaterialCommunityIcons name={showRentalPicker ? 'chevron-up' : 'chevron-down'} size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                  {showRentalPicker && (
+                    <View style={styles.reasonList}>
+                      {rentalRequests.map((r: any) => {
+                        const id = r.id || r._id;
+                        return (
+                          <TouchableOpacity
+                            key={id}
+                            style={[styles.reasonItem, selectedRentalId === id && styles.reasonItemActive]}
+                            onPress={() => { setSelectedRentalId(id); setShowRentalPicker(false); }}
+                          >
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.reasonItemText, selectedRentalId === id && styles.reasonItemTextActive]} numberOfLines={1}>
+                                {getRentalLabel(r)}
+                              </Text>
+                              <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
+                                {r.status} · {r.renter_email === userEmail ? `Owner: ${r.owner_email}` : `Renter: ${r.renter_email}`}
+                              </Text>
+                            </View>
+                            {selectedRentalId === id && <MaterialCommunityIcons name="check" size={16} color={colors.primary} />}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </>
+              )}
+              {selectedRental && (
+                <View style={styles.againstInfoBox}>
+                  <Text style={styles.againstInfoLabel}>Dispute against:</Text>
+                  <Text style={styles.againstInfoValue}>{againstEmail}</Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.card}>
@@ -171,7 +274,7 @@ export const DisputeDetailScreen = () => {
               )}
             </View>
 
-            <View style={styles.card}>
+            <View style={styles.card} onLayout={(e) => { fieldPositions.current.description = e.nativeEvent.layout.y; }}>
               <Text style={styles.sectionLabel}>Description *</Text>
               <TextInput
                 value={description}
@@ -181,9 +284,11 @@ export const DisputeDetailScreen = () => {
                 multiline
                 numberOfLines={4}
                 style={styles.input}
+                onFocus={() => scrollToField('description')}
               />
             </View>
 
+            <View onLayout={(e) => { fieldPositions.current.submit = e.nativeEvent.layout.y; }} />
             <Button
               mode="contained"
               onPress={handleSubmit}
@@ -259,6 +364,7 @@ export const DisputeDetailScreen = () => {
           </View>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 };
@@ -273,7 +379,7 @@ const InfoRow = ({ label, value }: { label: string; value: string }) => (
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  scroll: { paddingBottom: 40 },
+  scroll: { paddingBottom: 200 },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -359,4 +465,35 @@ const styles = StyleSheet.create({
   infoValue: { color: '#0F172A', fontWeight: '600', fontSize: typography.body, flex: 1, textAlign: 'right', marginLeft: 8 },
   descText: { color: '#475569', lineHeight: 22, fontSize: typography.body },
   notFoundText: { color: '#94A3B8', fontSize: typography.body },
+  emptyRentalsBox: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  emptyRentalsText: {
+    color: '#64748B',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  againstInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 10,
+    gap: 6,
+  },
+  againstInfoLabel: {
+    fontSize: 13,
+    color: '#64748B',
+  },
+  againstInfoValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0F172A',
+    flex: 1,
+  },
 });

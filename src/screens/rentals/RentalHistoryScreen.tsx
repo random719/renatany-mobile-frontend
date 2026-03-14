@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -10,8 +10,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Menu, Text, TextInput } from 'react-native-paper';
+import { AppBottomNavBar } from '../../components/common/AppBottomNavBar';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
+import { Footer } from '../../components/home/Footer';
 import { getRentalRequests } from '../../services/rentalService';
 import { useAuthStore } from '../../store/authStore';
 import { colors, typography } from '../../theme';
@@ -19,40 +21,76 @@ import { RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
 
 type Nav = StackNavigationProp<RootStackParamList>;
+type FilterKey = 'all' | 'completed' | 'active' | 'pending' | 'cancelled';
 
-type TabKey = 'all' | 'pending' | 'approved' | 'active' | 'completed' | 'cancelled';
-
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'approved', label: 'Approved' },
-  { key: 'active', label: 'Active' },
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'all', label: 'All Rentals' },
   { key: 'completed', label: 'Completed' },
+  { key: 'active', label: 'Active' },
+  { key: 'pending', label: 'Pending' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
-const STATUS_COLOR: Record<RentalRequest['status'], string> = {
+const STATUS_LABELS: Record<string, string> = {
+  pending: 'Pending',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  paid: 'Paid',
+  cancelled: 'Cancelled',
+  completed: 'Completed',
+  inquiry: 'Inquiry',
+  declined: 'Declined',
+};
+
+const STATUS_COLORS: Record<string, string> = {
   pending: '#F59E0B',
-  approved: '#3B82F6',
-  rejected: '#EF4444',
-  paid: '#8B5CF6',
-  cancelled: '#6B7280',
-  completed: '#10B981',
+  approved: '#2563EB',
+  rejected: '#DC2626',
+  paid: '#0F766E',
+  cancelled: '#64748B',
+  completed: '#059669',
+  inquiry: '#7C3AED',
+  declined: '#B91C1C',
 };
 
-const STATUS_ICON: Record<RentalRequest['status'], string> = {
-  pending: 'clock-outline',
-  approved: 'check-circle-outline',
-  rejected: 'close-circle-outline',
-  paid: 'credit-card-check-outline',
-  cancelled: 'cancel',
-  completed: 'check-decagram',
+const matchesFilter = (rental: RentalRequest, filter: FilterKey) => {
+  if (filter === 'all') return true;
+  if (filter === 'active') return rental.status === 'approved' || rental.status === 'paid';
+  return rental.status === filter;
 };
 
-const filterByTab = (rentals: RentalRequest[], tab: TabKey): RentalRequest[] => {
-  if (tab === 'all') return rentals;
-  if (tab === 'active') return rentals.filter((r) => r.status === 'approved' || r.status === 'paid');
-  return rentals.filter((r) => r.status === tab);
+const formatDateRange = (startDate: string, endDate: string) => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const startLabel = start.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  });
+  const endLabel = end.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  return `${startLabel} - ${endLabel}`;
+};
+
+const getDisplayTitle = (rental: RentalRequest) => {
+  const candidate = (rental as RentalRequest & {
+    item_title?: string;
+    listing_title?: string;
+    title?: string;
+    productName?: string;
+  }).item_title
+    || (rental as any).listing_title
+    || (rental as any).title
+    || (rental as any).productName;
+
+  if (candidate) return candidate;
+  if (rental.item_id) return rental.item_id.replace(/[-_]/g, ' ');
+  return 'Product';
 };
 
 export const RentalHistoryScreen = () => {
@@ -61,237 +99,400 @@ export const RentalHistoryScreen = () => {
   const [rentals, setRentals] = useState<RentalRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabKey>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState<FilterKey>('all');
+  const [isFilterMenuVisible, setIsFilterMenuVisible] = useState(false);
 
   const load = useCallback(async (quiet = false) => {
-    if (!user?.email) { setIsLoading(false); return; }
+    if (!user?.email) {
+      setIsLoading(false);
+      return;
+    }
     if (!quiet) setIsLoading(true);
+
     try {
       const [asRenter, asOwner] = await Promise.all([
         getRentalRequests({ renter_email: user.email }),
         getRentalRequests({ owner_email: user.email }),
       ]);
-      const all = [...asRenter, ...asOwner];
-      const unique = Array.from(new Map(all.map((r) => [r.id, r])).values());
+      const merged = [...asRenter, ...asOwner];
+      const unique = Array.from(new Map(merged.map((rental) => [rental.id, rental])).values());
       unique.sort((a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime());
       setRentals(unique);
     } catch {
-      // silently fail
+      // Keep the page stable even if the API fails.
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   }, [user?.email]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const displayed = filterByTab(rentals, activeTab);
+  const filteredRentals = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return rentals.filter((rental) => {
+      if (!matchesFilter(rental, selectedFilter)) return false;
+      if (!query) return true;
+
+      const searchBase = [
+        rental.id,
+        rental.item_id,
+        rental.renter_email,
+        rental.owner_email,
+        getDisplayTitle(rental),
+        STATUS_LABELS[rental.status] || rental.status,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return searchBase.includes(query);
+    });
+  }, [rentals, searchQuery, selectedFilter]);
 
   const renderCard = ({ item }: { item: RentalRequest }) => {
-    const isRenter = item.renter_email === user?.email;
-    const color = STATUS_COLOR[item.status] ?? '#6B7280';
-    const icon = STATUS_ICON[item.status] ?? 'circle-outline';
+    const title = getDisplayTitle(item);
+    const rentalFee = Math.max(
+      0,
+      (item.total_amount ?? 0) - (item.platform_fee ?? 0) - (item.security_deposit ?? 0)
+    );
+    const accent = STATUS_COLORS[item.status] ?? '#64748B';
 
     return (
       <TouchableOpacity
-        style={styles.card}
+        activeOpacity={0.88}
         onPress={() => navigation.navigate('RentalDetail', { rentalId: item.id })}
-        activeOpacity={0.7}
+        style={styles.card}
       >
-        <View style={styles.cardTop}>
-          <View style={[styles.statusBadge, { backgroundColor: color + '18' }]}>
-            <MaterialCommunityIcons name={icon as any} size={14} color={color} />
-            <Text style={[styles.statusText, { color }]}>{item.status.replace('_', ' ').toUpperCase()}</Text>
+        <View style={styles.cardHeader}>
+          <View style={styles.thumbnail}>
+            <MaterialCommunityIcons name="package-variant-closed" size={28} color="#E2E8F0" />
           </View>
-          <Text style={styles.amount}>${item.total_amount?.toFixed(2) ?? '—'}</Text>
-        </View>
 
-        <View style={styles.cardRow}>
-          <MaterialCommunityIcons name="calendar-range" size={14} color={colors.textSecondary} />
-          <Text style={styles.cardMeta}>
-            {new Date(item.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-            {' → '}
-            {new Date(item.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-          </Text>
-        </View>
+          <View style={styles.cardBody}>
+            <View style={styles.titleRow}>
+              <Text style={styles.productTitle} numberOfLines={1}>
+                {title}
+              </Text>
+              <View style={[styles.statusPill, { backgroundColor: `${accent}15` }]}>
+                <Text style={[styles.statusPillText, { color: accent }]}>
+                  {STATUS_LABELS[item.status] || item.status}
+                </Text>
+              </View>
+            </View>
 
-        <View style={styles.cardRow}>
-          <MaterialCommunityIcons name={isRenter ? 'account-arrow-right' : 'account-arrow-left'} size={14} color={colors.textSecondary} />
-          <Text style={styles.cardMeta} numberOfLines={1}>
-            {isRenter ? `Owner: ${item.owner_email}` : `Renter: ${item.renter_email}`}
-          </Text>
-        </View>
+            <View style={styles.metaRow}>
+              <MaterialCommunityIcons name="calendar-month-outline" size={14} color="#64748B" />
+              <Text style={styles.metaText}>{formatDateRange(item.start_date, item.end_date)}</Text>
+            </View>
 
-        <View style={styles.cardFooter}>
-          <Text style={styles.cardId} numberOfLines={1}>ID: {item.id}</Text>
-          <View style={styles.viewDetails}>
-            <Text style={styles.viewDetailsText}>View Details</Text>
-            <MaterialCommunityIcons name="chevron-right" size={14} color={colors.primary} />
+            <View style={styles.priceRow}>
+              <MaterialCommunityIcons name="currency-usd" size={14} color="#64748B" />
+              <Text style={styles.amountText}>${(item.total_amount ?? 0).toFixed(2)}</Text>
+            </View>
+
+            <Text style={styles.breakdownText} numberOfLines={1}>
+              Rental ${rentalFee.toFixed(2)} • Fee ${(item.platform_fee ?? 0).toFixed(2)} • Deposit ${(item.security_deposit ?? 0).toFixed(2)}
+            </Text>
           </View>
         </View>
+
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('RentalDetail', { rentalId: item.id })}
+          style={styles.receiptButton}
+        >
+          <MaterialCommunityIcons name="download" size={18} color="#111827" />
+          <Text style={styles.receiptButtonText}>Receipt</Text>
+        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
 
+  const selectedFilterLabel = FILTERS.find((filter) => filter.key === selectedFilter)?.label ?? 'All Rentals';
+
   return (
     <View style={styles.container}>
-      <GlobalHeader />
-
-      <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text variant="titleLarge" style={styles.headerTitle}>My Rentals</Text>
-        <TouchableOpacity onPress={() => load(true)} style={styles.refreshBtn}>
-          <MaterialCommunityIcons name="refresh" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Status Tabs */}
       <FlatList
-        horizontal
-        data={TABS}
-        keyExtractor={(t) => t.key}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabsContainer}
-        renderItem={({ item: tab }) => {
-          const count = filterByTab(rentals, tab.key).length;
-          const active = activeTab === tab.key;
-          return (
-            <TouchableOpacity
-              style={[styles.tab, active && styles.tabActive]}
-              onPress={() => setActiveTab(tab.key)}
-            >
-              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{tab.label}</Text>
-              {count > 0 && (
-                <View style={[styles.tabBadge, active && styles.tabBadgeActive]}>
-                  <Text style={[styles.tabBadgeText, active && styles.tabBadgeTextActive]}>{count}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        }}
-      />
+        data={isLoading ? [] : filteredRentals}
+        keyExtractor={(item) => item.id}
+        renderItem={renderCard}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => {
+              setIsRefreshing(true);
+              load(true);
+            }}
+          />
+        }
+        ListHeaderComponent={
+          <>
+            <GlobalHeader />
 
-      {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : (
-        <FlatList
-          data={displayed}
-          keyExtractor={(item) => item.id}
-          renderItem={renderCard}
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={() => { setIsRefreshing(true); load(true); }}
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="calendar-blank-outline" size={64} color="#CBD5E1" />
+            <View style={styles.heroSection}>
+              <Text style={styles.pageTitle}>Rental History</Text>
+              <Text style={styles.pageSubtitle}>
+                View all your completed rentals and download receipts
+              </Text>
+
+              <TextInput
+                mode="outlined"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search rentals..."
+                style={styles.searchInput}
+                outlineStyle={styles.searchOutline}
+                left={<TextInput.Icon icon="magnify" color="#94A3B8" />}
+                theme={{ colors: { primary: '#CBD5E1', outline: '#E2E8F0' } }}
+              />
+
+              <Menu
+                visible={isFilterMenuVisible}
+                onDismiss={() => setIsFilterMenuVisible(false)}
+                anchorPosition="bottom"
+                contentStyle={styles.menuContent}
+                anchor={
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => setIsFilterMenuVisible(true)}
+                    style={styles.filterButton}
+                  >
+                    <Text style={styles.filterButtonText}>{selectedFilterLabel}</Text>
+                    <MaterialCommunityIcons name="chevron-down" size={20} color="#111827" />
+                  </TouchableOpacity>
+                }
+              >
+                {FILTERS.map((filter) => (
+                  <Menu.Item
+                    key={filter.key}
+                    onPress={() => {
+                      setSelectedFilter(filter.key);
+                      setIsFilterMenuVisible(false);
+                    }}
+                    title={filter.label}
+                  />
+                ))}
+              </Menu>
+            </View>
+
+            {isLoading && (
+              <View style={styles.loadingWrap}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            )}
+          </>
+        }
+        ListEmptyComponent={
+          !isLoading ? (
+            <View style={styles.emptyCard}>
+              <MaterialCommunityIcons name="file-search-outline" size={44} color="#94A3B8" />
               <Text style={styles.emptyTitle}>No rentals found</Text>
               <Text style={styles.emptySubtitle}>
-                {activeTab === 'all' ? 'You have no rental activity yet.' : `No ${activeTab} rentals.`}
+                Try a different search or switch the rental filter.
               </Text>
             </View>
-          }
-        />
-      )}
+          ) : null
+        }
+        ListFooterComponent={
+          <View style={styles.footerWrap}>
+            <Footer />
+          </View>
+        }
+      />
+      <AppBottomNavBar activeKey="none" />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 12,
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
-  backBtn: {
-    padding: 8,
+  listContent: {
+    paddingBottom: 0,
+  },
+  heroSection: {
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 12,
+  },
+  pageTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  pageSubtitle: {
+    fontSize: typography.label,
+    lineHeight: 22,
+    color: '#64748B',
+    marginBottom: 18,
+  },
+  searchInput: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    marginBottom: 12,
   },
-  headerTitle: { flex: 1, fontWeight: '700', color: '#0F172A' },
-  refreshBtn: { padding: 6 },
-  tabsContainer: { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
-  tab: {
+  searchOutline: {
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    gap: 6,
+    height: 48,
+    marginBottom: 16,
   },
-  tabActive: {
-    backgroundColor: '#1F2937',
-    borderColor: '#1F2937',
+  filterButtonText: {
+    fontSize: typography.label,
+    color: '#111827',
   },
-  tabLabel: { fontSize: typography.small, fontWeight: '600', color: '#64748B' },
-  tabLabelActive: { color: '#FFFFFF' },
-  tabBadge: {
-    backgroundColor: '#F1F5F9',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    minWidth: 20,
-    alignItems: 'center',
-  },
-  tabBadgeActive: { backgroundColor: 'rgba(255,255,255,0.2)' },
-  tabBadgeText: { fontSize: 10, fontWeight: '700', color: '#64748B' },
-  tabBadgeTextActive: { color: '#FFFFFF' },
-  list: { paddingHorizontal: 16, paddingBottom: 40 },
-  card: {
+  menuContent: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+  },
+  loadingWrap: {
+    paddingVertical: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  card: {
+    marginHorizontal: 20,
+    marginBottom: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
     padding: 14,
-    marginBottom: 10,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 4,
   },
-  cardTop: {
+  cardHeader: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 14,
+  },
+  thumbnail: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
+    backgroundColor: '#111827',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardBody: {
+    flex: 1,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
+    gap: 8,
+    marginBottom: 8,
   },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  productTitle: {
+    flex: 1,
+    fontSize: 19,
+    lineHeight: 24,
+    fontWeight: '700',
+    color: '#0F172A',
+    textTransform: 'capitalize',
+  },
+  statusPill: {
+    borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
+    paddingVertical: 5,
   },
-  statusText: { fontSize: 10, fontWeight: '700' },
-  amount: { fontWeight: '700', color: '#0F172A', fontSize: typography.tabLabel },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  cardMeta: { color: '#64748B', fontSize: typography.small, flex: 1 },
-  cardFooter: {
+  statusPillText: {
+    fontSize: typography.small,
+    fontWeight: '700',
+  },
+  metaRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    gap: 6,
+    marginBottom: 6,
   },
-  cardId: { color: '#94A3B8', fontSize: 10, flex: 1 },
-  viewDetails: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  viewDetailsText: { color: colors.primary, fontSize: typography.small, fontWeight: '600' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
-  emptyTitle: { fontWeight: '700', color: '#475569', fontSize: typography.tabLabel },
-  emptySubtitle: { color: '#94A3B8', fontSize: typography.body, textAlign: 'center' },
+  metaText: {
+    fontSize: typography.caption,
+    color: '#64748B',
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  amountText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  breakdownText: {
+    fontSize: typography.small,
+    lineHeight: 18,
+    color: '#94A3B8',
+  },
+  receiptButton: {
+    minHeight: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  receiptButtonText: {
+    fontSize: typography.label,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  emptyCard: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 18,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 24,
+    paddingVertical: 36,
+    alignItems: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 18,
+    elevation: 3,
+  },
+  emptyTitle: {
+    marginTop: 14,
+    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  emptySubtitle: {
+    fontSize: typography.label,
+    lineHeight: 22,
+    textAlign: 'center',
+    color: '#64748B',
+  },
+  footerWrap: {
+    marginTop: 20,
+  },
 });

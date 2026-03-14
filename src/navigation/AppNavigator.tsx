@@ -17,6 +17,7 @@ import { DisputeDetailScreen } from '../screens/disputes/DisputeDetailScreen';
 import { DisputesScreen } from '../screens/disputes/DisputesScreen';
 import { BulkEditItemsScreen } from '../screens/listing/BulkEditItemsScreen';
 import { CreateListingScreen } from '../screens/listing/CreateListingScreen';
+import { ManageAvailabilityScreen } from '../screens/listing/ManageAvailabilityScreen';
 import { ConversationsScreen } from '../screens/messages/ConversationsScreen';
 import { NotificationsScreen } from '../screens/notifications/NotificationsScreen';
 import { RentalDetailScreen } from '../screens/rentals/RentalDetailScreen';
@@ -78,6 +79,7 @@ export const AppNavigator = () => {
             <Stack.Screen name="BulkEditItems" component={BulkEditItemsScreen} />
             <Stack.Screen name="CreateListing" component={CreateListingScreen} />
             <Stack.Screen name="EditItem" component={CreateListingScreen} />
+            <Stack.Screen name="ManageAvailability" component={ManageAvailabilityScreen} />
           </>
         ) : (
           <Stack.Screen name="Auth" component={AuthNavigator} />
