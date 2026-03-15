@@ -463,6 +463,10 @@ export const ProfileScreen = () => {
   ];
 
   const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://172.28.145.1:5000/api').replace(/\/api$/, '');
+  const cardReturnUrl = `${API_BASE}/api/stripe/app-return/profile`;
+  const bankReturnUrl = `${API_BASE}/api/stripe/app-return/stripe/confirm`;
+  const nativeCardCallback = 'rentany://payment-setup-complete';
+  const nativeBankCallback = 'rentany://bank-connect-complete';
 
   const refreshPaymentStatus = async () => {
     try {
@@ -476,11 +480,11 @@ export const ProfileScreen = () => {
   const handleAddPayment = async () => {
     try {
       const res = await api.post('/stripe/payment-method/setup', {
-        mobile_success_url: `${API_BASE}/api/stripe/app-return/profile`,
+        mobile_success_url: cardReturnUrl,
       });
       const url = res.data?.data?.url || res.data?.url;
       if (!url) return;
-      await WebBrowser.openAuthSessionAsync(url, 'rentany://');
+      await WebBrowser.openAuthSessionAsync(url, nativeCardCallback);
       await refreshPaymentStatus();
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.error || 'Failed to start card setup.');
@@ -489,15 +493,14 @@ export const ProfileScreen = () => {
 
   const handleConnectBank = async () => {
     try {
-      const mobileReturnUrl = `${API_BASE}/api/stripe/app-return/stripe/confirm`;
       const res = await api.post('/stripe/connect/onboarding', {
         origin: API_BASE,
         return_path: '/profile',
-        mobile_return_url: mobileReturnUrl,
+        mobile_return_url: bankReturnUrl,
       });
       const url = res.data?.data?.url || res.data?.url;
       if (!url) return;
-      await WebBrowser.openAuthSessionAsync(url, 'rentany://');
+      await WebBrowser.openAuthSessionAsync(url, nativeBankCallback);
       await refreshPaymentStatus();
       // After bank connect, prompt to add card if not yet connected
       const userRes = await api.get('/users/me').catch(() => null);

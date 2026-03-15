@@ -390,9 +390,15 @@ export const ListingDetailScreen = () => {
 
   // API base URL (without /api) used for mobile return pages
   const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://172.28.145.1:5000/api').replace(/\/api$/, '');
+  const identityReturnUrl = `${API_BASE}/api/stripe/app-return/identity`;
+  const cardReturnUrl = `${API_BASE}/api/stripe/app-return/profile`;
+  const bankReturnUrl = `${API_BASE}/api/stripe/app-return/stripe/confirm`;
+  const nativeIdentityCallback = 'rentany://identity-verified';
+  const nativeCardCallback = 'rentany://payment-setup-complete';
+  const nativeBankCallback = 'rentany://bank-connect-complete';
 
-  const openStripeAndWatchReturn = (url: string, onReturn: () => void) => {
-    WebBrowser.openAuthSessionAsync(url, 'rentany://').then(() => {
+  const openStripeAndWatchReturn = (url: string, returnUrl: string, onReturn: () => void) => {
+    WebBrowser.openAuthSessionAsync(url, returnUrl).then(() => {
       onReturn();
     });
   };
@@ -403,7 +409,7 @@ export const ListingDetailScreen = () => {
       const res = await api.post('/stripe/identity/create-session', {
         from: 'rental-request',
         item_id: listing?.id,
-        mobile_return_url: `${API_BASE}/api/stripe/app-return/identity`,
+        mobile_return_url: identityReturnUrl,
       });
       const url = res.data?.data?.url || res.data?.url;
       if (!url) {
@@ -411,7 +417,7 @@ export const ListingDetailScreen = () => {
         setIsStartingKyc(false);
         return;
       }
-      openStripeAndWatchReturn(url, async () => {
+      openStripeAndWatchReturn(url, nativeIdentityCallback, async () => {
         await refreshBackendUser();
         setIsStartingKyc(false);
         Alert.alert('Verification Submitted', 'Your ID verification has been submitted. Once approved, you can send your rental request.');
@@ -426,12 +432,12 @@ export const ListingDetailScreen = () => {
     setIsConnectingCard(true);
     try {
       const res = await api.post('/stripe/payment-method/setup', {
-        mobile_success_url: `${API_BASE}/api/stripe/app-return/profile`,
+        mobile_success_url: cardReturnUrl,
       });
       const url = res.data?.data?.url || res.data?.url;
       if (!url) { setIsConnectingCard(false); return; }
 
-      openStripeAndWatchReturn(url, async () => {
+      openStripeAndWatchReturn(url, nativeCardCallback, async () => {
         await refreshBackendUser();
         setIsConnectingCard(false);
       });
@@ -444,16 +450,15 @@ export const ListingDetailScreen = () => {
   const handleConnectBank = async () => {
     setIsConnectingBank(true);
     try {
-      const mobileReturnUrl = `${API_BASE}/api/stripe/app-return/stripe/confirm`;
       const res = await api.post('/stripe/connect/onboarding', {
         origin: API_BASE,
         return_path: '/profile',
-        mobile_return_url: mobileReturnUrl,
+        mobile_return_url: bankReturnUrl,
       });
       const url = res.data?.data?.url || res.data?.url;
       if (!url) { setIsConnectingBank(false); return; }
 
-      openStripeAndWatchReturn(url, async () => {
+      openStripeAndWatchReturn(url, nativeBankCallback, async () => {
         await refreshBackendUser();
         setIsConnectingBank(false);
         // After bank connect, prompt to add card if not yet connected
