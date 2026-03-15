@@ -4,27 +4,42 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Image,
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { Menu, Text, TextInput } from 'react-native-paper';
+import { useAuth, useUser } from '@clerk/expo';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { AppBottomNavBar } from '../../components/common/AppBottomNavBar';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { getRentalRequests } from '../../services/rentalService';
+import { getListingById } from '../../services/listingService';
+import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { colors, typography } from '../../theme';
 import { RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
 
 type Nav = StackNavigationProp<RootStackParamList>;
-type FilterKey = 'all' | 'completed' | 'active' | 'pending' | 'cancelled';
+type FilterKey = 'all' | 'as_renter' | 'as_owner' | 'completed' | 'active' | 'pending' | 'cancelled';
+
+interface ItemInfo {
+  id: string;
+  title: string;
+  images?: string[];
+}
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'All Rentals' },
+  { key: 'as_renter', label: 'As Renter' },
+  { key: 'as_owner', label: 'As Owner' },
   { key: 'completed', label: 'Completed' },
   { key: 'active', label: 'Active' },
   { key: 'pending', label: 'Pending' },
@@ -53,12 +68,6 @@ const STATUS_COLORS: Record<string, string> = {
   declined: '#B91C1C',
 };
 
-const matchesFilter = (rental: RentalRequest, filter: FilterKey) => {
-  if (filter === 'all') return true;
-  if (filter === 'active') return rental.status === 'approved' || rental.status === 'paid';
-  return rental.status === filter;
-};
-
 const formatDateRange = (startDate: string, endDate: string) => {
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -77,34 +86,23 @@ const formatDateRange = (startDate: string, endDate: string) => {
   return `${startLabel} - ${endLabel}`;
 };
 
-const getDisplayTitle = (rental: RentalRequest) => {
-  const candidate = (rental as RentalRequest & {
-    item_title?: string;
-    listing_title?: string;
-    title?: string;
-    productName?: string;
-  }).item_title
-    || (rental as any).listing_title
-    || (rental as any).title
-    || (rental as any).productName;
-
-  if (candidate) return candidate;
-  if (rental.item_id) return rental.item_id.replace(/[-_]/g, ' ');
-  return 'Product';
-};
-
 export const RentalHistoryScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { user: clerkUser } = useUser();
+  const { getToken } = useAuth();
   const { user } = useAuthStore();
+  const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress ?? user?.email;
   const [rentals, setRentals] = useState<RentalRequest[]>([]);
+  const [items, setItems] = useState<Record<string, ItemInfo>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<FilterKey>('all');
   const [isFilterMenuVisible, setIsFilterMenuVisible] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const load = useCallback(async (quiet = false) => {
-    if (!user?.email) {
+    if (!userEmail) {
       setIsLoading(false);
       return;
     }
@@ -112,38 +110,124 @@ export const RentalHistoryScreen = () => {
 
     try {
       const [asRenter, asOwner] = await Promise.all([
-        getRentalRequests({ renter_email: user.email }),
-        getRentalRequests({ owner_email: user.email }),
+        getRentalRequests({ renter_email: userEmail }),
+        getRentalRequests({ owner_email: userEmail }),
       ]);
       const merged = [...asRenter, ...asOwner];
       const unique = Array.from(new Map(merged.map((rental) => [rental.id, rental])).values());
       unique.sort((a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime());
       setRentals(unique);
+
+      // Fetch item details for all rentals
+      const itemIds = [...new Set(unique.map((r) => r.item_id).filter(Boolean))];
+      const itemsMap: Record<string, ItemInfo> = {};
+
+      // Fetch items in parallel (batch of 5 to avoid overwhelming)
+      const batchSize = 5;
+      for (let i = 0; i < itemIds.length; i += batchSize) {
+        const batch = itemIds.slice(i, i + batchSize);
+        const results = await Promise.all(
+          batch.map(async (itemId) => {
+            try {
+              const result = await getListingById(itemId);
+              if (result) {
+                return {
+                  id: itemId,
+                  title: result.listing.title,
+                  images: result.listing.images,
+                };
+              }
+            } catch {
+              // Item may have been deleted
+            }
+            return null;
+          })
+        );
+        results.forEach((item) => {
+          if (item) itemsMap[item.id] = item;
+        });
+      }
+
+      setItems(itemsMap);
     } catch {
       // Keep the page stable even if the API fails.
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [user?.email]);
+  }, [userEmail]);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  const handleDownloadReceipt = async (rentalId: string) => {
+    setDownloadingId(rentalId);
+    try {
+      const baseUrl = api.defaults.baseURL || '';
+      // Get a fresh Clerk session token
+      const token = await getToken();
+      if (!token) {
+        Alert.alert('Error', 'Session expired. Please log in again.');
+        setDownloadingId(null);
+        return;
+      }
+      const receiptUrl = `${baseUrl}/receipts?rental_request_id=${encodeURIComponent(rentalId)}`;
+
+      const destination = new File(Paths.cache, `receipt-${rentalId}.pdf`);
+      const downloaded = await File.downloadFileAsync(receiptUrl, destination, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/pdf',
+        },
+        idempotent: true,
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(downloaded.uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: `Receipt - ${rentalId}`,
+        });
+      } else {
+        Alert.alert('Success', 'Receipt downloaded successfully.');
+      }
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.includes('401') || msg.includes('Unauthorized')) {
+        Alert.alert('Error', 'Session expired. Please log in again.');
+      } else if (msg.includes('400') || msg.includes('only available for paid')) {
+        Alert.alert('Error', 'Receipt is only available for paid or completed rentals.');
+      } else {
+        Alert.alert('Error', 'Failed to download receipt. Please try again.');
+      }
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   const filteredRentals = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
     return rentals.filter((rental) => {
-      if (!matchesFilter(rental, selectedFilter)) return false;
+      // Apply filter
+      if (selectedFilter === 'as_renter') {
+        if (rental.renter_email !== userEmail) return false;
+      } else if (selectedFilter === 'as_owner') {
+        if (rental.owner_email !== userEmail) return false;
+      } else if (selectedFilter === 'active') {
+        if (rental.status !== 'approved' && rental.status !== 'paid') return false;
+      } else if (selectedFilter !== 'all') {
+        if (rental.status !== selectedFilter) return false;
+      }
+
       if (!query) return true;
 
+      const item = items[rental.item_id];
       const searchBase = [
         rental.id,
-        rental.item_id,
+        item?.title,
         rental.renter_email,
         rental.owner_email,
-        getDisplayTitle(rental),
         STATUS_LABELS[rental.status] || rental.status,
       ]
         .filter(Boolean)
@@ -152,26 +236,36 @@ export const RentalHistoryScreen = () => {
 
       return searchBase.includes(query);
     });
-  }, [rentals, searchQuery, selectedFilter]);
+  }, [rentals, searchQuery, selectedFilter, items, userEmail]);
 
-  const renderCard = ({ item }: { item: RentalRequest }) => {
-    const title = getDisplayTitle(item);
-    const rentalFee = Math.max(
-      0,
-      (item.total_amount ?? 0) - (item.platform_fee ?? 0) - (item.security_deposit ?? 0)
-    );
-    const accent = STATUS_COLORS[item.status] ?? '#64748B';
+  const renderCard = ({ item: rental }: { item: RentalRequest }) => {
+    const itemInfo = items[rental.item_id];
+    const title = itemInfo?.title || rental.item_id?.replace(/[-_]/g, ' ') || 'Product';
+    const imageUrl = itemInfo?.images?.[0];
+    const isRenter = rental.renter_email === userEmail;
+
+    const rentalCost = rental.total_amount ?? 0;
+    const platformFee = typeof rental.platform_fee === 'number' ? rental.platform_fee : rentalCost * 0.15;
+    const securityDeposit = typeof rental.security_deposit === 'number' ? rental.security_deposit : 0;
+    const totalPaid = typeof rental.total_paid === 'number' ? rental.total_paid : rentalCost + platformFee + securityDeposit;
+
+    const accent = STATUS_COLORS[rental.status] ?? '#64748B';
+    const isDownloading = downloadingId === rental.id;
 
     return (
       <TouchableOpacity
         activeOpacity={0.88}
-        onPress={() => navigation.navigate('RentalDetail', { rentalId: item.id })}
+        onPress={() => navigation.navigate('RentalDetail', { rentalId: rental.id })}
         style={styles.card}
       >
         <View style={styles.cardHeader}>
-          <View style={styles.thumbnail}>
-            <MaterialCommunityIcons name="package-variant-closed" size={28} color="#E2E8F0" />
-          </View>
+          {imageUrl ? (
+            <Image source={{ uri: imageUrl }} style={styles.thumbnail} resizeMode="cover" />
+          ) : (
+            <View style={styles.thumbnailPlaceholder}>
+              <MaterialCommunityIcons name="package-variant-closed" size={28} color="#E2E8F0" />
+            </View>
+          )}
 
           <View style={styles.cardBody}>
             <View style={styles.titleRow}>
@@ -180,34 +274,51 @@ export const RentalHistoryScreen = () => {
               </Text>
               <View style={[styles.statusPill, { backgroundColor: `${accent}15` }]}>
                 <Text style={[styles.statusPillText, { color: accent }]}>
-                  {STATUS_LABELS[item.status] || item.status}
+                  {STATUS_LABELS[rental.status] || rental.status}
                 </Text>
               </View>
             </View>
 
+            {/* Role badge */}
+            <View style={[styles.roleBadge, { backgroundColor: isRenter ? '#EFF6FF' : '#F0FDF4' }]}>
+              <Text style={[styles.roleBadgeText, { color: isRenter ? '#1D4ED8' : '#15803D' }]}>
+                {isRenter ? 'You rented' : 'You rented out'}
+              </Text>
+            </View>
+
             <View style={styles.metaRow}>
               <MaterialCommunityIcons name="calendar-month-outline" size={14} color="#64748B" />
-              <Text style={styles.metaText}>{formatDateRange(item.start_date, item.end_date)}</Text>
+              <Text style={styles.metaText}>{formatDateRange(rental.start_date, rental.end_date)}</Text>
             </View>
 
             <View style={styles.priceRow}>
               <MaterialCommunityIcons name="currency-usd" size={14} color="#64748B" />
-              <Text style={styles.amountText}>${(item.total_amount ?? 0).toFixed(2)}</Text>
+              <Text style={styles.amountText}>${totalPaid.toFixed(2)}</Text>
             </View>
 
             <Text style={styles.breakdownText} numberOfLines={1}>
-              Rental ${rentalFee.toFixed(2)} • Fee ${(item.platform_fee ?? 0).toFixed(2)} • Deposit ${(item.security_deposit ?? 0).toFixed(2)}
+              Rental ${rentalCost.toFixed(2)} • Fee ${platformFee.toFixed(2)} • Deposit ${securityDeposit.toFixed(2)}
             </Text>
           </View>
         </View>
 
         <TouchableOpacity
           activeOpacity={0.85}
-          onPress={() => navigation.navigate('RentalDetail', { rentalId: item.id })}
-          style={styles.receiptButton}
+          onPress={() => handleDownloadReceipt(rental.id)}
+          disabled={isDownloading}
+          style={[styles.receiptButton, isDownloading && { opacity: 0.6 }]}
         >
-          <MaterialCommunityIcons name="download" size={18} color="#111827" />
-          <Text style={styles.receiptButtonText}>Receipt</Text>
+          {isDownloading ? (
+            <>
+              <ActivityIndicator size="small" color="#111827" />
+              <Text style={styles.receiptButtonText}>Downloading...</Text>
+            </>
+          ) : (
+            <>
+              <MaterialCommunityIcons name="download" size={18} color="#111827" />
+              <Text style={styles.receiptButtonText}>Receipt</Text>
+            </>
+          )}
         </TouchableOpacity>
       </TouchableOpacity>
     );
@@ -391,6 +502,11 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 14,
+  },
+  thumbnailPlaceholder: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
     backgroundColor: '#111827',
     alignItems: 'center',
     justifyContent: 'center',
@@ -403,7 +519,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   productTitle: {
     flex: 1,
@@ -421,6 +537,17 @@ const styles = StyleSheet.create({
   statusPillText: {
     fontSize: typography.small,
     fontWeight: '700',
+  },
+  roleBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginBottom: 6,
+  },
+  roleBadgeText: {
+    fontSize: typography.small,
+    fontWeight: '600',
   },
   metaRow: {
     flexDirection: 'row',

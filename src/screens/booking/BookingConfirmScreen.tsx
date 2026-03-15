@@ -4,6 +4,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
+import { useUser } from '@clerk/expo';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { createRentalRequest } from '../../services/bookingService';
 import { useAuthStore } from '../../store/authStore';
@@ -16,7 +17,9 @@ type Route = RouteProp<RootStackParamList, 'BookingConfirm'>;
 export const BookingConfirmScreen = () => {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
+  const { user: clerkUser } = useUser();
   const { user } = useAuthStore();
+  const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress ?? user?.email;
   const [isLoading, setIsLoading] = useState(false);
 
   const {
@@ -27,7 +30,7 @@ export const BookingConfirmScreen = () => {
   } = route.params;
 
   const handleConfirm = async () => {
-    if (!user?.email) {
+    if (!userEmail) {
       Alert.alert('Error', 'You must be logged in to make a rental request.');
       return;
     }
@@ -35,7 +38,7 @@ export const BookingConfirmScreen = () => {
     try {
       const result = await createRentalRequest({
         item_id: listingId,
-        renter_email: user.email,
+        renter_email: userEmail,
         owner_email: ownerEmail,
         start_date: startDate,
         end_date: endDate,

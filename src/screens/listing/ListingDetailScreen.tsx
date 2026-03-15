@@ -4,13 +4,10 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { Calendar } from 'react-native-calendars';
 import {
   Alert,
-  AppState,
-  AppStateStatus,
   Dimensions,
   FlatList,
   Image,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   RefreshControl,
@@ -27,6 +24,7 @@ import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { ListingCard } from '../../components/listing/ListingCard';
 import { useListingStore } from '../../store/listingStore';
+import * as WebBrowser from 'expo-web-browser';
 import * as listingService from '../../services/listingService';
 import { api } from '../../services/api';
 import { getRentalRequests } from '../../services/bookingService';
@@ -394,16 +392,9 @@ export const ListingDetailScreen = () => {
   const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://172.28.145.1:5000/api').replace(/\/api$/, '');
 
   const openStripeAndWatchReturn = (url: string, onReturn: () => void) => {
-    // Only trigger onReturn after app went to background (browser opened) then came back active
-    let wentBackground = false;
-    const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
-      if (state === 'background') wentBackground = true;
-      if (state === 'active' && wentBackground) {
-        sub.remove();
-        onReturn();
-      }
+    WebBrowser.openAuthSessionAsync(url, 'rentany://').then(() => {
+      onReturn();
     });
-    Linking.openURL(url);
   };
 
   const handleStartKyc = async () => {
@@ -412,6 +403,7 @@ export const ListingDetailScreen = () => {
       const res = await api.post('/stripe/identity/create-session', {
         from: 'rental-request',
         item_id: listing?.id,
+        mobile_return_url: `${API_BASE}/api/stripe/app-return/identity`,
       });
       const url = res.data?.data?.url || res.data?.url;
       if (!url) {
@@ -464,6 +456,19 @@ export const ListingDetailScreen = () => {
       openStripeAndWatchReturn(url, async () => {
         await refreshBackendUser();
         setIsConnectingBank(false);
+        // After bank connect, prompt to add card if not yet connected
+        const userRes = await api.get('/users/me').catch(() => null);
+        const updatedUser = userRes?.data?.data || userRes?.data;
+        if (updatedUser && !updatedUser.stripe_payment_method_id) {
+          Alert.alert(
+            'Bank Connected!',
+            'Would you like to also connect a card for making rental payments?',
+            [
+              { text: 'Later', style: 'cancel' },
+              { text: 'Connect Card', onPress: () => handleConnectCard() },
+            ],
+          );
+        }
       });
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.error || 'Failed to start bank setup. Please try again.');

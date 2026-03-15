@@ -2,11 +2,10 @@ import { useClerk, useUser } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
+import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  AppState,
-  AppStateStatus,
   FlatList,
   Image,
   Linking,
@@ -24,6 +23,7 @@ import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { ListingCard } from '../../components/listing/ListingCard';
 import { api } from '../../services/api';
+import * as listingService from '../../services/listingService';
 import * as rentalService from '../../services/rentalService';
 import * as disputeService from '../../services/disputeService';
 import { useAuthStore } from '../../store/authStore';
@@ -95,6 +95,7 @@ export const ProfileScreen = () => {
   const [backendUser, setBackendUser] = useState<BackendUser | null>(null);
   const [reviews, setReviews] = useState<any[]>([]);
   const [rentals, setRentals] = useState<RentalRequest[]>([]);
+  const [rentalItems, setRentalItems] = useState<Record<string, { title: string; image?: string }>>({});
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [walletData, setWalletData] = useState<WalletData | null>(null);
   const [payouts, setPayouts] = useState<Payout[]>([]);
@@ -165,6 +166,24 @@ export const ProfileScreen = () => {
       const unique = all.filter((r, i, self) => self.findIndex((s) => s.id === r.id) === i);
       unique.sort((a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime());
       setRentals(unique);
+
+      // Fetch item details for each rental
+      const itemIds = [...new Set(unique.map((r) => r.item_id))];
+      const itemsMap: Record<string, { title: string; image?: string }> = {};
+      await Promise.all(
+        itemIds.map(async (itemId) => {
+          try {
+            const result = await listingService.getListingById(itemId);
+            if (result?.listing) {
+              itemsMap[itemId] = {
+                title: result.listing.title,
+                image: result.listing.images?.[0],
+              };
+            }
+          } catch {}
+        })
+      );
+      setRentalItems(itemsMap);
     } catch {
       setRentals([]);
     }
@@ -461,15 +480,8 @@ export const ProfileScreen = () => {
       });
       const url = res.data?.data?.url || res.data?.url;
       if (!url) return;
-      let wentBackground = false;
-      const sub = AppState.addEventListener('change', async (state: AppStateStatus) => {
-        if (state === 'background') wentBackground = true;
-        if (state === 'active' && wentBackground) {
-          sub.remove();
-          await refreshPaymentStatus();
-        }
-      });
-      await Linking.openURL(url);
+      await WebBrowser.openAuthSessionAsync(url, 'rentany://');
+      await refreshPaymentStatus();
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.error || 'Failed to start card setup.');
     }
@@ -485,15 +497,21 @@ export const ProfileScreen = () => {
       });
       const url = res.data?.data?.url || res.data?.url;
       if (!url) return;
-      let wentBackground = false;
-      const sub = AppState.addEventListener('change', async (state: AppStateStatus) => {
-        if (state === 'background') wentBackground = true;
-        if (state === 'active' && wentBackground) {
-          sub.remove();
-          await refreshPaymentStatus();
-        }
-      });
-      await Linking.openURL(url);
+      await WebBrowser.openAuthSessionAsync(url, 'rentany://');
+      await refreshPaymentStatus();
+      // After bank connect, prompt to add card if not yet connected
+      const userRes = await api.get('/users/me').catch(() => null);
+      const updatedUser = userRes?.data?.data || userRes?.data;
+      if (updatedUser && !updatedUser.stripe_payment_method_id) {
+        Alert.alert(
+          'Bank Connected!',
+          'Would you like to also connect a card for making rental payments?',
+          [
+            { text: 'Later', style: 'cancel' },
+            { text: 'Connect Card', onPress: () => handleAddPayment() },
+          ],
+        );
+      }
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.error || 'Failed to start bank setup.');
     }
@@ -786,30 +804,39 @@ export const ProfileScreen = () => {
                   const platformFee = typeof rental.platform_fee === 'number' ? rental.platform_fee : rentalCost * 0.15;
                   const securityDeposit = typeof rental.security_deposit === 'number' ? rental.security_deposit : 0;
                   const totalPaid = typeof rental.total_paid === 'number' ? rental.total_paid : rentalCost + platformFee + securityDeposit;
+                  const item = rentalItems[rental.item_id];
                   return (
                     <Surface key={rental.id} style={styles.rentalCard} elevation={0}>
-                      <View style={styles.rentalHeader}>
+                      <View style={styles.rentalCardRow}>
+                        {item?.image && (
+                          <Image source={{ uri: item.image }} style={styles.rentalItemImage} />
+                        )}
                         <View style={{ flex: 1 }}>
-                          <View style={[styles.roleBadge, role === 'renter' ? styles.roleBadgeRenter : styles.roleBadgeOwner]}>
-                            <Text style={styles.roleBadgeText}>
-                              {role === 'renter' ? 'You rented' : 'You rented out'}
-                            </Text>
+                          <View style={styles.rentalHeader}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.rentalItemTitle} numberOfLines={1}>
+                                {item?.title || 'Item not found'}
+                              </Text>
+                              <View style={[styles.roleBadge, role === 'renter' ? styles.roleBadgeRenter : styles.roleBadgeOwner]}>
+                                <Text style={styles.roleBadgeText}>
+                                  {role === 'renter' ? 'You rented' : 'You rented out'}
+                                </Text>
+                              </View>
+                            </View>
+                            <View
+                              style={[
+                                styles.statusBadge,
+                                rental.status === 'completed' && styles.statusCompleted,
+                                rental.status === 'approved' && styles.statusApproved,
+                                rental.status === 'paid' && styles.statusApproved,
+                                rental.status === 'pending' && styles.statusPending,
+                                rental.status === 'rejected' && styles.statusRejected,
+                                rental.status === 'cancelled' && styles.statusRejected,
+                              ]}
+                            >
+                              <Text style={styles.statusText}>{rental.status}</Text>
+                            </View>
                           </View>
-                        </View>
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            rental.status === 'completed' && styles.statusCompleted,
-                            rental.status === 'approved' && styles.statusApproved,
-                            rental.status === 'paid' && styles.statusApproved,
-                            rental.status === 'pending' && styles.statusPending,
-                            rental.status === 'rejected' && styles.statusRejected,
-                            rental.status === 'cancelled' && styles.statusRejected,
-                          ]}
-                        >
-                          <Text style={styles.statusText}>{rental.status}</Text>
-                        </View>
-                      </View>
                       {rental.start_date && rental.end_date && (
                         <View style={styles.rentalInfoRow}>
                           <MaterialCommunityIcons name="calendar-outline" size={14} color="#64748B" />
@@ -831,6 +858,8 @@ export const ProfileScreen = () => {
                         <Text style={styles.reviewDate}>
                           Created {new Date(rental.created_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </Text>
+                      </View>
+                        </View>
                       </View>
                     </Surface>
                   );
@@ -1728,6 +1757,22 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     padding: 16,
     marginBottom: 12,
+  },
+  rentalCardRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  rentalItemImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+    backgroundColor: '#E2E8F0',
+  },
+  rentalItemTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#0F172A',
+    marginBottom: 4,
   },
   rentalHeader: {
     flexDirection: 'row',

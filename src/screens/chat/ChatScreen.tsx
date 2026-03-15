@@ -8,7 +8,6 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  RefreshControl,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -102,7 +101,6 @@ export const ChatScreen = () => {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const flatListRef = useRef<FlatList<Message>>(null);
@@ -112,23 +110,17 @@ export const ChatScreen = () => {
     try {
       const data = await getMessages(rentalRequestId);
       setMessages(data.sort((a, b) =>
-        new Date(a.created_date).getTime() - new Date(b.created_date).getTime()
+        new Date(b.created_date).getTime() - new Date(a.created_date).getTime()
       ));
     } catch {
       // silently fail
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false);
     }
   }, [rentalRequestId]);
 
   useEffect(() => { loadMessages(); }, [loadMessages]);
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    }
-  }, [messages.length]);
 
   const handleSend = async () => {
     const content = inputText.trim();
@@ -141,7 +133,7 @@ export const ChatScreen = () => {
         sender_email: userEmail,
         content,
       });
-      setMessages((prev) => [...prev, newMsg]);
+      setMessages((prev) => [newMsg, ...prev]);
     } catch {
       setInputText(content);
     } finally {
@@ -168,8 +160,8 @@ export const ChatScreen = () => {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         {isLoading ? (
           <View style={styles.centered}>
@@ -179,17 +171,12 @@ export const ChatScreen = () => {
           <FlatList
             ref={flatListRef}
             data={messages}
+            inverted
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <MessageBubble msg={item} isOwn={item.sender_email === userEmail} />
             )}
             contentContainerStyle={styles.messageList}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={() => { setIsRefreshing(true); loadMessages(true); }}
-              />
-            }
             ListEmptyComponent={
               <View style={styles.emptyState}>
                 <MaterialCommunityIcons name="chat-outline" size={56} color="#CBD5E1" />
@@ -251,7 +238,7 @@ const styles = StyleSheet.create({
   chatSub: { color: '#64748B', fontSize: typography.small },
   refreshBtn: { padding: 6 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  messageList: { paddingVertical: 12, flexGrow: 1, justifyContent: 'flex-end' },
+  messageList: { paddingVertical: 12, flexGrow: 1 },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
   emptyText: { color: '#94A3B8', fontSize: typography.body, textAlign: 'center' },
   inputBar: {

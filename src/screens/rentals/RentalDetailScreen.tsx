@@ -2,10 +2,15 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Button, Text } from 'react-native-paper';
+import { useAuth, useUser } from '@clerk/expo';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { getRentalRequestById } from '../../services/rentalService';
+import { getListingById } from '../../services/listingService';
+import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { colors, typography } from '../../theme';
 import { RentalRequest } from '../../types/models';
@@ -14,13 +19,26 @@ import { RootStackParamList } from '../../types/navigation';
 type Nav = StackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'RentalDetail'>;
 
-const STATUS_COLOR: Record<RentalRequest['status'], string> = {
+interface ItemInfo {
+  title: string;
+  description?: string;
+  images?: string[];
+  category?: string;
+  condition?: string;
+  daily_rate?: number;
+  deposit?: number;
+  location?: { address?: string; city?: string } | string;
+}
+
+const STATUS_COLOR: Record<string, string> = {
   pending: '#F59E0B',
   approved: '#3B82F6',
   rejected: '#EF4444',
   paid: '#8B5CF6',
   cancelled: '#6B7280',
   completed: '#10B981',
+  inquiry: '#7C3AED',
+  declined: '#B91C1C',
 };
 
 const InfoRow = ({ label, value }: { label: string; value: string }) => (
@@ -34,16 +52,42 @@ export const RentalDetailScreen = () => {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { rentalId } = route.params;
+  const { user: clerkUser } = useUser();
+  const { getToken } = useAuth();
   const { user } = useAuthStore();
+  const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress ?? user?.email;
 
   const [rental, setRental] = useState<RentalRequest | null>(null);
+  const [itemInfo, setItemInfo] = useState<ItemInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [downloadingReceipt, setDownloadingReceipt] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
         const data = await getRentalRequestById(rentalId);
         setRental(data);
+
+        // Fetch item details
+        if (data?.item_id) {
+          try {
+            const result = await getListingById(data.item_id);
+            if (result) {
+              setItemInfo({
+                title: result.listing.title,
+                description: result.listing.description,
+                images: result.listing.images,
+                category: result.listing.category,
+                condition: result.listing.condition,
+                daily_rate: result.listing.pricePerDay,
+                deposit: result.listing.deposit,
+                location: result.listing.location,
+              });
+            }
+          } catch {
+            // Item may have been deleted
+          }
+        }
       } catch {
         Alert.alert('Error', 'Failed to load rental details.', [
           { text: 'OK', onPress: () => navigation.goBack() },
@@ -53,6 +97,50 @@ export const RentalDetailScreen = () => {
       }
     })();
   }, [rentalId]);
+
+  const handleDownloadReceipt = async () => {
+    if (!rental) return;
+    setDownloadingReceipt(true);
+    try {
+      const baseUrl = api.defaults.baseURL || '';
+      const token = await getToken();
+      if (!token) {
+        Alert.alert('Error', 'Session expired. Please log in again.');
+        setDownloadingReceipt(false);
+        return;
+      }
+      const receiptUrl = `${baseUrl}/receipts?rental_request_id=${encodeURIComponent(rental.id)}`;
+
+      const destination = new File(Paths.cache, `receipt-${rental.id}.pdf`);
+      const downloaded = await File.downloadFileAsync(receiptUrl, destination, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/pdf',
+        },
+        idempotent: true,
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(downloaded.uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: `Receipt - ${rental.id}`,
+        });
+      } else {
+        Alert.alert('Success', 'Receipt downloaded successfully.');
+      }
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.includes('401') || msg.includes('Unauthorized')) {
+        Alert.alert('Error', 'Session expired. Please log in again.');
+      } else if (msg.includes('400') || msg.includes('only available for paid')) {
+        Alert.alert('Error', 'Receipt is only available for paid or completed rentals.');
+      } else {
+        Alert.alert('Error', 'Failed to download receipt. Please try again.');
+      }
+    } finally {
+      setDownloadingReceipt(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -70,7 +158,7 @@ export const RentalDetailScreen = () => {
     );
   }
 
-  const isRenter = rental.renter_email === user?.email;
+  const isRenter = rental.renter_email === userEmail;
   const statusColor = STATUS_COLOR[rental.status] ?? '#6B7280';
   const startDate = new Date(rental.start_date).toLocaleDateString('en-US', {
     month: 'long', day: 'numeric', year: 'numeric',
@@ -87,6 +175,18 @@ export const RentalDetailScreen = () => {
     Math.ceil((new Date(rental.end_date).getTime() - new Date(rental.start_date).getTime()) / 86400000),
   );
 
+  const rentalCost = rental.total_amount ?? 0;
+  const platformFee = typeof rental.platform_fee === 'number' ? rental.platform_fee : rentalCost * 0.15;
+  const securityDeposit = typeof rental.security_deposit === 'number' ? rental.security_deposit : 0;
+  const totalPaid = typeof rental.total_paid === 'number' ? rental.total_paid : rentalCost + platformFee + securityDeposit;
+  const ownerPayout = rentalCost - platformFee;
+
+  const locationStr = itemInfo?.location
+    ? typeof itemInfo.location === 'string'
+      ? itemInfo.location
+      : [itemInfo.location.address, itemInfo.location.city].filter(Boolean).join(', ')
+    : undefined;
+
   return (
     <View style={styles.container}>
       <GlobalHeader />
@@ -97,6 +197,13 @@ export const RentalDetailScreen = () => {
           </TouchableOpacity>
           <Text variant="titleLarge" style={styles.headerTitle}>Rental Details</Text>
         </View>
+
+        {/* Item Image */}
+        {itemInfo?.images && itemInfo.images.length > 0 && (
+          <View style={styles.imageContainer}>
+            <Image source={{ uri: itemInfo.images[0] }} style={styles.itemImage} resizeMode="cover" />
+          </View>
+        )}
 
         {/* Status Card */}
         <View style={styles.card}>
@@ -110,6 +217,20 @@ export const RentalDetailScreen = () => {
           </View>
           <Text style={styles.roleTag}>{isRenter ? 'You are the renter' : 'You are the owner'}</Text>
         </View>
+
+        {/* Item Details */}
+        {itemInfo && (
+          <View style={styles.card}>
+            <Text style={styles.sectionLabel}>Item Details</Text>
+            <InfoRow label="Title" value={itemInfo.title} />
+            {itemInfo.category && <InfoRow label="Category" value={itemInfo.category} />}
+            {itemInfo.condition && <InfoRow label="Condition" value={itemInfo.condition} />}
+            {locationStr && <InfoRow label="Location" value={locationStr} />}
+            {itemInfo.description && (
+              <Text style={styles.descriptionText} numberOfLines={3}>{itemInfo.description}</Text>
+            )}
+          </View>
+        )}
 
         {/* Dates */}
         <View style={styles.card}>
@@ -133,25 +254,30 @@ export const RentalDetailScreen = () => {
           <Text style={styles.sectionLabel}>Parties</Text>
           <InfoRow label="Renter" value={rental.renter_email} />
           <InfoRow label="Owner" value={rental.owner_email} />
-          <InfoRow label="Item ID" value={rental.item_id} />
         </View>
 
         {/* Financials */}
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Financials</Text>
-          {rental.platform_fee !== undefined && (
-            <InfoRow label="Platform fee" value={`$${rental.platform_fee.toFixed(2)}`} />
+          <Text style={styles.sectionLabel}>Pricing Breakdown</Text>
+          {itemInfo?.daily_rate !== undefined && (
+            <InfoRow label="Daily rate" value={`$${itemInfo.daily_rate.toFixed(2)}`} />
           )}
-          {rental.security_deposit !== undefined && (
-            <InfoRow label="Security deposit" value={`$${rental.security_deposit.toFixed(2)}`} />
+          {itemInfo?.daily_rate !== undefined && (
+            <InfoRow label="Duration" value={`${totalDays} day${totalDays !== 1 ? 's' : ''}`} />
           )}
-          {rental.total_paid !== undefined && (
-            <InfoRow label="Total paid" value={`$${rental.total_paid.toFixed(2)}`} />
-          )}
+          <InfoRow label="Rental cost" value={`$${rentalCost.toFixed(2)}`} />
+          <InfoRow label="Platform fee" value={`$${platformFee.toFixed(2)}`} />
+          <InfoRow label="Security deposit" value={`$${securityDeposit.toFixed(2)}`} />
           <View style={[styles.infoRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Total Amount</Text>
-            <Text style={styles.totalValue}>${rental.total_amount?.toFixed(2) ?? '—'}</Text>
+            <Text style={styles.totalLabel}>Total Paid</Text>
+            <Text style={styles.totalValue}>${totalPaid.toFixed(2)}</Text>
           </View>
+          {!isRenter && (
+            <View style={[styles.infoRow, { borderBottomWidth: 0, marginTop: 4 }]}>
+              <Text style={[styles.infoLabel, { color: '#059669' }]}>Owner payout</Text>
+              <Text style={[styles.infoValue, { color: '#059669', fontWeight: '700' }]}>${ownerPayout.toFixed(2)}</Text>
+            </View>
+          )}
         </View>
 
         {/* Message */}
@@ -178,6 +304,17 @@ export const RentalDetailScreen = () => {
             icon="message-outline"
           >
             Open Chat
+          </Button>
+          <Button
+            mode="outlined"
+            onPress={handleDownloadReceipt}
+            loading={downloadingReceipt}
+            disabled={downloadingReceipt}
+            style={styles.receiptBtn}
+            contentStyle={styles.btnContent}
+            icon="download"
+          >
+            Download Receipt
           </Button>
           <Button
             mode="outlined"
@@ -212,6 +349,17 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   headerTitle: { fontWeight: '700', color: '#0F172A' },
+  imageContainer: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  itemImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 16,
+  },
   card: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
@@ -236,6 +384,12 @@ const styles = StyleSheet.create({
   dateText: { color: '#64748B', fontSize: typography.small },
   roleTag: { color: '#64748B', fontSize: typography.small, fontStyle: 'italic' },
   sectionLabel: { fontWeight: '700', color: '#0F172A', fontSize: typography.body, marginBottom: 12 },
+  descriptionText: {
+    color: '#475569',
+    fontSize: typography.body,
+    lineHeight: 22,
+    marginTop: 8,
+  },
   datesRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -268,6 +422,7 @@ const styles = StyleSheet.create({
   messageText: { color: '#475569', fontStyle: 'italic', lineHeight: 22, fontSize: typography.body },
   actions: { marginHorizontal: 16, gap: 10 },
   chatBtn: { backgroundColor: colors.primary, borderRadius: 12 },
+  receiptBtn: { borderColor: '#111827', borderRadius: 12 },
   backBtnAction: { borderColor: colors.primary, borderRadius: 12 },
   btnContent: { paddingVertical: 6 },
   notFoundText: { color: '#94A3B8', fontSize: typography.body },
