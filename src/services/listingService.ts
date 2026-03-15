@@ -1,6 +1,6 @@
 import { mockCategories } from '../data/categories';
 import { mockListings } from '../data/listings';
-import { Category, Listing, ListingFilter, CreateListingFormData } from '../types/listing';
+import { Category, Listing, ListingFilter, CreateListingFormData, SavedSearch } from '../types/listing';
 import { api } from './api';
 
 const USE_API = true;
@@ -357,4 +357,35 @@ export const addFavorite = async (itemId: string, userEmail: string): Promise<Fa
 
 export const removeFavorite = async (itemId: string, userEmail: string): Promise<void> => {
   await api.delete('/favorites', { data: { item_id: itemId, user_email: userEmail } });
+};
+
+// ── Saved Searches API ──
+
+export const getSavedSearches = async (): Promise<SavedSearch[]> => {
+  const res = await api.get('/saved-searches');
+  return res.data.data || res.data || [];
+};
+
+export const createSavedSearch = async (data: {
+  name: string;
+  filters: {
+    category?: string;
+    location?: string;
+    min_price?: number;
+    max_price?: number;
+    search_query?: string;
+  };
+  notify_new_items?: boolean;
+}): Promise<SavedSearch> => {
+  const res = await api.post('/saved-searches', data);
+  return res.data.data || res.data;
+};
+
+export const updateSavedSearch = async (id: string, data: Record<string, any>): Promise<SavedSearch> => {
+  const res = await api.put(`/saved-searches/${id}`, data);
+  return res.data.data || res.data;
+};
+
+export const deleteSavedSearch = async (id: string): Promise<void> => {
+  await api.delete(`/saved-searches/${id}`);
 };

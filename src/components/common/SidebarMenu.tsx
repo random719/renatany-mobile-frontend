@@ -226,7 +226,7 @@ export const SidebarMenu = () => {
                   renderNavItem(
                     "bookmark-outline",
                     "Saved Searches",
-                    () => navigation.navigate("SavedSearches"),
+                    () => navigation.navigate("Main", { screen: "FavoritesTab", params: { screen: "SavedSearches" } }),
                     isSavedSearches,
                   )}
                 {!isAdmin &&

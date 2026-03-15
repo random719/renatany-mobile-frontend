@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, StyleSheet, TextInput, TouchableOpacity, View, Modal, ScrollView } from 'react-native';
+import { Alert, FlatList, StyleSheet, TextInput, TouchableOpacity, View, Modal, ScrollView } from 'react-native';
 import { ActivityIndicator, Menu, Text, Checkbox } from 'react-native-paper';
 import { useUser } from '@clerk/expo';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
@@ -33,6 +33,7 @@ export const SearchScreen = () => {
     fetchMoreListings,
     setActiveFilter,
     fetchCategories,
+    createSavedSearch,
   } = useListingStore();
 
   const [query, setQuery] = useState(activeFilter.query || '');
@@ -60,6 +61,11 @@ export const SearchScreen = () => {
   const [hasDateRange, setHasDateRange] = useState(false);
   const [hasDistance, setHasDistance] = useState(false);
   const [hasRating, setHasRating] = useState(!!activeFilter.rating);
+
+  // Save Search modal state
+  const [saveSearchModalVisible, setSaveSearchModalVisible] = useState(false);
+  const [saveSearchName, setSaveSearchName] = useState('');
+  const [isSavingSearch, setIsSavingSearch] = useState(false);
 
   const hasActiveFilters = !!(
     activeFilter.category ||
@@ -163,6 +169,32 @@ export const SearchScreen = () => {
     }
   };
 
+  const handleSaveSearch = () => {
+    if (!query.trim() && !location.trim() && !activeFilter.category) {
+      Alert.alert('No Search', 'Enter a search query, location, or select a category first.');
+      return;
+    }
+    setSaveSearchName('');
+    setSaveSearchModalVisible(true);
+  };
+
+  const handleConfirmSaveSearch = async () => {
+    if (!saveSearchName.trim()) {
+      Alert.alert('Error', 'Please enter a name for your saved search.');
+      return;
+    }
+    setIsSavingSearch(true);
+    try {
+      await createSavedSearch(saveSearchName.trim(), activeFilter);
+      setSaveSearchModalVisible(false);
+      Alert.alert('Search Saved', "You'll receive notifications when new items match your criteria.");
+    } catch {
+      Alert.alert('Error', 'Failed to save search. Please try again.');
+    } finally {
+      setIsSavingSearch(false);
+    }
+  };
+
   const handleLoadMore = () => {
     if (hasActiveFilters) return; // filtered results come in one batch
     fetchMoreListings();
@@ -187,7 +219,7 @@ export const SearchScreen = () => {
           Search & Filter
         </Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.saveBtn}>
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSaveSearch}>
             <MaterialCommunityIcons name="bookmark-outline" size={18} color={colors.textPrimary} />
             <Text style={styles.saveBtnText}>Save Search</Text>
           </TouchableOpacity>
@@ -484,6 +516,52 @@ export const SearchScreen = () => {
           />
         )}
       </View>
+
+      {/* Save Search Modal */}
+      <Modal
+        visible={saveSearchModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSaveSearchModalVisible(false)}
+      >
+        <View style={styles.saveModalOverlay}>
+          <View style={styles.saveModalContent}>
+            <Text style={styles.saveModalTitle}>Save This Search</Text>
+            <Text style={styles.saveModalSubtitle}>
+              Give your search a name so you can easily find it later.
+            </Text>
+            <TextInput
+              style={styles.saveModalInput}
+              placeholder="e.g., Weekend Camera Gear"
+              placeholderTextColor="#9CA3AF"
+              value={saveSearchName}
+              onChangeText={setSaveSearchName}
+              autoFocus
+            />
+            <Text style={styles.saveModalHint}>
+              You'll receive notifications when new items match your search criteria.
+            </Text>
+            <View style={styles.saveModalActions}>
+              <TouchableOpacity
+                style={styles.saveModalCancelBtn}
+                onPress={() => setSaveSearchModalVisible(false)}
+                disabled={isSavingSearch}
+              >
+                <Text style={styles.saveModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveModalSaveBtn, (!saveSearchName.trim() || isSavingSearch) && { opacity: 0.5 }]}
+                onPress={handleConfirmSaveSearch}
+                disabled={!saveSearchName.trim() || isSavingSearch}
+              >
+                <Text style={styles.saveModalSaveText}>
+                  {isSavingSearch ? 'Saving...' : 'Save Search'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Advanced Filters Modal */}
       <Modal
@@ -1013,5 +1091,73 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
     color: '#111827',
     fontWeight: '500',
+  },
+  saveModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  saveModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  saveModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  saveModalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 20,
+  },
+  saveModalInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 48,
+    fontSize: 15,
+    color: '#111827',
+    marginBottom: 12,
+  },
+  saveModalHint: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginBottom: 24,
+  },
+  saveModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  saveModalCancelBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  saveModalCancelText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  saveModalSaveBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#111827',
+  },
+  saveModalSaveText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

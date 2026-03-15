@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -56,6 +57,7 @@ export const HomeScreen = () => {
     setActiveFilter,
     availableCount,
     fetchItemsStats,
+    createSavedSearch,
   } = useListingStore();
 
   const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
@@ -65,6 +67,9 @@ export const HomeScreen = () => {
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
   const [selectedSort, setSelectedSort] = useState<string>("Relevance");
+  const [saveSearchModalVisible, setSaveSearchModalVisible] = useState(false);
+  const [saveSearchName, setSaveSearchName] = useState("");
+  const [isSavingSearch, setIsSavingSearch] = useState(false);
   const { height: screenHeight } = useWindowDimensions();
   const scrollViewRef = React.useRef<RNScrollView>(null);
   const allItemsRef = React.useRef<View>(null);
@@ -147,7 +152,29 @@ export const HomeScreen = () => {
       Alert.alert("No Search", "Enter a search query, location, or select a category first.");
       return;
     }
-    Alert.alert("Search Saved", "Your search has been saved. You can find it in your Saved Searches.");
+    setSaveSearchName("");
+    setSaveSearchModalVisible(true);
+  };
+
+  const handleConfirmSaveSearch = async () => {
+    if (!saveSearchName.trim()) {
+      Alert.alert("Error", "Please enter a name for your saved search.");
+      return;
+    }
+    setIsSavingSearch(true);
+    try {
+      const filter: ListingFilter = {};
+      if (query.trim()) filter.query = query.trim();
+      if (location.trim()) filter.location = location.trim();
+      if (selectedCategory) filter.category = selectedCategory;
+      await createSavedSearch(saveSearchName.trim(), filter);
+      setSaveSearchModalVisible(false);
+      Alert.alert("Search Saved", "You'll receive notifications when new items match your criteria.");
+    } catch {
+      Alert.alert("Error", "Failed to save search. Please try again.");
+    } finally {
+      setIsSavingSearch(false);
+    }
   };
 
   const handleAdvancedFilters = () => {
@@ -640,6 +667,52 @@ export const HomeScreen = () => {
         {/* Footer Section */}
         <Footer />
       </ScrollView>
+
+      {/* Save Search Modal */}
+      <Modal
+        visible={saveSearchModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSaveSearchModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Save This Search</Text>
+            <Text style={styles.modalSubtitle}>
+              Give your search a name so you can easily find it later.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g., Weekend Camera Gear"
+              placeholderTextColor="#9CA3AF"
+              value={saveSearchName}
+              onChangeText={setSaveSearchName}
+              autoFocus
+            />
+            <Text style={styles.modalHint}>
+              You'll receive notifications when new items match your search criteria.
+            </Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setSaveSearchModalVisible(false)}
+                disabled={isSavingSearch}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveBtn, (!saveSearchName.trim() || isSavingSearch) && { opacity: 0.5 }]}
+                onPress={handleConfirmSaveSearch}
+                disabled={!saveSearchName.trim() || isSavingSearch}
+              >
+                <Text style={styles.modalSaveText}>
+                  {isSavingSearch ? "Saving..." : "Save Search"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -967,5 +1040,73 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontSize: typography.body,
     paddingVertical: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 20,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 48,
+    fontSize: 15,
+    color: '#111827',
+    marginBottom: 12,
+  },
+  modalHint: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginBottom: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  modalCancelBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  modalCancelText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  modalSaveBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#111827',
+  },
+  modalSaveText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

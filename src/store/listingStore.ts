@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as listingService from '../services/listingService';
-import { Category, Listing, ListingFilter } from '../types/listing';
+import { Category, Listing, ListingFilter, SavedSearch } from '../types/listing';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -49,6 +49,12 @@ interface ListingState {
   favoriteItems: Listing[];
   isFavoritesLoading: boolean;
   fetchItemsStats: () => Promise<void>;
+  savedSearches: SavedSearch[];
+  isSavedSearchesLoading: boolean;
+  fetchSavedSearches: () => Promise<void>;
+  createSavedSearch: (name: string, filters: ListingFilter) => Promise<void>;
+  updateSavedSearch: (id: string, data: Record<string, any>) => Promise<void>;
+  deleteSavedSearch: (id: string) => Promise<void>;
 }
 
 export const useListingStore = create<ListingState>()(
@@ -73,6 +79,8 @@ export const useListingStore = create<ListingState>()(
       favoriteItemIds: new Set<string>(),
       favoriteItems: [],
       isFavoritesLoading: false,
+      savedSearches: [],
+      isSavedSearchesLoading: false,
 
       fetchListings: async () => {
         const { activeFilter } = get();
@@ -390,6 +398,44 @@ export const useListingStore = create<ListingState>()(
         } catch {
           set({ isFavoritesLoading: false });
         }
+      },
+
+      fetchSavedSearches: async () => {
+        set({ isSavedSearchesLoading: true });
+        try {
+          const savedSearches = await listingService.getSavedSearches();
+          set({ savedSearches, isSavedSearchesLoading: false });
+        } catch {
+          set({ isSavedSearchesLoading: false });
+        }
+      },
+
+      createSavedSearch: async (name: string, filters: ListingFilter) => {
+        const apiFilters: Record<string, any> = {};
+        if (filters.category) apiFilters.category = filters.category;
+        if (filters.location) apiFilters.location = filters.location;
+        if (filters.minPrice !== undefined) apiFilters.min_price = filters.minPrice;
+        if (filters.maxPrice !== undefined) apiFilters.max_price = filters.maxPrice;
+        if (filters.query) apiFilters.search_query = filters.query;
+
+        const newSearch = await listingService.createSavedSearch({
+          name,
+          filters: apiFilters,
+          notify_new_items: true,
+        });
+        set({ savedSearches: [newSearch, ...get().savedSearches] });
+      },
+
+      updateSavedSearch: async (id: string, data: Record<string, any>) => {
+        const updated = await listingService.updateSavedSearch(id, data);
+        set({
+          savedSearches: get().savedSearches.map((s) => (s.id === id ? updated : s)),
+        });
+      },
+
+      deleteSavedSearch: async (id: string) => {
+        await listingService.deleteSavedSearch(id);
+        set({ savedSearches: get().savedSearches.filter((s) => s.id !== id) });
       },
 
       clearSearch: () => set({ searchResults: [], activeFilter: {} }),

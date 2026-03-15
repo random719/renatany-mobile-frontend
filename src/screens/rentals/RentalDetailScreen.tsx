@@ -131,11 +131,11 @@ export const RentalDetailScreen = () => {
     } catch (err: any) {
       const msg = err?.message || '';
       if (msg.includes('401') || msg.includes('Unauthorized')) {
-        Alert.alert('Error', 'Session expired. Please log in again.');
-      } else if (msg.includes('400') || msg.includes('only available for paid')) {
-        Alert.alert('Error', 'Receipt is only available for paid or completed rentals.');
+        Alert.alert('Session Expired', 'Please log in again to download receipts.');
+      } else if (msg.includes('400') || msg.includes('only available')) {
+        Alert.alert('Receipt Unavailable', 'Receipts are only available for paid or completed rentals.');
       } else {
-        Alert.alert('Error', 'Failed to download receipt. Please try again.');
+        Alert.alert('Download Failed', 'Unable to download receipt. Please try again.');
       }
     } finally {
       setDownloadingReceipt(false);

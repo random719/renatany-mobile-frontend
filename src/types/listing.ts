@@ -87,3 +87,19 @@ export interface ListingFilter {
   location?: string;
   availability?: 'all' | 'available' | 'unavailable';
 }
+
+export interface SavedSearch {
+  id: string;
+  user_email: string;
+  name: string;
+  filters?: {
+    category?: string;
+    location?: string;
+    min_price?: number;
+    max_price?: number;
+    search_query?: string;
+  };
+  notify_new_items: boolean;
+  created_at: string;
+  updated_at?: string;
+}
