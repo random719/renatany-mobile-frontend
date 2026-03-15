@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import * as DocumentPicker from 'expo-document-picker';
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Calendar } from 'react-native-calendars';
 import {
@@ -38,6 +39,15 @@ type Route = RouteProp<HomeStackParamList, 'ListingDetail'>;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_HEIGHT = 300;
 const THUMB_SIZE = 64;
+const REPORT_REASONS = [
+  { value: 'fraud', label: 'Fraudulent Listing' },
+  { value: 'stolen_item', label: 'Suspected Stolen Item' },
+  { value: 'prohibited_item', label: 'Prohibited Item' },
+  { value: 'misleading', label: 'Misleading Description/Photos' },
+  { value: 'price_gouging', label: 'Price Gouging' },
+  { value: 'spam', label: 'Spam or Duplicate' },
+  { value: 'other', label: 'Other' },
+] as const;
 
 const isVideoUrl = (url: string): boolean => /\.(mp4|mov|webm)$/i.test(url);
 
@@ -64,6 +74,14 @@ export const ListingDetailScreen = () => {
   const [showInquiryModal, setShowInquiryModal] = useState(false);
   const [inquiryMessage, setInquiryMessage] = useState('');
   const [isSendingInquiry, setIsSendingInquiry] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showReportReasons, setShowReportReasons] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportEvidence, setReportEvidence] = useState<Array<{ name: string; uri: string; uploadedUrl?: string }>>([]);
+  const [isUploadingReportEvidence, setIsUploadingReportEvidence] = useState(false);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [hasOpenListingReport, setHasOpenListingReport] = useState(false);
   const [backendUser, setBackendUser] = useState<any>(null);
   const [isConnectingCard, setIsConnectingCard] = useState(false);
   const [isConnectingBank, setIsConnectingBank] = useState(false);
@@ -76,6 +94,14 @@ export const ListingDetailScreen = () => {
   // Calendar month navigation (offset from current month)
   const [monthOffset, setMonthOffset] = useState(0);
   const [requestSentSuccessfully, setRequestSentSuccessfully] = useState(false);
+  const [submittedRequestSummary, setSubmittedRequestSummary] = useState<{
+    listingTitle: string;
+    datesLabel: string;
+    totalCost: number;
+    instantBooking: boolean;
+  } | null>(null);
+  const [showIdentityVerificationCard, setShowIdentityVerificationCard] = useState(false);
+  const [identityVerificationReason, setIdentityVerificationReason] = useState<string | null>(null);
   const [isStartingKyc, setIsStartingKyc] = useState(false);
   // Image zoom
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
@@ -94,6 +120,10 @@ export const ListingDetailScreen = () => {
   useEffect(() => {
     fetchListingById(listingId);
   }, [listingId, fetchListingById]);
+
+  useEffect(() => {
+    setHasOpenListingReport(false);
+  }, [listingId]);
 
   // Track view + add to recently viewed
   useEffect(() => {
@@ -153,15 +183,90 @@ export const ListingDetailScreen = () => {
   };
 
   const handleReport = () => {
-    Alert.alert('Report Listing', 'Are you sure you want to report this listing?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Report',
-        style: 'destructive',
-        onPress: () =>
-          Alert.alert('Reported', 'Thank you for your report. Our team will review this listing.'),
-      },
-    ]);
+    if (hasOpenListingReport) {
+      Alert.alert(
+        'Report Already Submitted',
+        'You have already reported this listing. Our team is still reviewing your existing report.'
+      );
+      return;
+    }
+    setShowReportReasons(false);
+    setShowReportModal(true);
+  };
+
+  const handlePickReportEvidence = async () => {
+    try {
+      setIsUploadingReportEvidence(true);
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*'],
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const uploaded = await Promise.all(
+        result.assets.map(async (asset) => {
+          const uploadedUrl = await listingService.uploadFile(asset.uri, 'image');
+          return { name: asset.name, uri: asset.uri, uploadedUrl };
+        })
+      );
+      setReportEvidence((prev) => [...prev, ...uploaded]);
+    } catch (error: any) {
+      Alert.alert('Upload Failed', 'Could not add evidence. Please try again.');
+    } finally {
+      setIsUploadingReportEvidence(false);
+    }
+  };
+
+  const resetReportForm = () => {
+    setShowReportModal(false);
+    setShowReportReasons(false);
+    setReportReason('');
+    setReportDetails('');
+    setReportEvidence([]);
+    setIsUploadingReportEvidence(false);
+    setIsSubmittingReport(false);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!listing || !userEmail) {
+      Alert.alert('Sign In Required', 'You must be signed in to submit a report.');
+      return;
+    }
+    if (!reportReason) {
+      Alert.alert('Reason Required', 'Please select a reason for your report.');
+      return;
+    }
+    if (!reportDetails.trim()) {
+      Alert.alert('Details Required', 'Please provide detailed information about the issue.');
+      return;
+    }
+
+    setIsSubmittingReport(true);
+    try {
+      await api.post('/reports/listing', {
+        item_id: listing.id,
+        reporter_email: userEmail,
+        reason: reportReason,
+        description: reportDetails.trim(),
+        evidence_urls: reportEvidence.map((file) => file.uploadedUrl).filter(Boolean),
+        status: 'pending',
+      });
+      setHasOpenListingReport(true);
+      Alert.alert('Report Submitted', 'Thank you. Our team will review this listing report.');
+      resetReportForm();
+    } catch (error: any) {
+      const statusCode = error?.response?.status;
+      const errorMessage = error?.response?.data?.error || 'Could not submit your report. Please try again.';
+      if (statusCode === 409) {
+        setHasOpenListingReport(true);
+        Alert.alert('Report Already Submitted', errorMessage);
+        resetReportForm();
+        return;
+      }
+      Alert.alert('Submission Failed', errorMessage);
+    } finally {
+      setIsSubmittingReport(false);
+    }
   };
 
   const handleRentNow = () => {
@@ -205,6 +310,28 @@ export const ListingDetailScreen = () => {
       return d;
     }
   }, [noticePeriodHours, sameDayPickup]);
+
+  const currentCalendarDate = useMemo(() => {
+    const date = new Date();
+    date.setMonth(date.getMonth() + monthOffset);
+    return date;
+  }, [monthOffset]);
+
+  const nextCalendarDate = useMemo(() => {
+    const date = new Date();
+    date.setMonth(date.getMonth() + monthOffset + 1);
+    return date;
+  }, [monthOffset]);
+
+  const currentCalendarLabel = useMemo(
+    () => currentCalendarDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+    [currentCalendarDate]
+  );
+
+  const nextCalendarLabel = useMemo(
+    () => nextCalendarDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+    [nextCalendarDate]
+  );
 
   // Calendar: handle day tap for range selection
   const handleDayPress = (day: { dateString: string }) => {
@@ -254,13 +381,13 @@ export const ListingDetailScreen = () => {
     today.setHours(0, 0, 0, 0);
     const earliestStr = earliestAvailableDate.toISOString().split('T')[0];
 
-    // Past dates (60 days back): red
+    // Past dates (60 days back): soft red
     for (let i = 1; i <= 60; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
       marks[d.toISOString().split('T')[0]] = {
         disabled: true, disableTouchEvent: true,
-        customStyles: { container: { backgroundColor: '#DC2626', borderRadius: 6 }, text: { color: '#FFFFFF' } },
+        customStyles: { container: { backgroundColor: '#F7B7BC', borderRadius: 14 }, text: { color: '#FFFFFF' } },
       };
     }
 
@@ -274,13 +401,13 @@ export const ListingDetailScreen = () => {
         // Same-day unavailable: orange
         marks[ds] = {
           disabled: true, disableTouchEvent: true,
-          customStyles: { container: { backgroundColor: '#F97316', borderRadius: 6 }, text: { color: '#FFFFFF' } },
+          customStyles: { container: { backgroundColor: '#FFD27E', borderRadius: 14 }, text: { color: '#FFFFFF' } },
         };
       } else {
         // Notice period: amber
         marks[ds] = {
           disabled: true, disableTouchEvent: true,
-          customStyles: { container: { backgroundColor: '#F59E0B', borderRadius: 6 }, text: { color: '#FFFFFF' } },
+          customStyles: { container: { backgroundColor: '#FFD98F', borderRadius: 14 }, text: { color: '#FFFFFF' } },
         };
       }
       cur.setDate(cur.getDate() + 1);
@@ -291,18 +418,25 @@ export const ListingDetailScreen = () => {
       if (!marks[ds]) {
         marks[ds] = {
           disabled: true, disableTouchEvent: true,
-          customStyles: { container: { backgroundColor: '#EF4444', borderRadius: 6 }, text: { color: '#FFFFFF' } },
+          customStyles: { container: { backgroundColor: '#FB7185', borderRadius: 14 }, text: { color: '#FFFFFF' } },
         };
       }
     });
 
-    // Selected dates: blue period
+    // Selected dates: blue cells
     selectedDates.forEach((date, i) => {
       marks[date] = {
-        color: '#2563EB',
-        textColor: '#FFFFFF',
-        startingDay: i === 0,
-        endingDay: i === selectedDates.length - 1,
+        customStyles: {
+          container: {
+            backgroundColor: '#2563EB',
+            borderRadius: 14,
+            borderWidth: 0,
+          },
+          text: {
+            color: '#FFFFFF',
+            fontWeight: '700',
+          },
+        },
       };
     });
 
@@ -325,6 +459,16 @@ export const ListingDetailScreen = () => {
     const deposit = (listing as any).deposit || 0;
     return { rentalCost, platformFee, deposit, totalCost: rentalCost + platformFee + deposit };
   }, [listing, selectedDates]);
+
+  const selectedDatesLabel = useMemo(() => {
+    if (selectedDates.length === 0) return '';
+    const sorted = [...selectedDates].sort();
+    return sorted.length === 1
+      ? new Date(sorted[0]).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : `${sorted.length} dates: ${sorted
+          .map((date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+          .join(', ')}`;
+  }, [selectedDates]);
 
   // Submit rental request inline
   const handleSubmitRental = async () => {
@@ -353,6 +497,12 @@ export const ListingDetailScreen = () => {
           message_type: 'text',
         }).catch(() => {});
       }
+      setSubmittedRequestSummary({
+        listingTitle: listing.title,
+        datesLabel: selectedDatesLabel,
+        totalCost: rentalCosts.totalCost,
+        instantBooking: Boolean((listing as any).instant_booking),
+      });
       setSelectedDates([]);
       setRangeStart(null);
       setRentalMessage('');
@@ -360,16 +510,9 @@ export const ListingDetailScreen = () => {
     } catch (err: any) {
       const data = err?.response?.data;
       if (data?.kyc_required) {
-        // KYC required — prompt user to verify identity
         const riskLabel = data.risk_trigger === 'amount' ? 'High rental value' : data.risk_trigger === 'category' ? 'High-risk category' : 'Item requires verification';
-        Alert.alert(
-          'ID Verification Required',
-          `This rental requires identity verification.\n\nReason: ${riskLabel}.`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Verify Identity', onPress: () => handleStartKyc() },
-          ]
-        );
+        setIdentityVerificationReason(riskLabel);
+        setShowIdentityVerificationCard(true);
       } else {
         Alert.alert('Error', data?.error || 'Failed to submit request. Please try again.');
       }
@@ -419,6 +562,8 @@ export const ListingDetailScreen = () => {
       }
       openStripeAndWatchReturn(url, nativeIdentityCallback, async () => {
         await refreshBackendUser();
+        setShowIdentityVerificationCard(false);
+        setIdentityVerificationReason(null);
         setIsStartingKyc(false);
         Alert.alert('Verification Submitted', 'Your ID verification has been submitted. Once approved, you can send your rental request.');
       });
@@ -631,7 +776,11 @@ export const ListingDetailScreen = () => {
               <Text style={styles.headerIconText}>Share</Text>
             </TouchableOpacity>
             {!isOwner && (
-              <TouchableOpacity style={styles.reportButton} onPress={handleReport}>
+              <TouchableOpacity
+                style={[styles.reportButton, hasOpenListingReport && styles.reportButtonDisabled]}
+                onPress={handleReport}
+                disabled={hasOpenListingReport}
+              >
                 <MaterialCommunityIcons name="alert-outline" size={20} color="#EF4444" />
               </TouchableOpacity>
             )}
@@ -936,35 +1085,53 @@ export const ListingDetailScreen = () => {
         {!isOwner && listing.availability !== false && (
           backendUser && !backendUser.stripe_payment_method_id ? (
             // Connect card section — matches frontend-v1 VerificationPrompt layout
-            <View style={styles.sectionCard}>
-              {/* Icon + title + description */}
+            <View style={[styles.sectionCard, styles.connectRentCard]}>
               <View style={styles.connectCardHeader}>
                 <View style={styles.connectCardIconBg}>
-                  <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#2563EB" />
+                  <MaterialCommunityIcons name="alert-circle-outline" size={26} color="#2563EB" />
                 </View>
                 <Text variant="titleMedium" style={styles.connectCardTitle}>Connect card to rent</Text>
                 <Text style={styles.connectCardDesc}>
                   Connect your payment card to make rental payments and start renting items.
                 </Text>
 
-                {/* Single status badge — card only, same as frontend-v1 */}
                 <View style={styles.connectStatusRow}>
                   <View style={styles.statusBadge}>
                     <MaterialCommunityIcons name="shield-outline" size={12} color="#475569" />
                     <Text style={styles.statusBadgeText}>Card not connected</Text>
                   </View>
+                  <View
+                    style={[
+                      backendUser?.kyc_status === 'verified'
+                        ? styles.statusBadgeVerified
+                        : styles.statusBadgePending,
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name={backendUser?.kyc_status === 'verified' ? 'check-circle-outline' : 'clock-outline'}
+                      size={12}
+                      color={backendUser?.kyc_status === 'verified' ? '#15803D' : '#92400E'}
+                    />
+                    <Text
+                      style={[
+                        backendUser?.kyc_status === 'verified'
+                          ? styles.statusBadgeVerifiedText
+                          : styles.statusBadgePendingText,
+                      ]}
+                    >
+                      {backendUser?.kyc_status === 'verified' ? 'Verified' : 'Verification pending'}
+                    </Text>
+                  </View>
                 </View>
+
+                <Text style={styles.connectCardPrompt}>Connect your card to rent this item</Text>
+                <Text style={styles.stripeDisclaimer}>
+                  We use Stripe to securely process payments. Your payment information is encrypted and securely handled by Stripe.
+                </Text>
               </View>
 
-              {/* Blue info box */}
-              <View style={styles.connectInfoBox}>
-                <MaterialCommunityIcons name="information-outline" size={16} color="#1D4ED8" />
-                <Text style={styles.connectInfoText}>Connect your card to make rental payments.</Text>
-              </View>
-
-              {/* Connect Card button — solid blue */}
               <TouchableOpacity
-                style={[styles.connectCardBtn2, isConnectingCard && styles.connectCardBtnDisabled]}
+                style={[styles.connectCardBtnRent, isConnectingCard && styles.connectCardBtnDisabled]}
                 onPress={handleConnectCard}
                 disabled={isConnectingCard}
               >
@@ -972,31 +1139,11 @@ export const ListingDetailScreen = () => {
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="shield-outline" size={18} color="#FFFFFF" />
-                    <Text style={styles.connectCardBtnText}>Connect Card (to Rent)</Text>
+                    <MaterialCommunityIcons name="credit-card-outline" size={18} color="#FFFFFF" />
+                    <Text style={styles.connectCardBtnText}>Connect Card</Text>
                   </>
                 )}
               </TouchableOpacity>
-
-              {/* Connect Bank button — outline */}
-              <TouchableOpacity
-                style={[styles.connectBankBtn2, isConnectingBank && styles.connectCardBtnDisabled]}
-                onPress={handleConnectBank}
-                disabled={isConnectingBank}
-              >
-                {isConnectingBank ? (
-                  <ActivityIndicator size="small" color="#2563EB" />
-                ) : (
-                  <>
-                    <MaterialCommunityIcons name="shield-outline" size={18} color="#2563EB" />
-                    <Text style={styles.connectBankBtnText}>Connect Bank Account (to Lend)</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <Text style={styles.stripeDisclaimer}>
-                Payments are securely processed by Stripe. Your information is encrypted and protected.
-              </Text>
             </View>
           ) : (
             // Availability calendar + rental request
@@ -1005,54 +1152,99 @@ export const ListingDetailScreen = () => {
                 /* Success card — shown after request is submitted */
                 <View style={styles.sectionCard}>
                   <View style={styles.successCard}>
+                    <TouchableOpacity
+                      style={styles.successCloseBtn}
+                      onPress={() => setRequestSentSuccessfully(false)}
+                    >
+                      <MaterialCommunityIcons name="close" size={24} color="#64748B" />
+                    </TouchableOpacity>
+
                     <View style={styles.successIconBg}>
-                      <MaterialCommunityIcons name="check-circle" size={40} color="#16A34A" />
+                      <MaterialCommunityIcons name="check" size={44} color="#FFFFFF" />
                     </View>
+
                     <Text variant="titleLarge" style={styles.successTitle}>
-                      {(listing as any).instant_booking ? 'Booking Confirmed!' : 'Request Sent!'}
+                      {(submittedRequestSummary?.instantBooking ?? (listing as any).instant_booking)
+                        ? 'Booking Confirmed!'
+                        : 'Request Sent!'}
                     </Text>
+
                     <Text style={styles.successDesc}>
-                      {(listing as any).instant_booking
-                        ? 'Your booking has been confirmed. Check your conversations for details.'
-                        : 'Your rental request has been sent. The owner will be notified and you can chat in Conversations.'}
+                      {(submittedRequestSummary?.instantBooking ?? (listing as any).instant_booking)
+                        ? `Your booking for ${submittedRequestSummary?.listingTitle || listing?.title || 'this item'} is confirmed.`
+                        : `Your rental request for ${submittedRequestSummary?.listingTitle || listing?.title || 'this item'} has been sent to the owner.`}
                     </Text>
+
+                    <View style={styles.successSummaryCard}>
+                      <View style={styles.successSummaryRow}>
+                        <MaterialCommunityIcons name="clock-outline" size={20} color="#64748B" />
+                        <Text style={styles.successSummaryText}>
+                          {submittedRequestSummary?.datesLabel || selectedDatesLabel}
+                        </Text>
+                      </View>
+                      <View style={styles.successSummaryRow}>
+                        <MaterialCommunityIcons name="credit-card-outline" size={20} color="#64748B" />
+                        <Text style={styles.successSummaryTotal}>
+                          Total: ${Number(submittedRequestSummary?.totalCost ?? rentalCosts.totalCost).toFixed(2)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.successInfoCard}>
+                      <Text style={styles.successInfoTitle}>What happens next?</Text>
+                      {(submittedRequestSummary?.instantBooking ?? (listing as any).instant_booking) ? (
+                        <>
+                          <Text style={styles.successInfoItem}>• Your booking is now confirmed</Text>
+                          <Text style={styles.successInfoItem}>• You can message the owner for pickup details</Text>
+                          <Text style={styles.successInfoItem}>• You&apos;ll receive updates in Conversations</Text>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={styles.successInfoItem}>• The owner will review your request</Text>
+                          <Text style={styles.successInfoItem}>• You&apos;ll receive a notification when they respond</Text>
+                          <Text style={styles.successInfoItem}>• If approved, you can proceed with payment</Text>
+                        </>
+                      )}
+                    </View>
+
                     <TouchableOpacity
                       style={styles.successConvBtn}
                       onPress={() => (navigation as any).navigate('MyConversations')}
                     >
-                      <MaterialCommunityIcons name="chat-outline" size={18} color="#FFFFFF" />
-                      <Text style={styles.successConvBtnText}>View Conversations</Text>
+                      <MaterialCommunityIcons name="chat-outline" size={20} color="#FFFFFF" />
+                      <Text style={styles.successConvBtnText}>View Conversation</Text>
                     </TouchableOpacity>
+
                     <TouchableOpacity
-                      style={styles.successNewBtn}
+                      style={styles.successSecondaryBtn}
                       onPress={() => setRequestSentSuccessfully(false)}
                     >
-                      <Text style={styles.successNewBtnText}>Make another request</Text>
+                      <Text style={styles.successSecondaryBtnText}>Continue Browsing</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
               ) : (
               <>
               {/* Calendar */}
-              <View style={styles.sectionCard}>
+              <View style={[styles.sectionCard, styles.calendarCard]}>
                 <Text variant="titleMedium" style={styles.calendarTitle}>Select Rental Dates</Text>
 
                 {/* Legend */}
                 <View style={styles.legendRow}>
                   <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: '#DC2626', opacity: 0.7 }]} />
+                    <View style={[styles.legendDot, { backgroundColor: '#F67B86' }]} />
                     <Text style={styles.legendText}>Past dates</Text>
                   </View>
                   <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: '#F59E0B', opacity: 0.8 }]} />
+                    <View style={[styles.legendDot, { backgroundColor: '#FFBE55' }]} />
                     <Text style={styles.legendText}>Notice period</Text>
                   </View>
                   <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: '#F97316', opacity: 0.8 }]} />
+                    <View style={[styles.legendDot, { backgroundColor: '#FFB347' }]} />
                     <Text style={styles.legendText}>Same-day unavailable</Text>
                   </View>
                   <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: '#EF4444', opacity: 0.8 }]} />
+                    <View style={[styles.legendDot, { backgroundColor: '#FB7185' }]} />
                     <Text style={styles.legendText}>Blocked by owner</Text>
                   </View>
                 </View>
@@ -1064,57 +1256,74 @@ export const ListingDetailScreen = () => {
                     ? 'Tap an end date'
                     : `${selectedDates.length} days selected`}
                 </Text>
-                {/* Month navigation arrows */}
                 <View style={styles.calNavRow}>
                   <TouchableOpacity
-                    style={[styles.calNavBtn, monthOffset === 0 && styles.calNavBtnDisabled]}
+                    style={styles.calNavIconBtn}
                     onPress={() => setMonthOffset(o => Math.max(0, o - 1))}
                     disabled={monthOffset === 0}
                   >
-                    <MaterialCommunityIcons name="chevron-left" size={22} color={monthOffset === 0 ? '#CBD5E1' : '#2563EB'} />
+                    <MaterialCommunityIcons name="chevron-left" size={28} color={monthOffset === 0 ? '#CBD5E1' : '#111827'} />
                   </TouchableOpacity>
+                  <Text style={styles.calNavTitle}>{currentCalendarLabel}</Text>
                   <TouchableOpacity
-                    style={styles.calNavBtn}
+                    style={styles.calNavIconBtn}
                     onPress={() => setMonthOffset(o => o + 1)}
                   >
-                    <MaterialCommunityIcons name="chevron-right" size={22} color="#2563EB" />
+                    <MaterialCommunityIcons name="chevron-right" size={28} color="#111827" />
                   </TouchableOpacity>
                 </View>
 
                 {/* Month 1 — key forces remount when monthOffset changes */}
                 <Calendar
                   key={`m1-${monthOffset}`}
-                  current={(() => { const d = new Date(); d.setMonth(d.getMonth() + monthOffset); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`; })()}
-                  markingType="period"
+                  current={`${currentCalendarDate.getFullYear()}-${String(currentCalendarDate.getMonth()+1).padStart(2,'0')}-01`}
+                  markingType="custom"
                   markedDates={markedDates}
                   onDayPress={handleDayPress}
                   minDate={new Date().toISOString().split('T')[0]}
                   hideArrows={true}
+                  disableMonthChange={true}
+                  hideExtraDays={false}
+                  renderHeader={() => <View />}
+                  style={styles.calendarMonth}
                   theme={{
-                    todayTextColor: '#2563EB',
-                    selectedDayBackgroundColor: '#2563EB',
-                    arrowColor: '#2563EB',
-                    textDayFontSize: 14,
-                    textMonthFontSize: 15,
-                    textDayHeaderFontSize: 12,
+                    calendarBackground: '#FFFFFF',
+                    textSectionTitleColor: '#6B7280',
+                    dayTextColor: '#111827',
+                    monthTextColor: '#111827',
+                    textDisabledColor: '#9CA3AF',
+                    textDayFontSize: 15,
+                    textDayHeaderFontSize: 13,
+                    textDayFontWeight: '500',
+                    textMonthFontSize: 22,
+                    textMonthFontWeight: '800',
                   }}
                 />
+                <Text style={styles.secondaryCalendarTitle}>{nextCalendarLabel}</Text>
                 {/* Month 2 — key forces remount when monthOffset changes */}
                 <Calendar
                   key={`m2-${monthOffset}`}
-                  current={(() => { const d = new Date(); d.setMonth(d.getMonth() + monthOffset + 1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`; })()}
-                  markingType="period"
+                  current={`${nextCalendarDate.getFullYear()}-${String(nextCalendarDate.getMonth()+1).padStart(2,'0')}-01`}
+                  markingType="custom"
                   markedDates={markedDates}
                   onDayPress={handleDayPress}
                   minDate={new Date().toISOString().split('T')[0]}
                   hideArrows={true}
+                  disableMonthChange={true}
+                  hideExtraDays={false}
+                  renderHeader={() => <View />}
+                  style={styles.calendarMonth}
                   theme={{
-                    todayTextColor: '#2563EB',
-                    selectedDayBackgroundColor: '#2563EB',
-                    arrowColor: '#2563EB',
-                    textDayFontSize: 14,
-                    textMonthFontSize: 15,
-                    textDayHeaderFontSize: 12,
+                    calendarBackground: '#FFFFFF',
+                    textSectionTitleColor: '#6B7280',
+                    dayTextColor: '#111827',
+                    monthTextColor: '#111827',
+                    textDisabledColor: '#9CA3AF',
+                    textDayFontSize: 15,
+                    textDayHeaderFontSize: 13,
+                    textDayFontWeight: '500',
+                    textMonthFontSize: 22,
+                    textMonthFontWeight: '800',
                   }}
                 />
                 {selectedDates.length > 0 && (
@@ -1128,14 +1337,16 @@ export const ListingDetailScreen = () => {
               </View>
 
               {/* Rental request card — always visible, shows prompt or form */}
-              <View style={styles.sectionCard}>
+              <View style={[styles.sectionCard, styles.rentalRequestCard]}>
                 <Text variant="titleMedium" style={styles.rentalCardTitle}>Request to Rent</Text>
 
 
                 {selectedDates.length === 0 ? (
                   /* No dates selected yet — prompt */
                   <View style={styles.selectDatesPrompt}>
-                    <Text style={styles.selectDatesText}>Select dates to see rental cost</Text>
+                    <Text style={styles.selectDatesText}>
+                      Select your desired rental dates on the calendar above to see the final price and send your request.
+                    </Text>
                   </View>
                 ) : (
                   <>
@@ -1145,9 +1356,7 @@ export const ListingDetailScreen = () => {
                       <View style={styles.costRow}>
                         <Text style={styles.costLabel}>Rental period:</Text>
                         <Text style={[styles.costValue, { flex: 1, textAlign: 'right' }]}>
-                          {selectedDates.length === 1
-                            ? new Date(selectedDates[0]).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                            : `${selectedDates.length} dates: ${selectedDates.map(d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).join(', ')}`}
+                          {selectedDatesLabel}
                         </Text>
                       </View>
                       {/* Rental cost */}
@@ -1187,11 +1396,16 @@ export const ListingDetailScreen = () => {
                       </View>
                     )}
                     {backendUser?.kyc_status === 'failed' && (
-                      <View style={[styles.kycBanner, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
-                        <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#991B1B" />
-                        <Text style={[styles.kycBannerText, { color: '#991B1B' }]}>ID verification failed. Please retry.</Text>
-                        <TouchableOpacity onPress={handleStartKyc} disabled={isStartingKyc}>
-                          <Text style={styles.kycRetryText}>{isStartingKyc ? 'Starting...' : 'Retry'}</Text>
+                      <View style={[styles.kycBanner, styles.kycBannerError]}>
+                        <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#B91C1C" />
+                        <Text style={[styles.kycBannerText, styles.kycBannerErrorText]}>
+                          ID verification failed. Please verify again before sending your request.
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => setShowIdentityVerificationCard(true)}
+                          disabled={isStartingKyc}
+                        >
+                          <Text style={styles.kycRetryText}>{isStartingKyc ? 'Starting...' : 'Verify'}</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -1259,6 +1473,220 @@ export const ListingDetailScreen = () => {
 
         <Footer />
       </ScrollView>
+
+      <Modal
+        visible={showIdentityVerificationCard}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowIdentityVerificationCard(false);
+          setIdentityVerificationReason(null);
+        }}
+      >
+        <View style={styles.identityModalOverlay}>
+          <TouchableOpacity
+            style={styles.identityModalBackdrop}
+            activeOpacity={1}
+            onPress={() => {
+              setShowIdentityVerificationCard(false);
+              setIdentityVerificationReason(null);
+            }}
+          />
+          <View style={styles.identityModalCard}>
+            <View style={styles.identityHeader}>
+              <MaterialCommunityIcons name="shield-outline" size={38} color="#111827" />
+              <Text style={styles.identityTitle}>ID verification</Text>
+            </View>
+            <Text style={styles.identityDescription}>
+              This booking requires identity verification before you can send the request.
+            </Text>
+            <Text style={styles.identityDescription}>
+              We use Stripe Identity to verify your ID and a live selfie. You only need to verify once.
+            </Text>
+            {identityVerificationReason ? (
+              <Text style={styles.identityReason}>Reason: {identityVerificationReason}</Text>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.identityPrimaryBtn, isStartingKyc && styles.identityPrimaryBtnDisabled]}
+              onPress={handleStartKyc}
+              disabled={isStartingKyc}
+            >
+              {isStartingKyc ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.identityPrimaryBtnText}>Start verification (ID + selfie)</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.identitySecondaryBtn}
+              onPress={() => {
+                setShowIdentityVerificationCard(false);
+                setIdentityVerificationReason(null);
+              }}
+            >
+              <MaterialCommunityIcons name="arrow-left" size={20} color="#111827" />
+              <Text style={styles.identitySecondaryBtnText}>Back</Text>
+            </TouchableOpacity>
+            <Text style={styles.identityFooterText}>Profile</Text>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showReportModal}
+        transparent
+        animationType="fade"
+        onRequestClose={resetReportForm}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.reportModalOverlay}
+        >
+          <TouchableOpacity
+            style={styles.reportModalBackdrop}
+            activeOpacity={1}
+            onPress={resetReportForm}
+          />
+          <View style={styles.reportModalCard}>
+            <View style={styles.reportModalHandle} />
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.reportModalScrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.reportModalHeader}>
+                <View style={styles.reportModalTitleWrap}>
+                  <MaterialCommunityIcons name="alert-outline" size={28} color="#8B1E1E" />
+                  <Text style={styles.reportModalTitle}>Report Listing</Text>
+                </View>
+                <TouchableOpacity onPress={resetReportForm} style={styles.reportModalCloseBtn}>
+                  <MaterialCommunityIcons name="close" size={24} color="#4B5563" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.reportingBox}>
+                <Text style={styles.reportingLabel}>
+                  <Text style={styles.reportingLabelStrong}>Reporting:</Text> {listing?.title}
+                </Text>
+              </View>
+
+              <Text style={styles.reportFieldTitle}>Reason for Report</Text>
+              <TouchableOpacity
+                style={styles.reportSelect}
+                onPress={() => setShowReportReasons((prev) => !prev)}
+              >
+                <Text style={[styles.reportSelectText, !reportReason && styles.reportPlaceholderText]}>
+                  {REPORT_REASONS.find((reason) => reason.value === reportReason)?.label || 'Select a reason'}
+                </Text>
+                <MaterialCommunityIcons
+                  name={showReportReasons ? 'chevron-up' : 'chevron-down'}
+                  size={22}
+                  color="#6B7280"
+                />
+              </TouchableOpacity>
+
+              {showReportReasons && (
+                <View style={styles.reportReasonList}>
+                  {REPORT_REASONS.map((reason) => (
+                    <TouchableOpacity
+                      key={reason.value}
+                      style={[
+                        styles.reportReasonItem,
+                        reportReason === reason.value && styles.reportReasonItemActive,
+                      ]}
+                      onPress={() => {
+                        setReportReason(reason.value);
+                        setShowReportReasons(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.reportReasonText,
+                          reportReason === reason.value && styles.reportReasonTextActive,
+                        ]}
+                      >
+                        {reason.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              <Text style={styles.reportFieldTitle}>Detailed Description</Text>
+              <TextInput
+                style={styles.reportDetailsInput}
+                value={reportDetails}
+                onChangeText={setReportDetails}
+                placeholder="Please provide detailed information about the issue. Include dates, specific incidents, or any relevant details..."
+                placeholderTextColor="#9CA3AF"
+                multiline
+                numberOfLines={5}
+                textAlignVertical="top"
+              />
+              <Text style={styles.reportHelperText}>
+                Be as specific as possible. This helps our team investigate the report.
+              </Text>
+
+              <Text style={styles.reportFieldTitle}>Evidence (Screenshots/Photos)</Text>
+              <Text style={styles.reportSubtext}>
+                Upload any evidence that supports your report (optional but recommended)
+              </Text>
+              <TouchableOpacity
+                style={styles.reportEvidenceBtn}
+                onPress={handlePickReportEvidence}
+                disabled={isUploadingReportEvidence}
+              >
+                {isUploadingReportEvidence ? (
+                  <ActivityIndicator size="small" color="#111827" />
+                ) : (
+                  <MaterialCommunityIcons name="upload-outline" size={20} color="#111827" />
+                )}
+                <Text style={styles.reportEvidenceBtnText}>
+                  {isUploadingReportEvidence ? 'Uploading...' : 'Add Evidence'}
+                </Text>
+              </TouchableOpacity>
+              {reportEvidence.length > 0 && (
+                <View style={styles.reportEvidenceList}>
+                  {reportEvidence.map((file, index) => (
+                    <View key={`${file.uri}-${index}`} style={styles.reportEvidenceChip}>
+                      <Text style={styles.reportEvidenceChipText} numberOfLines={1}>
+                        {file.name}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setReportEvidence((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
+                      >
+                        <MaterialCommunityIcons name="close" size={16} color="#64748B" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              <View style={styles.reportWarningBox}>
+                <Text style={styles.reportWarningText}>
+                  <Text style={styles.reportWarningStrong}>Important:</Text> False reports may result in account
+                  suspension. Only submit reports for genuine concerns about safety, fraud, or policy violations.
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.reportSubmitBtn, isSubmittingReport && styles.reportSubmitBtnDisabled]}
+                onPress={handleSubmitReport}
+                disabled={isSubmittingReport || isUploadingReportEvidence}
+              >
+                {isSubmittingReport ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.reportSubmitBtnText}>Submit Report</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.reportCancelBtn} onPress={resetReportForm}>
+                <Text style={styles.reportCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Image Zoom Modal */}
       <Modal
@@ -1430,6 +1858,243 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FEE2E2',
     justifyContent: 'center',
+  },
+  reportButtonDisabled: {
+    opacity: 0.45,
+  },
+  reportModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    justifyContent: 'flex-end',
+  },
+  reportModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  reportModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 26,
+    shadowColor: '#111827',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 8,
+    maxHeight: '86%',
+  },
+  reportModalHandle: {
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'center',
+    marginBottom: 18,
+  },
+  reportModalScrollContent: {
+    paddingBottom: 8,
+  },
+  reportModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  reportModalTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  reportModalTitle: {
+    color: '#8B1E1E',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  reportModalCloseBtn: {
+    padding: 4,
+  },
+  reportingBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 22,
+  },
+  reportingLabel: {
+    color: '#475569',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  reportingLabelStrong: {
+    color: '#334155',
+    fontWeight: '800',
+  },
+  reportFieldTitle: {
+    color: '#111827',
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 10,
+  },
+  reportSelect: {
+    height: 60,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    marginBottom: 14,
+  },
+  reportSelectText: {
+    color: '#111827',
+    fontSize: 16,
+  },
+  reportPlaceholderText: {
+    color: '#6B7280',
+  },
+  reportReasonList: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    marginBottom: 14,
+    paddingVertical: 10,
+    shadowColor: '#111827',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  reportReasonItem: {
+    paddingHorizontal: 18,
+    paddingVertical: 13,
+  },
+  reportReasonItemActive: {
+    backgroundColor: '#F8FAFC',
+    marginHorizontal: 8,
+    borderRadius: 10,
+  },
+  reportReasonText: {
+    color: '#111827',
+    fontSize: 15,
+  },
+  reportReasonTextActive: {
+    fontWeight: '700',
+  },
+  reportDetailsInput: {
+    minHeight: 170,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 18,
+    padding: 18,
+    fontSize: 16,
+    color: '#111827',
+    backgroundColor: '#FCFCFD',
+    marginBottom: 8,
+  },
+  reportHelperText: {
+    color: '#64748B',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 18,
+  },
+  reportSubtext: {
+    color: '#64748B',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  reportEvidenceBtn: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 12,
+  },
+  reportEvidenceBtnText: {
+    color: '#111827',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  reportEvidenceList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  reportEvidenceChip: {
+    maxWidth: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 999,
+    paddingLeft: 12,
+    paddingRight: 10,
+    paddingVertical: 8,
+  },
+  reportEvidenceChipText: {
+    maxWidth: 180,
+    color: '#475569',
+    fontSize: 12,
+  },
+  reportWarningBox: {
+    backgroundColor: '#FFFBEA',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 20,
+  },
+  reportWarningText: {
+    color: '#92400E',
+    fontSize: 14,
+    lineHeight: 24,
+  },
+  reportWarningStrong: {
+    fontWeight: '800',
+  },
+  reportSubmitBtn: {
+    backgroundColor: '#F4757F',
+    borderRadius: 16,
+    minHeight: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  reportSubmitBtnDisabled: {
+    opacity: 0.7,
+  },
+  reportSubmitBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  reportCancelBtn: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    minHeight: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  reportCancelBtnText: {
+    color: '#111827',
+    fontSize: 16,
+    fontWeight: '700',
   },
   imageContainer: {
     paddingHorizontal: 16,
@@ -1852,34 +2517,35 @@ const styles = StyleSheet.create({
   },
   connectCardHeader: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 22,
   },
   connectCardIconBg: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#DBEAFE',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 18,
   },
   connectCardTitle: {
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 8,
+    fontWeight: '800',
+    color: '#111827',
+    fontSize: 16,
+    marginBottom: 10,
     textAlign: 'center',
   },
   connectCardDesc: {
     color: '#64748B',
     textAlign: 'center',
     fontSize: typography.body,
-    lineHeight: 22,
-    marginBottom: 16,
+    lineHeight: 24,
+    marginBottom: 18,
   },
   connectStatusRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 18,
     flexWrap: 'wrap',
     justifyContent: 'center',
   },
@@ -1897,6 +2563,58 @@ const styles = StyleSheet.create({
     color: '#1D4ED8',
     fontSize: typography.small,
     lineHeight: 18,
+  },
+  connectRentCard: {
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 6,
+    paddingTop: 30,
+    paddingBottom: 26,
+  },
+  statusBadgeVerified: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    gap: 6,
+  },
+  statusBadgeVerifiedText: {
+    fontSize: typography.small,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  statusBadgePending: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    gap: 6,
+  },
+  statusBadgePendingText: {
+    fontSize: typography.small,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  connectCardPrompt: {
+    color: '#475569',
+    textAlign: 'center',
+    fontSize: typography.body,
+    marginBottom: 18,
+  },
+  connectCardBtnRent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0F172A',
+    borderRadius: 14,
+    height: 50,
+    gap: 8,
   },
   connectCardBtn2: {
     flexDirection: 'row',
@@ -1935,105 +2653,143 @@ const styles = StyleSheet.create({
   },
   stripeDisclaimer: {
     color: '#94A3B8',
-    fontSize: typography.tiny,
+    fontSize: 12,
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 20,
   },
   // Calendar
+  calendarCard: {
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 6,
+  },
   calendarTitle: {
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 12,
+    fontWeight: '800',
+    color: '#111827',
+    fontSize: 16,
+    marginBottom: 16,
   },
   noticeBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
+    backgroundColor: '#EAF3FF',
+    borderColor: '#C6DCF9',
     borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 18,
     marginHorizontal: 16,
-    marginBottom: 12,
-    gap: 8,
+    marginBottom: 18,
+    gap: 12,
   },
   noticeText: {
-    fontSize: typography.small,
+    fontSize: 14,
     color: '#1E40AF',
-    lineHeight: 18,
+    lineHeight: 21,
   },
   noticeBold: {
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#1E40AF',
   },
   noticeSubtext: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#3B82F6',
-    marginTop: 2,
+    marginTop: 6,
+    lineHeight: 18,
   },
   legendRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 12,
+    gap: 14,
+    marginBottom: 14,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
   },
   legendDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 3,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
   },
   legendText: {
-    fontSize: 11,
+    fontSize: 13,
     color: '#64748B',
   },
   calendarHint: {
     color: '#64748B',
-    fontSize: typography.small,
-    marginBottom: 12,
+    fontSize: 12,
+    marginBottom: 16,
   },
   calNavRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 16,
   },
-  calNavBtn: {
-    padding: 6,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+  calNavIconBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  calNavBtnDisabled: {
-    backgroundColor: '#F8FAFC',
+  calNavTitle: {
+    color: '#111827',
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  secondaryCalendarTitle: {
+    color: '#111827',
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 14,
+  },
+  calendarMonth: {
+    paddingBottom: 8,
   },
   clearDatesBtn: {
     alignSelf: 'center',
-    marginTop: 10,
+    marginTop: 14,
   },
   clearDatesText: {
     color: '#2563EB',
-    fontSize: typography.small,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
   },
   selectDatesPrompt: {
-    paddingVertical: 20,
+    minHeight: 190,
+    paddingHorizontal: 20,
+    paddingTop: 44,
+    paddingBottom: 28,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   selectDatesText: {
-    color: '#64748B',
-    fontWeight: '500',
-    fontSize: typography.body,
+    color: '#475569',
+    fontWeight: '700',
+    fontSize: 16,
     textAlign: 'center',
+    lineHeight: 27,
   },
   // Rental request card
+  rentalRequestCard: {
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 6,
+  },
   rentalCardTitle: {
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 16,
+    fontWeight: '800',
+    color: '#111827',
+    fontSize: 16,
+    marginBottom: 12,
   },
   costBox: {
     backgroundColor: '#F8FAFC',
@@ -2072,7 +2828,7 @@ const styles = StyleSheet.create({
   costTotalValue: {
     color: '#0F172A',
     fontWeight: '800',
-    fontSize: 18,
+    fontSize: 16,
   },
   messageLabel: {
     color: '#374151',
@@ -2251,53 +3007,117 @@ const styles = StyleSheet.create({
   },
   // Success card (post-submission)
   successCard: {
+    position: 'relative',
     alignItems: 'center',
-    paddingVertical: 24,
-    gap: 12,
+    paddingTop: 16,
+    paddingBottom: 8,
+    gap: 16,
+  },
+  successCloseBtn: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    padding: 4,
+    zIndex: 1,
   },
   successIconBg: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#DCFCE7',
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    backgroundColor: '#16D47B',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   successTitle: {
-    fontWeight: '700',
-    color: '#15803D',
+    fontWeight: '800',
+    fontSize: 24,
+    color: '#111827',
     textAlign: 'center',
   },
   successDesc: {
-    color: '#475569',
-    fontSize: 14,
+    color: '#6B7280',
+    fontSize: 16,
     textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 8,
+    lineHeight: 26,
+    paddingHorizontal: 18,
+  },
+  successSummaryCard: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    gap: 14,
+  },
+  successSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  successSummaryText: {
+    flex: 1,
+    color: '#475569',
+    fontSize: 15,
+    lineHeight: 28,
+  },
+  successSummaryTotal: {
+    flex: 1,
+    color: '#111827',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  successInfoCard: {
+    width: '100%',
+    backgroundColor: '#EAF3FF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#C6DCF9',
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    gap: 10,
+  },
+  successInfoTitle: {
+    color: '#1D4ED8',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  successInfoItem: {
+    color: '#1D4ED8',
+    fontSize: 15,
+    lineHeight: 24,
   },
   successConvBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#2563EB',
-    paddingVertical: 12,
+    width: '100%',
+    backgroundColor: '#0F172A',
+    paddingVertical: 16,
     paddingHorizontal: 24,
-    borderRadius: 8,
+    borderRadius: 14,
     marginTop: 4,
   },
   successConvBtnText: {
     color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  successSecondaryBtn: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingVertical: 16,
+  },
+  successSecondaryBtnText: {
+    color: '#111827',
+    fontSize: 16,
     fontWeight: '700',
-    fontSize: 15,
-  },
-  successNewBtn: {
-    paddingVertical: 8,
-  },
-  successNewBtnText: {
-    color: '#64748B',
-    fontSize: 13,
-    textDecorationLine: 'underline',
   },
   kycBanner: {
     flexDirection: 'row',
@@ -2316,9 +3136,104 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
+  kycBannerError: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  kycBannerErrorText: {
+    color: '#991B1B',
+  },
   kycRetryText: {
-    color: '#DC2626',
+    color: '#B91C1C',
     fontWeight: '700',
     fontSize: 12,
+  },
+  identityModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  identityModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  identityModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    shadowColor: '#111827',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 8,
+  },
+  identityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  identityTitle: {
+    flex: 1,
+    color: '#111827',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  identityDescription: {
+    color: '#6B7280',
+    fontSize: 14,
+    lineHeight: 24,
+    marginBottom: 14,
+  },
+  identityReason: {
+    color: '#374151',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  identityPrimaryBtn: {
+    backgroundColor: '#171717',
+    borderRadius: 14,
+    minHeight: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+    marginBottom: 14,
+    paddingHorizontal: 16,
+  },
+  identityPrimaryBtnDisabled: {
+    opacity: 0.7,
+  },
+  identityPrimaryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  identitySecondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    minHeight: 54,
+    backgroundColor: '#FFFFFF',
+  },
+  identitySecondaryBtnText: {
+    color: '#111827',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  identityFooterText: {
+    color: '#111827',
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 18,
   },
 });

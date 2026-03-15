@@ -22,18 +22,49 @@ import {
 import { getListings } from "../../services/listingService";
 import { colors, typography } from "../../theme";
 
+const reasonLabels: Record<string, string> = {
+  fraud: 'Fraudulent Listing',
+  stolen_item: 'Suspected Stolen Item',
+  prohibited_item: 'Prohibited Item',
+  misleading: 'Misleading Description/Photos',
+  price_gouging: 'Price Gouging',
+  spam: 'Spam or Duplicate',
+  other: 'Other',
+};
+
+const reasonRiskLevel: Record<string, 'low' | 'medium' | 'high'> = {
+  fraud: 'high',
+  stolen_item: 'high',
+  prohibited_item: 'high',
+  misleading: 'medium',
+  price_gouging: 'medium',
+  spam: 'low',
+  other: 'medium',
+};
+
+const actionLabels: Record<string, string> = {
+  none: 'No action',
+  warning_sent: 'Warning Sent',
+  listing_removed: 'Listing Removed',
+  user_suspended: 'User Suspended',
+  user_banned: 'User Banned',
+};
+
 export const AdminListingReportsScreen = () => {
   const navigation = useNavigation();
   const [reports, setReports] = useState<ListingReport[]>([]);
   const [items, setItems] = useState<Record<string, string>>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<ListingReport | null>(null);
   const [adminNotes, setAdminNotes] = useState("");
   const [actionTaken, setActionTaken] = useState("none");
+  const [activeTab, setActiveTab] = useState<'pending' | 'investigating' | 'resolved'>('pending');
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const data = await getListingReports();
       setReports(data);
@@ -46,8 +77,15 @@ export const AdminListingReportsScreen = () => {
         });
         setItems(itemsMap);
       }
-    } catch (e) {
+    } catch (e: any) {
       setReports([]);
+      const status = e?.response?.status;
+      const message = e?.response?.data?.error || e?.message || 'Failed to load listing reports.';
+      if (status === 403) {
+        setLoadError('Admin access required on the backend for listing reports. This account can open the admin UI, but the API is rejecting the request.');
+      } else {
+        setLoadError(message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -92,8 +130,71 @@ export const AdminListingReportsScreen = () => {
     }
   };
 
+  const getRiskColors = (risk: 'low' | 'medium' | 'high') => {
+    switch (risk) {
+      case 'high':
+        return { bg: '#FEE2E2', border: '#FECACA', text: '#B91C1C' };
+      case 'medium':
+        return { bg: '#FEF3C7', border: '#FDE68A', text: '#B45309' };
+      default:
+        return { bg: '#DBEAFE', border: '#BFDBFE', text: '#1D4ED8' };
+    }
+  };
+
+  const pendingReports = reports.filter((report) => report.status === 'pending');
+  const investigatingReports = reports.filter((report) => report.status === 'investigating');
+  const resolvedReports = reports.filter((report) => report.status === 'resolved');
+  const filteredReports =
+    activeTab === 'pending'
+      ? pendingReports
+      : activeTab === 'investigating'
+      ? investigatingReports
+      : resolvedReports;
+
+  const closeReview = () => {
+    setSelectedReport(null);
+    setAdminNotes("");
+    setActionTaken("none");
+  };
+
+  const handleTakeAction = async () => {
+    if (!selectedReport) return;
+    if (actionTaken === 'none') {
+      Alert.alert("Action Required", "Please select an action to take.");
+      return;
+    }
+
+    setProcessingId(selectedReport.id);
+    try {
+      await updateListingReportStatus(selectedReport.id, {
+        status: 'resolved',
+        admin_notes: adminNotes || undefined,
+        action_taken: actionTaken,
+      });
+
+      setReports((prev) =>
+        prev.map((report) =>
+          report.id === selectedReport.id
+            ? { ...report, status: 'resolved', admin_notes: adminNotes || undefined, action_taken: actionTaken as any }
+            : report
+        )
+      );
+
+      const actionLabel = actionLabels[actionTaken] || actionTaken;
+      closeReview();
+      Alert.alert("Success", `${actionLabel} applied and report resolved.`);
+    } catch (e) {
+      Alert.alert("Error", "Failed to take action on this report.");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const renderReport = ({ item }: { item: ListingReport }) => {
     const statusColor = getStatusColor(item.status);
+    const risk = reasonRiskLevel[item.reason] || 'medium';
+    const riskColors = getRiskColors(risk);
+    const hasEvidence = !!item.evidence_urls?.length;
 
     return (
       <TouchableOpacity 
@@ -114,10 +215,21 @@ export const AdminListingReportsScreen = () => {
         </View>
 
         <View style={styles.cardBody}>
+          <View style={styles.metaRow}>
+            <View style={[styles.riskBadge, { backgroundColor: riskColors.bg, borderColor: riskColors.border }]}>
+              <Text style={[styles.riskBadgeText, { color: riskColors.text }]}>{risk.toUpperCase()} RISK</Text>
+            </View>
+            {hasEvidence && (
+              <View style={styles.evidenceBadge}>
+                <MaterialCommunityIcons name="camera-outline" size={12} color="#B45309" />
+                <Text style={styles.evidenceBadgeText}>{item.evidence_urls?.length} Evidence</Text>
+              </View>
+            )}
+          </View>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#64748B" />
             <Text style={styles.infoLabel}>Reason:</Text>
-            <Text style={styles.infoValue}>{item.reason}</Text>
+            <Text style={styles.infoValue}>{reasonLabels[item.reason] || item.reason}</Text>
           </View>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="account-outline" size={16} color="#64748B" />
@@ -140,35 +252,67 @@ export const AdminListingReportsScreen = () => {
     <View style={styles.container}>
       <GlobalHeader />
       <FlatList
-        data={reports}
+        data={filteredReports}
         keyExtractor={(item) => item.id}
         renderItem={renderReport}
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={loadData} />
         }
         contentContainerStyle={styles.listContent}
+        ListHeaderComponentStyle={styles.headerWrap}
         ListHeaderComponent={
-          <View style={styles.header}>
-            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-              <MaterialCommunityIcons name="arrow-left" size={20} color={colors.textPrimary} />
-            </TouchableOpacity>
-            <View style={styles.headerTitleContainer}>
-              <MaterialCommunityIcons name="package-variant-closed" size={24} color="#DC2626" />
-              <Text style={styles.headerTitle}>Listing Reports</Text>
+          <View>
+            <View style={styles.header}>
+              <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+                <MaterialCommunityIcons name="arrow-left" size={20} color={colors.textPrimary} />
+              </TouchableOpacity>
+              <View style={styles.headerTitleContainer}>
+                <MaterialCommunityIcons name="package-variant-closed" size={24} color="#DC2626" />
+                <Text style={styles.headerTitle}>Listing Reports</Text>
+              </View>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{reports.length} Total</Text>
+              </View>
             </View>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{reports.filter(r => r.status === 'pending').length} New</Text>
+
+            <Text style={styles.headerSubtitle}>Review and take action on flagged listings</Text>
+
+            <View style={styles.tabsRow}>
+              {[
+                { key: 'pending', label: `Pending (${pendingReports.length})` },
+                { key: 'investigating', label: `Investigating (${investigatingReports.length})` },
+                { key: 'resolved', label: `Resolved (${resolvedReports.length})` },
+              ].map((tab) => {
+                const isActive = activeTab === tab.key;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
+                    style={[styles.tabBtn, isActive && styles.tabBtnActive]}
+                    onPress={() => setActiveTab(tab.key as 'pending' | 'investigating' | 'resolved')}
+                  >
+                    <Text style={[styles.tabBtnText, isActive && styles.tabBtnTextActive]}>{tab.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         }
         ListEmptyComponent={
           isLoading ? (
             <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 48 }} />
+          ) : loadError ? (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={64} color="#DC2626" />
+              <Text style={styles.emptyTitle}>Couldn&apos;t Load Reports</Text>
+              <Text style={styles.emptySubtitle}>{loadError}</Text>
+            </View>
           ) : (
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="shield-check-outline" size={64} color="#16A34A" />
               <Text style={styles.emptyTitle}>All Clear!</Text>
-              <Text style={styles.emptySubtitle}>No pending listing reports to review.</Text>
+              <Text style={styles.emptySubtitle}>
+                No {activeTab === 'pending' ? 'pending' : activeTab === 'investigating' ? 'investigating' : 'resolved'} listing reports to review.
+              </Text>
             </View>
           )
         }
@@ -177,12 +321,32 @@ export const AdminListingReportsScreen = () => {
       <Portal>
         <Modal
           visible={!!selectedReport}
-          onDismiss={() => setSelectedReport(null)}
+          onDismiss={closeReview}
           contentContainerStyle={styles.modalContainer}
         >
           {selectedReport && (
             <ScrollView style={styles.modalScroll}>
               <Text style={styles.modalTitle}>Review Report</Text>
+
+              <View style={styles.summaryCard}>
+                <View style={styles.summaryHeader}>
+                  <View style={styles.summaryTitleWrap}>
+                    <MaterialCommunityIcons name="alert-outline" size={22} color="#DC2626" />
+                    <Text style={styles.summaryTitle}>{items[selectedReport.item_id] || "Unknown Item"}</Text>
+                  </View>
+                  {(() => {
+                    const risk = reasonRiskLevel[selectedReport.reason] || 'medium';
+                    const riskColors = getRiskColors(risk);
+                    return (
+                      <View style={[styles.riskBadge, { backgroundColor: riskColors.bg, borderColor: riskColors.border }]}>
+                        <Text style={[styles.riskBadgeText, { color: riskColors.text }]}>{risk.toUpperCase()} RISK</Text>
+                      </View>
+                    );
+                  })()}
+                </View>
+                <Text style={styles.summaryMeta}>Reporter: {selectedReport.reporter_email}</Text>
+                <Text style={styles.summaryMeta}>Reported: {new Date(selectedReport.created_date).toLocaleString()}</Text>
+              </View>
               
               <View style={styles.modalSection}>
                 <Text style={styles.modalLabel}>Item</Text>
@@ -191,7 +355,9 @@ export const AdminListingReportsScreen = () => {
 
               <View style={styles.modalSection}>
                 <Text style={styles.modalLabel}>Reason</Text>
-                <Text style={[styles.modalValue, { color: '#DC2626', fontWeight: '700' }]}>{selectedReport.reason.toUpperCase()}</Text>
+                <Text style={[styles.modalValue, { color: '#DC2626', fontWeight: '700' }]}>
+                  {reasonLabels[selectedReport.reason] || selectedReport.reason}
+                </Text>
               </View>
 
               <View style={styles.modalSection}>
@@ -221,6 +387,32 @@ export const AdminListingReportsScreen = () => {
                 />
               </View>
 
+              <View style={styles.modalSection}>
+                <Text style={styles.modalLabel}>Action to Take</Text>
+                <View style={styles.actionList}>
+                  {[
+                    'none',
+                    'warning_sent',
+                    'listing_removed',
+                    'user_suspended',
+                    'user_banned',
+                  ].map((action) => {
+                    const isActive = actionTaken === action;
+                    return (
+                      <TouchableOpacity
+                        key={action}
+                        style={[styles.actionChip, isActive && styles.actionChipActive]}
+                        onPress={() => setActionTaken(action)}
+                      >
+                        <Text style={[styles.actionChipText, isActive && styles.actionChipTextActive]}>
+                          {actionLabels[action]}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
               <View style={styles.modalActions}>
                 <Button 
                   mode="outlined" 
@@ -239,10 +431,19 @@ export const AdminListingReportsScreen = () => {
                   Resolve
                 </Button>
               </View>
+
+              <Button
+                mode="contained"
+                onPress={handleTakeAction}
+                style={[styles.modalBtn, styles.takeActionBtn]}
+                disabled={processingId === selectedReport.id}
+              >
+                Take Action & Resolve
+              </Button>
               
               <Button 
                 mode="text" 
-                onPress={() => setSelectedReport(null)} 
+                onPress={closeReview} 
                 style={{ marginTop: 8 }}
                 disabled={processingId === selectedReport.id}
               >
@@ -265,10 +466,12 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
+  headerWrap: {
+    marginBottom: 20,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
     gap: 12,
   },
   backBtn: {
@@ -301,6 +504,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#DC2626",
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    marginTop: 10,
+    marginBottom: 14,
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 4,
+  },
+  tabBtn: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  tabBtnActive: {
+    backgroundColor: '#0F172A',
+    borderColor: '#0F172A',
+  },
+  tabBtnText: {
+    color: '#475569',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  tabBtnTextActive: {
+    color: '#FFFFFF',
   },
   card: {
     backgroundColor: "#FFFFFF",
@@ -336,6 +573,39 @@ const styles = StyleSheet.create({
   cardBody: {
     gap: 8,
     marginBottom: 12,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+    flexWrap: 'wrap',
+  },
+  riskBadge: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  riskBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  evidenceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  evidenceBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#B45309',
   },
   infoRow: {
     flexDirection: 'row',
@@ -379,6 +649,36 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0F172A',
     marginBottom: 20,
+  },
+  summaryCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 18,
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 10,
+  },
+  summaryTitleWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  summaryTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  summaryMeta: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 2,
   },
   modalSection: {
     marginBottom: 16,
@@ -428,6 +728,35 @@ const styles = StyleSheet.create({
   modalBtn: {
     flex: 1,
     borderRadius: 8,
+  },
+  actionList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  actionChip: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  actionChipActive: {
+    borderColor: '#0F172A',
+    backgroundColor: '#0F172A',
+  },
+  actionChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  actionChipTextActive: {
+    color: '#FFFFFF',
+  },
+  takeActionBtn: {
+    backgroundColor: '#DC2626',
+    marginTop: 12,
   },
   emptyState: {
     alignItems: 'center',

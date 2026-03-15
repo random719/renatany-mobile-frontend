@@ -665,6 +665,22 @@ export const ProfileScreen = () => {
             )}
           </Surface>
 
+          <Surface style={styles.card} elevation={0}>
+            <Text style={styles.cardTitle}>Trust & safety</Text>
+            <Text style={styles.safetyHelperText}>
+              Review the listing reports you have submitted and follow their latest status.
+            </Text>
+            <Button
+              mode="outlined"
+              icon="shield-search-outline"
+              style={styles.safetyBtn}
+              labelStyle={styles.safetyBtnLabel}
+              onPress={() => navigation.navigate('MyListingReports')}
+            >
+              My Listing Reports
+            </Button>
+          </Surface>
+
           {/* Tabs Grid */}
           <Surface style={styles.tabBarSurface} elevation={1}>
             <View style={styles.tabGrid}>
@@ -1654,6 +1670,21 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     marginTop: 8,
+  },
+  safetyHelperText: {
+    fontSize: 14,
+    color: '#64748B',
+    lineHeight: 21,
+    marginBottom: 16,
+  },
+  safetyBtn: {
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+  },
+  safetyBtnLabel: {
+    color: '#0F172A',
+    fontSize: 15,
+    fontWeight: '600',
   },
   // Tabs
   tabBarSurface: {

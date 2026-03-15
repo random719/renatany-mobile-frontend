@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 import { Text } from "react-native-paper";
+import { useIsAdmin } from "../../hooks/useIsAdmin";
 import { useAuthStore } from "../../store/authStore";
 import { useListingStore } from "../../store/listingStore";
 import { useUIStore } from "../../store/uiStore";
@@ -21,22 +22,17 @@ import { colors, typography } from "../../theme";
 
 const { width, height } = Dimensions.get("window");
 const SIDEBAR_WIDTH = Math.min(width * 0.8, 320);
-const ADMIN_EMAILS = new Set(["collegeworks0910@gmail.com", "admin@rentany.fr"]);
 
 export const SidebarMenu = () => {
   const navigation = useNavigation<any>();
   const { signOut } = useClerk();
   const { user: clerkUser } = useUser();
+  const { isAdmin } = useIsAdmin();
   const { isSidebarVisible: isVisible, closeSidebar: onClose } = useUIStore();
   const { logout } = useAuthStore();
   const { activeFilter, applyFilter } = useListingStore();
   const primaryEmail =
     clerkUser?.primaryEmailAddress?.emailAddress?.toLowerCase() || "";
-  const metadataRole =
-    typeof clerkUser?.publicMetadata?.role === "string"
-      ? clerkUser.publicMetadata.role.toLowerCase()
-      : "";
-  const isAdmin = metadataRole === "admin" || ADMIN_EMAILS.has(primaryEmail);
   const derivedHandle =
     clerkUser?.username ||
     (primaryEmail.includes("@") ? primaryEmail.split("@")[0] : "");
@@ -198,7 +194,7 @@ export const SidebarMenu = () => {
           <Text style={styles.sectionTitle}>NAVIGATE</Text>
           {(() => {
             const isFavorites = ["Favorites", "FavoritesTab"].includes(latestRoute);
-            const isProfile = ["Profile", "ProfileTab", "EditProfile", "Settings"].includes(latestRoute);
+            const isProfile = ["Profile", "ProfileTab", "EditProfile", "Settings", "MyListingReports"].includes(latestRoute);
             const isListItem = ["ListItemTab", "CreateListing"].includes(latestRoute);
             const isRentalHistory = ["RentalHistory", "RentalDetail"].includes(latestRoute);
             const isConversations = ["MyConversations", "Chat"].includes(latestRoute);
@@ -309,6 +305,11 @@ export const SidebarMenu = () => {
                 "shield-check-outline",
                 "Admin: Fraud Reports",
                 () => navigation.navigate("AdminFraudReports"),
+              )}
+              {renderAdminNavItem(
+                "shield-cog-outline",
+                "Admin: Security",
+                () => navigation.navigate("AdminSecurity"),
               )}
             </>
           )}

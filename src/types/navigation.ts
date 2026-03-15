@@ -52,6 +52,7 @@ export type ProfileStackParamList = {
   Profile: undefined;
   EditProfile: undefined;
   Settings: undefined;
+  MyListingReports: undefined;
 };
 
 export type RootStackParamList = {
@@ -68,6 +69,7 @@ export type RootStackParamList = {
   AdminUserReports: undefined;
   AdminFraudReports: undefined;
   AdminListingReports: undefined;
+  AdminSecurity: undefined;
   BulkEditItems: undefined;
   CreateListing: undefined;
   EditItem: { itemId: string };

@@ -359,6 +359,29 @@ export const removeFavorite = async (itemId: string, userEmail: string): Promise
   await api.delete('/favorites', { data: { item_id: itemId, user_email: userEmail } });
 };
 
+export interface UserListingReport {
+  id: string;
+  item_id: string;
+  reporter_email: string;
+  reason: string;
+  description: string;
+  evidence_urls?: string[];
+  status: 'pending' | 'investigating' | 'resolved' | 'dismissed';
+  action_taken?: 'none' | 'warning_sent' | 'listing_removed' | 'user_suspended' | 'user_banned';
+  admin_notes?: string;
+  reviewed_date?: string;
+  created_date: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export const getMyListingReports = async (params?: {
+  status?: string;
+}): Promise<UserListingReport[]> => {
+  const res = await api.get('/reports/listing/mine', { params });
+  return res.data?.data || res.data || [];
+};
+
 // ── Saved Searches API ──
 
 export const getSavedSearches = async (): Promise<SavedSearch[]> => {

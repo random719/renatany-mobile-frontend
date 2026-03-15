@@ -10,6 +10,7 @@ import { AdminDisputesScreen } from '../screens/admin/AdminDisputesScreen';
 import { AdminFraudReportsScreen } from '../screens/admin/AdminFraudReportsScreen';
 import { AdminListingReportsScreen } from '../screens/admin/AdminListingReportsScreen';
 import { AdminModerationScreen } from '../screens/admin/AdminModerationScreen';
+import { AdminSecurityScreen } from '../screens/admin/AdminSecurityScreen';
 import { AdminUserReportsScreen } from '../screens/admin/AdminUserReportsScreen';
 import { BookingConfirmScreen } from '../screens/booking/BookingConfirmScreen';
 import { BookingScreen } from '../screens/booking/BookingScreen';
@@ -78,6 +79,7 @@ export const AppNavigator = () => {
             <Stack.Screen name="AdminUserReports" component={AdminUserReportsScreen} />
             <Stack.Screen name="AdminFraudReports" component={AdminFraudReportsScreen} />
             <Stack.Screen name="AdminListingReports" component={AdminListingReportsScreen} />
+            <Stack.Screen name="AdminSecurity" component={AdminSecurityScreen} />
             <Stack.Screen name="BulkEditItems" component={BulkEditItemsScreen} />
             <Stack.Screen name="CreateListing" component={CreateListingScreen} />
             <Stack.Screen name="EditItem" component={CreateListingScreen} />

@@ -41,7 +41,7 @@ export interface Dispute {
 }
 
 export const getDisputes = async (): Promise<Dispute[]> => {
-  return api.get('/admin/disputes').then((r) => r.data);
+  return api.get('/disputes').then((r) => r.data?.data || r.data || []);
 };
 
 export const updateDisputeStatus = async (
@@ -49,7 +49,7 @@ export const updateDisputeStatus = async (
   status: 'resolved' | 'dismissed',
   resolution_note?: string
 ): Promise<void> => {
-  return api.put(`/admin/disputes/${id}`, { status, resolution_note }).then((r) => r.data);
+  return api.put(`/disputes/${id}`, { status, resolution_note }).then((r) => r.data?.data || r.data);
 };
 
 export interface UserReport {
@@ -62,7 +62,7 @@ export interface UserReport {
 }
 
 export const getUserReports = async (): Promise<UserReport[]> => {
-  return api.get('/admin/user-reports').then((r) => r.data);
+  return api.get('/reports/user').then((r) => r.data?.data || r.data || []);
 };
 
 export const updateUserReportStatus = async (
@@ -70,7 +70,7 @@ export const updateUserReportStatus = async (
   status: 'reviewed' | 'action_taken',
   admin_note?: string
 ): Promise<void> => {
-  return api.put(`/admin/user-reports/${id}`, { status, admin_note }).then((r) => r.data);
+  return api.put(`/reports/user/${id}`, { status, admin_note }).then((r) => r.data?.data || r.data);
 };
 
 export interface FraudReport {
@@ -83,7 +83,7 @@ export interface FraudReport {
 }
 
 export const getFraudReports = async (): Promise<FraudReport[]> => {
-  return api.get('/admin/fraud-reports').then((r) => r.data);
+  return api.get('/reports/fraud').then((r) => r.data?.data || r.data || []);
 };
 
 export const updateFraudReportStatus = async (
@@ -91,7 +91,7 @@ export const updateFraudReportStatus = async (
   status: 'investigating' | 'resolved',
   admin_note?: string
 ): Promise<void> => {
-  return api.put(`/admin/fraud-reports/${id}`, { status, admin_note }).then((r) => r.data);
+  return api.put(`/reports/fraud/${id}`, { status, admin_note }).then((r) => r.data?.data || r.data);
 };
 
 export interface ListingReport {
@@ -108,7 +108,7 @@ export interface ListingReport {
 }
 
 export const getListingReports = async (): Promise<ListingReport[]> => {
-  return api.get('/reports/listing').then((r) => r.data);
+  return api.get('/reports/listing').then((r) => r.data?.data || r.data || []);
 };
 
 export const updateListingReportStatus = async (
@@ -119,7 +119,43 @@ export const updateListingReportStatus = async (
     action_taken?: string;
   }
 ): Promise<void> => {
-  return api.put(`/reports/listing/${id}`, data).then((r) => r.data);
+  return api.put(`/reports/listing/${id}`, data).then((r) => r.data?.data || r.data);
+};
+
+export interface SecuritySettings {
+  kyc_amount_threshold: number;
+  kyc_high_risk_categories: string[];
+}
+
+export interface SecurityItem {
+  id: string;
+  title: string;
+  category: string;
+  daily_rate?: number;
+  high_risk_override?: boolean;
+}
+
+export const getSecuritySettings = async (): Promise<SecuritySettings> => {
+  return api.get('/security/settings').then((r) => r.data?.data || r.data);
+};
+
+export const updateSecuritySettings = async (data: SecuritySettings): Promise<SecuritySettings> => {
+  return api.put('/security/settings', data).then((r) => r.data?.data || r.data);
+};
+
+export const getSecurityItems = async (params?: {
+  search?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<SecurityItem[]> => {
+  return api.get('/security/items', { params }).then((r) => r.data?.data || r.data || []);
+};
+
+export const updateSecurityItemOverride = async (
+  id: string,
+  high_risk_override: boolean
+): Promise<SecurityItem> => {
+  return api.put(`/security/items/${id}`, { high_risk_override }).then((r) => r.data?.data || r.data);
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -145,9 +181,9 @@ export const getAdminDashboardData = async (): Promise<AdminDashboardData> => {
       api.get('/items', { params: { limit: 100 } }),
       api.get('/items/stats'),
       api.get('/rental-requests'),
-      api.get('/admin/disputes'),
-      api.get('/admin/user-reports'),
-      api.get('/admin/fraud-reports'),
+      api.get('/disputes'),
+      api.get('/reports/user'),
+      api.get('/reports/fraud'),
       api.get('/reports/listing'),
     ]);
 

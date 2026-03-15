@@ -1,16 +1,17 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useUser } from '@clerk/expo';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { FAB } from 'react-native-paper';
+import { useIsAdmin } from '../hooks/useIsAdmin';
 import { CategoriesScreen } from '../screens/categories/CategoriesScreen';
 import { CategoryDetailScreen } from '../screens/categories/CategoryDetailScreen';
 import { FavoritesScreen } from '../screens/favorites/FavoritesScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { CreateListingScreen } from '../screens/listing/CreateListingScreen';
 import { ListingDetailScreen } from '../screens/listing/ListingDetailScreen';
+import { MyListingReportsScreen } from '../screens/profile/MyListingReportsScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { FilterScreen } from '../screens/search/FilterScreen';
 import { SavedSearchesScreen } from '../screens/search/saved/SavedSearchesScreen';
@@ -115,6 +116,10 @@ const ProfileStackNavigator = () => (
     <ProfileStack.Screen
       name="Profile"
       component={ProfileScreen}
+    />
+    <ProfileStack.Screen
+      name="MyListingReports"
+      component={MyListingReportsScreen}
     />
   </ProfileStack.Navigator>
 );
@@ -235,14 +240,8 @@ const UserTabNavigator = () => (
 );
 
 // --- Main Tab Navigator ---
-const ADMIN_EMAILS = new Set(['collegeworks0910@gmail.com', 'admin@rentany.fr']);
-
 export const MainTabNavigator = () => {
-  const { user: clerkUser } = useUser();
-  const primaryEmail = clerkUser?.primaryEmailAddress?.emailAddress?.toLowerCase() || '';
-  const metadataRole = typeof clerkUser?.publicMetadata?.role === 'string'
-    ? clerkUser.publicMetadata.role.toLowerCase() : '';
-  const isAdmin = metadataRole === 'admin' || ADMIN_EMAILS.has(primaryEmail);
+  const { isAdmin } = useIsAdmin();
 
   return isAdmin ? <AdminTabNavigator /> : <UserTabNavigator />;
 };

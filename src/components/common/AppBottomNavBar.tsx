@@ -1,10 +1,10 @@
-import { useUser } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { FAB, Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIsAdmin } from '../../hooks/useIsAdmin';
 import { colors, typography } from '../../theme';
 
 type NavKey = 'home' | 'search' | 'list' | 'favorites' | 'profile' | 'none';
@@ -13,17 +13,10 @@ interface AppBottomNavBarProps {
   activeKey?: NavKey;
 }
 
-const ADMIN_EMAILS = new Set(['collegeworks0910@gmail.com', 'admin@rentany.fr']);
-
 export const AppBottomNavBar = ({ activeKey = 'none' }: AppBottomNavBarProps) => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { user: clerkUser } = useUser();
-  const primaryEmail = clerkUser?.primaryEmailAddress?.emailAddress?.toLowerCase() || '';
-  const metadataRole = typeof clerkUser?.publicMetadata?.role === 'string'
-    ? clerkUser.publicMetadata.role.toLowerCase()
-    : '';
-  const isAdmin = metadataRole === 'admin' || ADMIN_EMAILS.has(primaryEmail);
+  const { isAdmin } = useIsAdmin();
 
   const navigateToMainTab = (screen: string) => {
     navigation.navigate('Main', { screen });

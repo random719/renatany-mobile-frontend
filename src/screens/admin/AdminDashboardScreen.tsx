@@ -675,6 +675,10 @@ export const AdminDashboardScreen = () => {
                 <MaterialCommunityIcons name="package-variant-closed" size={iconSize.md} color="#0EA5E9" />
                 <Text style={styles.quickActionText}>Review Listing Reports ({dashboardData.listingReportsCount || 0})</Text>
               </TouchableOpacity>
+              <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('AdminSecurity')}>
+                <MaterialCommunityIcons name="shield-outline" size={iconSize.md} color="#475569" />
+                <Text style={styles.quickActionText}>Manage Security Settings</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('AdminModeration')}>
                 <MaterialCommunityIcons name="clock-outline" size={iconSize.md} color="#2563EB" />
                 <Text style={styles.quickActionText}>Review Pending Requests ({dashboardData.pendingRequestsCount})</Text>
