@@ -117,7 +117,7 @@ export const AdminDisputesScreen = () => {
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="clock-outline" size={16} color="#64748B" />
             <Text style={styles.infoLabel}>Date:</Text>
-            <Text style={styles.infoValue}>{formatDate(item.created_at)}</Text>
+            <Text style={styles.infoValue}>{formatDate(item.created_date || item.created_at)}</Text>
           </View>
         </View>
 

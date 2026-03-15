@@ -495,8 +495,21 @@ export const AdminDashboardScreen = () => {
 
   const loadDashboard = useCallback(async () => {
     setIsRefreshing(true);
+    const startTime = Date.now();
     try {
       const data = await getAdminDashboardData();
+      const loadTimeSeconds = (Date.now() - startTime) / 1000;
+
+      // Compute real health metrics from load time
+      const systemStatus = loadTimeSeconds < 3 ? 'Healthy' : loadTimeSeconds < 5 ? 'Degraded' : 'Critical';
+      const performanceScore = loadTimeSeconds < 2 ? 92 : loadTimeSeconds < 5 ? 68 : 45;
+
+      data.systemStatus = systemStatus;
+      data.performanceScore = performanceScore;
+      data.pageLoadTimes = data.pageLoadTimes.map((p: any) =>
+        p.page === 'Admin Dashboard' ? { ...p, loadTime: parseFloat(loadTimeSeconds.toFixed(2)) } : p
+      );
+
       setDashboardData(data);
       setLastUpdated(new Date());
     } finally {
@@ -719,11 +732,18 @@ export const AdminDashboardScreen = () => {
 
     return (
       <>
-        {/* System Status: Critical */}
-        <View style={[styles.healthCard, styles.healthCardCritical]}>
+        {/* System Status */}
+        <View style={[styles.healthCard,
+          dashboardData.systemStatus === 'Healthy' ? styles.healthCardHealthy :
+          dashboardData.systemStatus === 'Degraded' ? styles.healthCardDegraded :
+          styles.healthCardCritical
+        ]}>
           <View style={styles.healthStatusHeader}>
-            <View style={styles.criticalDot} />
-            <Text style={styles.cardTitle}>System Status: Critical</Text>
+            <View style={[styles.criticalDot, {
+              backgroundColor: dashboardData.systemStatus === 'Healthy' ? '#22C55E' :
+                dashboardData.systemStatus === 'Degraded' ? '#EAB308' : '#EF4444'
+            }]} />
+            <Text style={styles.cardTitle}>System Status: {dashboardData.systemStatus}</Text>
           </View>
           <View style={styles.metricsGrid}>
              <View style={styles.healthSubCard}>
@@ -849,7 +869,10 @@ export const AdminDashboardScreen = () => {
               </Text>
             </View>
             <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${dashboardData.performanceScore}%` }]} />
+              <View style={[styles.progressBarFill, {
+                width: `${dashboardData.performanceScore}%`,
+                backgroundColor: dashboardData.performanceScore >= 80 ? '#22C55E' : dashboardData.performanceScore >= 60 ? '#EAB308' : '#EF4444',
+              }]} />
             </View>
             <Text style={styles.scoreSubtitle}>Based on load times, API efficiency, and user experience metrics</Text>
           </View>
@@ -1558,6 +1581,14 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 18,
     gap: 8,
+  },
+  healthCardHealthy: {
+    backgroundColor: "#F0FDF4",
+    borderColor: "#BBF7D0",
+  },
+  healthCardDegraded: {
+    backgroundColor: "#FEFCE8",
+    borderColor: "#FEF08A",
   },
   healthCardCritical: {
     backgroundColor: "#FEF2F2",

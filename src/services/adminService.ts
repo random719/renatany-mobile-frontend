@@ -176,8 +176,9 @@ export const getAdminDashboardData = async (): Promise<AdminDashboardData> => {
   }
 
   // Fetch from real endpoints in parallel
-  const [itemsRes, statsRes, rentalsRes, disputesRes, userReportsRes, fraudReportsRes, listingReportsRes] =
+  const [usersRes, itemsRes, statsRes, rentalsRes, disputesRes, userReportsRes, fraudReportsRes, listingReportsRes] =
     await Promise.allSettled([
+      api.get('/users'),
       api.get('/items', { params: { limit: 100 } }),
       api.get('/items/stats'),
       api.get('/rental-requests'),
@@ -187,6 +188,7 @@ export const getAdminDashboardData = async (): Promise<AdminDashboardData> => {
       api.get('/reports/listing'),
     ]);
 
+  const users: any[] = usersRes.status === 'fulfilled' ? (usersRes.value.data.data || usersRes.value.data || []) : [];
   const items: any[] = itemsRes.status === 'fulfilled' ? (itemsRes.value.data.data || itemsRes.value.data || []) : [];
   const stats: any = statsRes.status === 'fulfilled' ? (statsRes.value.data.data || statsRes.value.data || {}) : {};
   const allRentals: any[] = rentalsRes.status === 'fulfilled' ? (rentalsRes.value.data.data || rentalsRes.value.data || []) : [];
@@ -195,34 +197,69 @@ export const getAdminDashboardData = async (): Promise<AdminDashboardData> => {
   const fraudReports: any[] = fraudReportsRes.status === 'fulfilled' ? (fraudReportsRes.value.data.data || fraudReportsRes.value.data || []) : [];
   const listingReports: any[] = listingReportsRes.status === 'fulfilled' ? (listingReportsRes.value.data.data || listingReportsRes.value.data || []) : [];
 
+  const totalUsers: number = users.length;
+  const verifiedUsers: number = users.filter((u: any) => u.verification_status === 'verified').length;
+  const now = new Date();
+  const oneWeekAgo = new Date(now.getTime() - 7 * DAY_MS);
+  const oneMonthAgo = new Date(now.getTime() - 30 * DAY_MS);
+  const usersJoinedThisWeek = users.filter((u: any) => new Date(u.created_at || u.created_date) >= oneWeekAgo).length;
+  const usersJoinedThisMonth = users.filter((u: any) => new Date(u.created_at || u.created_date) >= oneMonthAgo).length;
+
   const totalItems: number = stats.total_available ?? items.length;
   const activeItems: number = items.filter((i: any) => i.status === 'active').length || totalItems;
   const pendingRentals = allRentals.filter((r: any) => r.status === 'pending');
   const completedRentalsList = allRentals.filter((r: any) => r.status === 'completed');
-  const openDisputes = disputes.filter((d: any) => d.status === 'pending');
+  const openDisputes = disputes.filter((d: any) => ['pending', 'open', 'under_review'].includes(d.status));
 
-  // Category performance from real items
-  const catCounts = new Map<string, number>();
+  // Revenue calculations from real rental data
+  const completedAndPaidRentals = allRentals.filter((r: any) => ['completed', 'paid'].includes(r.status));
+  const totalRevenueAllTime = completedAndPaidRentals.reduce((sum: number, r: any) =>
+    sum + (typeof r.platform_fee === 'number' ? r.platform_fee : (r.total_amount * 0.15)), 0);
+  const revenueThisMonth = completedAndPaidRentals
+    .filter((r: any) => new Date(r.created_date || r.created_at) >= oneMonthAgo)
+    .reduce((sum: number, r: any) => sum + (typeof r.platform_fee === 'number' ? r.platform_fee : (r.total_amount * 0.15)), 0);
+  const revenueThisWeek = completedAndPaidRentals
+    .filter((r: any) => new Date(r.created_date || r.created_at) >= oneWeekAgo)
+    .reduce((sum: number, r: any) => sum + (typeof r.platform_fee === 'number' ? r.platform_fee : (r.total_amount * 0.15)), 0);
+
+  // Category performance from real items + rentals
+  const catStats = new Map<string, { items: number; rentals: number; revenue: number }>();
   items.forEach((item: any) => {
     const cat = item.category || 'Other';
-    catCounts.set(cat, (catCounts.get(cat) || 0) + 1);
+    if (!catStats.has(cat)) catStats.set(cat, { items: 0, rentals: 0, revenue: 0 });
+    catStats.get(cat)!.items++;
   });
-  const categoryPerformance = [...catCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
+  completedAndPaidRentals.forEach((r: any) => {
+    const item = items.find((i: any) => i.id === r.item_id);
+    if (item) {
+      const cat = item.category || 'Other';
+      if (!catStats.has(cat)) catStats.set(cat, { items: 0, rentals: 0, revenue: 0 });
+      catStats.get(cat)!.rentals++;
+      catStats.get(cat)!.revenue += (typeof r.platform_fee === 'number' ? r.platform_fee : (r.total_amount * 0.15));
+    }
+  });
+  const categoryPerformance = [...catStats.entries()]
+    .sort((a, b) => b[1].items - a[1].items)
     .slice(0, 5)
-    .map(([category, itemCount]) => ({
+    .map(([category, data]) => ({
       category,
-      items: itemCount,
-      rentals: Math.max(1, Math.round(itemCount * 0.4)),
+      items: data.items,
+      rentals: data.rentals,
     }));
-  const revenueByCategory = categoryPerformance.map((cat) => ({
-    category: cat.category,
-    items: cat.items,
-    rentals: cat.rentals,
-    revenue: Number((cat.items * 2.5).toFixed(2)),
-  }));
+  const revenueByCategory = [...catStats.entries()]
+    .sort((a, b) => b[1].items - a[1].items)
+    .slice(0, 5)
+    .map(([category, data]) => ({
+      category,
+      items: data.items,
+      rentals: data.rentals,
+      revenue: Number(data.revenue.toFixed(2)),
+    }));
 
   // Recent activity from real data
+  const recentUsers = [...users]
+    .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+    .slice(0, 3);
   const recentItems = [...items]
     .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
     .slice(0, 5);
@@ -230,6 +267,13 @@ export const getAdminDashboardData = async (): Promise<AdminDashboardData> => {
     .sort((a: any, b: any) => new Date(b.created_date || 0).getTime() - new Date(a.created_date || 0).getTime())
     .slice(0, 3);
   const recentActivity = [
+    ...recentUsers.map((u: any, idx: number) => ({
+      id: `user-${idx}-${u.id || idx}`,
+      icon: 'account-plus-outline',
+      iconColor: '#6366F1',
+      message: `${u.full_name || u.email} joined the platform`,
+      timestamp: u.created_at || new Date().toISOString(),
+    })),
     ...recentItems.map((item: any, idx: number) => ({
       id: `item-${idx}-${item.id || idx}`,
       icon: 'cube-outline',
@@ -248,20 +292,42 @@ export const getAdminDashboardData = async (): Promise<AdminDashboardData> => {
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, 8);
 
-  // Revenue trend: zeros until a real revenue endpoint is available
-  const now = new Date();
+  // Revenue trend from real rental data (last 30 days)
   const revenueTrend: RevenuePoint[] = Array.from({ length: 30 }, (_, i) => {
     const date = new Date(now.getTime() - (29 - i) * DAY_MS);
-    return { date: formatDateLabel(date), value: 0 };
+    const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const dayEnd = new Date(dayStart.getTime() + DAY_MS);
+    const dayRevenue = completedAndPaidRentals
+      .filter((r: any) => {
+        const d = new Date(r.created_date || r.created_at);
+        return d >= dayStart && d < dayEnd;
+      })
+      .reduce((sum: number, r: any) => sum + (typeof r.platform_fee === 'number' ? r.platform_fee : (r.total_amount * 0.15)), 0);
+    return { date: formatDateLabel(date), value: Number(dayRevenue.toFixed(2)) };
   });
-  const dailyRevenueBreakdown: DailyRevenuePoint[] = revenueTrend.map((p) => ({
-    date: p.date,
-    revenue: 0,
-    rentals: 0,
-  }));
+  const dailyRevenueBreakdown: DailyRevenuePoint[] = Array.from({ length: 30 }, (_, i) => {
+    const date = new Date(now.getTime() - (29 - i) * DAY_MS);
+    const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const dayEnd = new Date(dayStart.getTime() + DAY_MS);
+    const dayRentals = completedAndPaidRentals.filter((r: any) => {
+      const d = new Date(r.created_date || r.created_at);
+      return d >= dayStart && d < dayEnd;
+    });
+    const dayRevenue = dayRentals.reduce((sum: number, r: any) =>
+      sum + (typeof r.platform_fee === 'number' ? r.platform_fee : (r.total_amount * 0.15)), 0);
+    return { date: formatDateLabel(date), revenue: Number(dayRevenue.toFixed(2)), rentals: dayRentals.length };
+  });
 
   return {
     metrics: [
+      {
+        id: 'users',
+        label: 'Total Users',
+        value: String(totalUsers),
+        subtitle: `${verifiedUsers} verified`,
+        changeText: 'Live data',
+        color: '#6366F1',
+      },
       {
         id: 'items',
         label: 'Total Items',
@@ -298,17 +364,17 @@ export const getAdminDashboardData = async (): Promise<AdminDashboardData> => {
     revenueTrend,
     revenueByCategory,
     dailyRevenueBreakdown,
-    totalRevenueAllTime: 0,
-    revenueThisMonth: 0,
-    revenueThisWeek: 0,
+    totalRevenueAllTime,
+    revenueThisMonth,
+    revenueThisWeek,
     pendingPayouts: 0,
     paidOutAmount: 0,
     categoryPerformance,
     recentActivity,
-    usersJoinedThisMonth: 0,
-    usersJoinedThisWeek: 0,
-    verifiedUsers: 0,
-    userGrowthPct: 0,
+    usersJoinedThisMonth,
+    usersJoinedThisWeek,
+    verifiedUsers,
+    userGrowthPct: totalUsers > 0 ? Math.round((usersJoinedThisMonth / totalUsers) * 100) : 0,
     userReportsCount: userReports.length,
     fraudReportsCount: fraudReports.length,
     listingReportsCount: listingReports.length,
