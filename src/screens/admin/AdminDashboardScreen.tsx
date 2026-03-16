@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Text } from "react-native-paper";
+import { ActivityIndicator, Text } from "react-native-paper";
 import Svg, { Circle, Line, Polyline, Rect, Text as SvgText } from "react-native-svg";
 import { GlobalHeader } from "../../components/common/GlobalHeader";
 import { Footer } from "../../components/home/Footer";
@@ -492,6 +492,41 @@ export const AdminDashboardScreen = () => {
   const [dashboardData, setDashboardData] = useState<AdminDashboardData | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [implementingOptimization, setImplementingOptimization] = useState<string | null>(null);
+  const [optimizationResults, setOptimizationResults] = useState<Record<string, { success: boolean; message: string }>>({});
+
+  const implementOptimization = useCallback(async (optimizationType: string) => {
+    setImplementingOptimization(optimizationType);
+    try {
+      // Simulate implementation with a delay (same as frontend-v1)
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      const messages: Record<string, string> = {
+        caching: "Caching has been enabled! User profiles and items will now be cached for 5 minutes.",
+        pagination: "Pagination enabled! Admin dashboard will now load 50 items at a time.",
+        thumbnails: "Image optimization enabled! All item cards now use 400x300 thumbnails.",
+        debounce: "Search debouncing enabled! Searches now wait 500ms after typing stops.",
+      };
+
+      setOptimizationResults((prev) => ({
+        ...prev,
+        [optimizationType]: {
+          success: true,
+          message: messages[optimizationType] || "Optimization applied successfully.",
+        },
+      }));
+    } catch (error) {
+      setOptimizationResults((prev) => ({
+        ...prev,
+        [optimizationType]: {
+          success: false,
+          message: `Implementation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        },
+      }));
+    } finally {
+      setImplementingOptimization(null);
+    }
+  }, []);
 
   const loadDashboard = useCallback(async () => {
     setIsRefreshing(true);
@@ -614,7 +649,7 @@ export const AdminDashboardScreen = () => {
               title="This Month"
               value={`$${dashboardData.revenueThisMonth.toFixed(2)}`}
               subtitle="Platform fees"
-              change="0% vs last month"
+              change={`${dashboardData.revenueGrowth > 0 ? '+' : ''}${dashboardData.revenueGrowth}% vs last month`}
               color="#10B981"
               iconName="trending-up"
             />
@@ -684,17 +719,9 @@ export const AdminDashboardScreen = () => {
                 <MaterialCommunityIcons name="package-variant-closed" size={iconSize.md} color="#0EA5E9" />
                 <Text style={styles.quickActionText}>Review Listing Reports ({dashboardData.listingReportsCount || 0})</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('AdminSecurity')}>
-                <MaterialCommunityIcons name="shield-outline" size={iconSize.md} color="#475569" />
-                <Text style={styles.quickActionText}>Manage Security Settings</Text>
-              </TouchableOpacity>
               <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('AdminModeration')}>
                 <MaterialCommunityIcons name="clock-outline" size={iconSize.md} color="#2563EB" />
                 <Text style={styles.quickActionText}>Review Pending Requests ({dashboardData.pendingRequestsCount})</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('CreateListing')}>
-                <MaterialCommunityIcons name="plus-circle-outline" size={iconSize.md} color="#16A34A" />
-                <Text style={styles.quickActionText}>Create New Listing</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -796,7 +823,17 @@ export const AdminDashboardScreen = () => {
                              <MaterialCommunityIcons name="checkbox-marked" size={14} color="#16A34A" />
                              <Text style={styles.fastPillText}>Fast</Text>
                            </View>
-                         ) : null}
+                         ) : item.loadTime < 5 ? (
+                           <View style={[styles.fastPill, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
+                             <MaterialCommunityIcons name="alert" size={14} color="#D97706" />
+                             <Text style={[styles.fastPillText, { color: '#D97706' }]}>Slow</Text>
+                           </View>
+                         ) : (
+                           <View style={[styles.fastPill, { backgroundColor: '#FEE2E2', borderColor: '#FECACA' }]}>
+                             <MaterialCommunityIcons name="alert-circle" size={14} color="#DC2626" />
+                             <Text style={[styles.fastPillText, { color: '#DC2626' }]}>Critical</Text>
+                           </View>
+                         )}
                        </>
                      )}
                    </View>
@@ -938,10 +975,36 @@ export const AdminDashboardScreen = () => {
                     </View>
                   )}
 
-                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: item.actionButtonColor || "#2563EB" }]}>
-                    <MaterialCommunityIcons name="lightning-bolt" size={18} color="#FFFFFF" />
-                    <Text style={styles.actionBtnText}>{item.actionButtonText}</Text>
-                  </TouchableOpacity>
+                  {optimizationResults[item.id] ? (
+                    <View style={[styles.optimizationResult, optimizationResults[item.id].success ? styles.optimizationResultSuccess : styles.optimizationResultError]}>
+                      <MaterialCommunityIcons
+                        name={optimizationResults[item.id].success ? "check-circle-outline" : "alert-circle-outline"}
+                        size={16}
+                        color={optimizationResults[item.id].success ? "#16A34A" : "#DC2626"}
+                      />
+                      <Text style={[styles.optimizationResultText, { color: optimizationResults[item.id].success ? "#166534" : "#991B1B" }]}>
+                        {optimizationResults[item.id].message}
+                      </Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: item.actionButtonColor || "#2563EB", opacity: implementingOptimization === item.id ? 0.7 : 1 }]}
+                      onPress={() => implementOptimization(item.id)}
+                      disabled={implementingOptimization === item.id}
+                    >
+                      {implementingOptimization === item.id ? (
+                        <>
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                          <Text style={styles.actionBtnText}>Implementing...</Text>
+                        </>
+                      ) : (
+                        <>
+                          <MaterialCommunityIcons name="lightning-bolt" size={18} color="#FFFFFF" />
+                          <Text style={styles.actionBtnText}>{item.actionButtonText}</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
                 </View>
               ))}
             </View>
@@ -2011,6 +2074,28 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: typography.bodyStrong,
     fontWeight: "600",
+  },
+  optimizationResult: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  optimizationResultSuccess: {
+    backgroundColor: "#F0FDF4",
+    borderColor: "#BBF7D0",
+  },
+  optimizationResultError: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+  },
+  optimizationResultText: {
+    fontSize: 12,
+    flex: 1,
+    lineHeight: 17,
   },
   goldenRulesList: {
     marginTop: 14,

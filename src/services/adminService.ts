@@ -16,7 +16,8 @@ export interface RentalRequest {
 }
 
 export const getPendingRequests = async (): Promise<RentalRequest[]> => {
-  return api.get('/rental-requests', { params: { status: 'pending' } }).then((r) => r.data?.data || r.data || []);
+  const all = await api.get('/rental-requests').then((r) => r.data?.data || r.data || []);
+  return (Array.isArray(all) ? all : []).filter((r: RentalRequest) => r.status === 'pending');
 };
 
 export const updateRentalRequestStatus = async (
@@ -24,40 +25,63 @@ export const updateRentalRequestStatus = async (
   status: 'approved' | 'rejected',
   note?: string
 ): Promise<void> => {
-  const data: any = { status };
+  // Backend uses 'declined' not 'rejected'
+  const backendStatus = status === 'rejected' ? 'declined' : status;
+  const data: any = { status: backendStatus };
   if (note?.trim()) {
     data.message = `[Admin Note: ${note}]`;
   }
-  return api.put(`/rental-requests/${id}`, data).then((r) => r.data);
+  return api.put(`/rental-requests/${id}`, data).then((r) => r.data?.data || r.data);
 };
 
 export interface Dispute {
   id: string;
-  rental_id: string;
-  reporter_email: string;
+  rental_request_id: string;
+  filed_by_email: string;
+  against_email: string;
   reason: string;
-  status: 'pending' | 'resolved' | 'dismissed';
-  created_at: string;
+  description: string;
+  status: 'open' | 'under_review' | 'resolved' | 'closed';
+  evidence_urls?: string[];
+  resolution?: string;
+  decision?: 'favor_renter' | 'favor_owner' | 'split';
+  refund_to_renter?: number;
+  charge_to_owner?: number;
+  admin_notes?: string;
+  created_date: string;
+  resolved_date?: string;
 }
 
 export const getDisputes = async (): Promise<Dispute[]> => {
   return api.get('/disputes').then((r) => r.data?.data || r.data || []);
 };
 
-export const updateDisputeStatus = async (
+export const updateDispute = async (
   id: string,
-  status: 'resolved' | 'dismissed',
-  resolution_note?: string
-): Promise<void> => {
-  return api.put(`/disputes/${id}`, { status, resolution_note }).then((r) => r.data?.data || r.data);
+  data: {
+    status?: string;
+    decision?: string;
+    resolution?: string;
+    admin_notes?: string;
+    refund_to_renter?: number;
+    charge_to_owner?: number;
+    resolved_date?: string;
+  }
+): Promise<Dispute> => {
+  return api.put(`/disputes/${id}`, data).then((r) => r.data?.data || r.data);
 };
 
 export interface UserReport {
   id: string;
-  reported_email: string;
   reporter_email: string;
+  reported_email: string;
   reason: string;
-  status: 'pending' | 'reviewed' | 'action_taken';
+  description: string;
+  status: 'pending' | 'under_review' | 'resolved' | 'dismissed';
+  evidence_urls?: string[];
+  admin_notes?: string;
+  action_taken?: 'none' | 'warning_sent' | 'user_suspended' | 'user_banned';
+  created_date: string;
   created_at: string;
 }
 
@@ -65,12 +89,15 @@ export const getUserReports = async (): Promise<UserReport[]> => {
   return api.get('/reports/user').then((r) => r.data?.data || r.data || []);
 };
 
-export const updateUserReportStatus = async (
+export const updateUserReport = async (
   id: string,
-  status: 'reviewed' | 'action_taken',
-  admin_note?: string
+  data: {
+    status?: string;
+    admin_notes?: string;
+    action_taken?: string;
+  }
 ): Promise<void> => {
-  return api.put(`/reports/user/${id}`, { status, admin_note }).then((r) => r.data?.data || r.data);
+  return api.put(`/reports/user/${id}`, data).then((r) => r.data?.data || r.data);
 };
 
 export interface FraudReport {
@@ -226,6 +253,16 @@ export const getAdminDashboardData = async (): Promise<AdminDashboardData> => {
   const revenueThisWeek = completedAndPaidRentals
     .filter((r: any) => new Date(r.created_date || r.created_at) >= oneWeekAgo)
     .reduce((sum: number, r: any) => sum + (typeof r.platform_fee === 'number' ? r.platform_fee : (r.total_amount * 0.15)), 0);
+  const twoMonthsAgo = new Date(now.getTime() - 60 * DAY_MS);
+  const revenueLastMonth = completedAndPaidRentals
+    .filter((r: any) => {
+      const d = new Date(r.created_date || r.created_at);
+      return d >= twoMonthsAgo && d < oneMonthAgo;
+    })
+    .reduce((sum: number, r: any) => sum + (typeof r.platform_fee === 'number' ? r.platform_fee : (r.total_amount * 0.15)), 0);
+  const revenueGrowth = revenueLastMonth > 0
+    ? parseFloat(((revenueThisMonth - revenueLastMonth) / revenueLastMonth * 100).toFixed(1))
+    : 0;
 
   // Category performance from real items + rentals
   const catStats = new Map<string, { items: number; rentals: number; revenue: number }>();
@@ -380,6 +417,7 @@ export const getAdminDashboardData = async (): Promise<AdminDashboardData> => {
     usersJoinedThisWeek,
     verifiedUsers,
     userGrowthPct: totalUsers > 0 ? Math.round((usersJoinedThisMonth / totalUsers) * 100) : 0,
+    revenueGrowth,
     userReportsCount: userReports.length,
     fraudReportsCount: fraudReports.length,
     listingReportsCount: listingReports.length,

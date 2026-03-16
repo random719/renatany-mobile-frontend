@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -17,11 +18,14 @@ import {
   RentalRequest,
   updateRentalRequestStatus,
 } from "../../services/adminService";
-import { getListings } from "../../services/listingService";
+import { api } from "../../services/api";
 import { colors, typography } from "../../theme";
+import { RootStackParamList } from "../../types/navigation";
+
+type Nav = StackNavigationProp<RootStackParamList>;
 
 export const AdminModerationScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<Nav>();
   const [requests, setRequests] = useState<RentalRequest[]>([]);
   const [items, setItems] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -34,17 +38,22 @@ export const AdminModerationScreen = () => {
       const data = await getPendingRequests();
       setRequests(data);
 
+      // Fetch only items referenced by pending requests (like frontend-v1)
       if (data.length > 0) {
-        const itemIds = [...new Set(data.map(r => r.item_id).filter(Boolean))];
+        const itemIds = [...new Set(data.map((r) => r.item_id).filter(Boolean))];
         if (itemIds.length > 0) {
           try {
-            // Using getListings with params if supported, or falling back to individual fetches if needed
-            // For now, let's try to fetch them or at least prepare the mapping
-            const fetchedItems = await getListings({ limit: 100 }); // Simple approach for now
-            const itemsMap: Record<string, string> = {};
-            fetchedItems.forEach(item => {
-              itemsMap[item.id] = item.title;
+            const idsParam = itemIds.join(",");
+            const res = await api.get("/items", {
+              params: { ids: idsParam },
             });
+            const fetchedItems = res.data?.data || res.data || [];
+            const itemsMap: Record<string, string> = {};
+            (Array.isArray(fetchedItems) ? fetchedItems : []).forEach(
+              (item: any) => {
+                itemsMap[item.id] = item.title;
+              }
+            );
             setItems(itemsMap);
           } catch (e) {
             console.error("Error fetching items for requests:", e);
@@ -52,7 +61,6 @@ export const AdminModerationScreen = () => {
         }
       }
     } catch (e) {
-      // API not connected yet — show empty state
       setRequests([]);
     } finally {
       setIsLoading(false);
@@ -114,6 +122,20 @@ export const AdminModerationScreen = () => {
     }
   };
 
+  const formatDateTime = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return iso;
+    }
+  };
+
   const renderRequest = ({ item }: { item: RentalRequest }) => {
     const isProcessing = processingId === item.id;
 
@@ -126,8 +148,17 @@ export const AdminModerationScreen = () => {
               size={16}
               color="#64748B"
             />
-            <Text style={styles.infoLabel}>Renter:</Text>
+            <Text style={styles.infoLabel}>Submitted by:</Text>
             <Text style={styles.infoValue}>{item.renter_email}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons
+              name="account-arrow-right-outline"
+              size={16}
+              color="#64748B"
+            />
+            <Text style={styles.infoLabel}>Owner:</Text>
+            <Text style={styles.infoValue}>{item.owner_email}</Text>
           </View>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons
@@ -136,7 +167,9 @@ export const AdminModerationScreen = () => {
               color="#64748B"
             />
             <Text style={styles.infoLabel}>Item:</Text>
-            <Text style={styles.infoValue}>{items[item.item_id] || 'Loading Item...'}</Text>
+            <Text style={styles.infoValue}>
+              {items[item.item_id] || "Loading..."}
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons
@@ -168,19 +201,23 @@ export const AdminModerationScreen = () => {
             />
             <Text style={styles.infoLabel}>Submitted:</Text>
             <Text style={styles.infoValue}>
-              {formatDate(item.created_date)}
+              {formatDateTime(item.created_date)}
             </Text>
           </View>
           {item.message && (
             <View style={styles.messageBox}>
+              <Text style={styles.messageLabel}>Message:</Text>
               <Text style={styles.messageText}>{item.message}</Text>
             </View>
           )}
         </View>
 
+        <Text style={styles.noteLabel}>
+          Optional Note (will be added to request):
+        </Text>
         <TextInput
           style={styles.noteInput}
-          placeholder="Optional note..."
+          placeholder="Add a note for this request..."
           placeholderTextColor="#9CA3AF"
           value={notes[item.id] || ""}
           onChangeText={(text) =>
@@ -189,6 +226,8 @@ export const AdminModerationScreen = () => {
           editable={!isProcessing}
           multiline
         />
+
+        <View style={styles.divider} />
 
         <View style={styles.actionsRow}>
           <TouchableOpacity
@@ -244,42 +283,54 @@ export const AdminModerationScreen = () => {
         }
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
-          <View style={styles.header}>
-            <TouchableOpacity
-              style={styles.backBtn}
-              onPress={() => navigation.goBack()}
-            >
-              <MaterialCommunityIcons
-                name="arrow-left"
-                size={20}
-                color={colors.textPrimary}
-              />
-            </TouchableOpacity>
-            <View style={styles.headerTitleContainer}>
-              <MaterialCommunityIcons
-                name="clock-outline"
-                size={24}
-                color="#2563EB"
-              />
-              <Text style={styles.headerTitle}>Pending Rental Requests</Text>
+          <View>
+            <View style={styles.header}>
+              <TouchableOpacity
+                style={styles.backBtn}
+                onPress={() => navigation.goBack()}
+              >
+                <MaterialCommunityIcons
+                  name="arrow-left"
+                  size={20}
+                  color={colors.textPrimary}
+                />
+              </TouchableOpacity>
+              <View style={styles.headerTitleContainer}>
+                <MaterialCommunityIcons
+                  name="clock-outline"
+                  size={24}
+                  color="#2563EB"
+                />
+                <Text style={styles.headerTitle}>
+                  Pending Rental Requests
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.refreshBtn}
+                onPress={loadData}
+                disabled={isLoading}
+              >
+                <MaterialCommunityIcons
+                  name="refresh"
+                  size={20}
+                  color={colors.textPrimary}
+                  style={
+                    isLoading
+                      ? { transform: [{ rotate: "45deg" }] }
+                      : {}
+                  }
+                />
+              </TouchableOpacity>
             </View>
+            <Text style={styles.headerSubtitle}>
+              Review and approve or reject rental requests
+            </Text>
             <View style={styles.badge}>
               <Text style={styles.badgeText}>
-                {requests.length} Pending
+                {requests.length} Pending Request
+                {requests.length !== 1 ? "s" : ""}
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.refreshBtn}
-              onPress={loadData}
-              disabled={isLoading}
-            >
-              <MaterialCommunityIcons
-                name="refresh"
-                size={20}
-                color={colors.textPrimary}
-                style={isLoading ? { transform: [{ rotate: '45deg' }] } : {}}
-              />
-            </TouchableOpacity>
           </View>
         }
         ListEmptyComponent={
@@ -320,7 +371,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 8,
     gap: 12,
   },
   backBtn: {
@@ -348,6 +399,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#0F172A",
   },
+  headerSubtitle: {
+    fontSize: typography.body,
+    color: "#64748B",
+    marginBottom: 16,
+  },
   badge: {
     backgroundColor: "#EFF6FF",
     borderWidth: 1,
@@ -355,9 +411,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
+    alignSelf: "flex-start",
+    marginBottom: 20,
   },
   badgeText: {
-    fontSize: typography.caption,
+    fontSize: typography.body,
     fontWeight: "600",
     color: "#2563EB",
   },
@@ -373,7 +431,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   requestInfo: {
-    gap: 8,
+    gap: 10,
     marginBottom: 16,
   },
   infoRow: {
@@ -397,9 +455,21 @@ const styles = StyleSheet.create({
     padding: 12,
     marginTop: 4,
   },
+  messageLabel: {
+    fontSize: typography.small,
+    fontWeight: "600",
+    color: "#64748B",
+    marginBottom: 4,
+  },
   messageText: {
     fontSize: typography.body,
     color: "#334155",
+  },
+  noteLabel: {
+    fontSize: typography.small,
+    fontWeight: "600",
+    color: "#475569",
+    marginBottom: 6,
   },
   noteInput: {
     borderWidth: 1,
@@ -408,9 +478,14 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: typography.body,
     color: "#0F172A",
-    minHeight: 60,
+    minHeight: 70,
     marginBottom: 16,
     textAlignVertical: "top",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#E2E8F0",
+    marginBottom: 16,
   },
   actionsRow: {
     flexDirection: "row",

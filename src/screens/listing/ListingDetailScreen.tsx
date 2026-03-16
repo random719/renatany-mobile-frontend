@@ -731,6 +731,7 @@ export const ListingDetailScreen = () => {
       : ['https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&h=600&fit=crop'];
 
   const isOwner = user?.id === listing.ownerId;
+  const isAdmin = backendUser?.role === 'admin';
   const locationText =
     typeof listing.location === 'object' && listing.location !== null
       ? listing.location.address || listing.location.city || ''
@@ -877,8 +878,8 @@ export const ListingDetailScreen = () => {
             </View>
           </View>
 
-          {/* Ask Question & AI Assistant - only for non-owners */}
-          {!isOwner && (
+          {/* Ask Question & AI Assistant - only for non-owners, non-admins */}
+          {!isOwner && !isAdmin && (
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <TouchableOpacity style={[styles.askQuestionBtn, { flex: 1 }]} onPress={() => setShowInquiryModal(true)}>
                 <MaterialCommunityIcons name="chat-outline" size={20} color={colors.textPrimary} />
@@ -1101,7 +1102,20 @@ export const ListingDetailScreen = () => {
             </View>
           </View>
         )}
-        {!isOwner && listing.availability !== false && (
+        {/* Admin cannot rent notice */}
+        {isAdmin && !isOwner && (
+          <View style={[styles.sectionCard, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A', borderWidth: 1 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <MaterialCommunityIcons name="shield-account" size={24} color="#D97706" />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#92400E' }}>Admin Account</Text>
+                <Text style={{ fontSize: 13, color: '#A16207', marginTop: 2 }}>Admins manage the platform and cannot rent or list items.</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {!isOwner && !isAdmin && listing.availability !== false && (
           backendUser && !backendUser.stripe_payment_method_id ? (
             // Connect card section — matches frontend-v1 VerificationPrompt layout
             <View style={[styles.sectionCard, styles.connectRentCard]}>
@@ -1805,6 +1819,7 @@ export const ListingDetailScreen = () => {
           onClose={() => setShowAIChat(false)}
           itemId={listing.id}
           itemTitle={listing.title}
+          item={listing}
         />
       )}
     </View>

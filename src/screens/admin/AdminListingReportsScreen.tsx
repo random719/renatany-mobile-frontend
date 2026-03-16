@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
+  Linking,
   RefreshControl,
   StyleSheet,
   TextInput,
@@ -368,11 +369,18 @@ export const AdminListingReportsScreen = () => {
               {selectedReport.evidence_urls && selectedReport.evidence_urls.length > 0 && (
                 <View style={styles.modalSection}>
                   <Text style={styles.modalLabel}>Evidence ({selectedReport.evidence_urls.length})</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.evidenceRow}>
+                  <View style={styles.evidenceGrid}>
                     {selectedReport.evidence_urls.map((url, idx) => (
-                      <Image key={idx} source={{ uri: url }} style={styles.evidenceImage} />
+                      <TouchableOpacity
+                        key={idx}
+                        style={styles.evidenceGridItem}
+                        onPress={() => Linking.openURL(url).catch(() => {})}
+                        activeOpacity={0.7}
+                      >
+                        <Image source={{ uri: url }} style={styles.evidenceGridImage} />
+                      </TouchableOpacity>
                     ))}
-                  </ScrollView>
+                  </View>
                 </View>
               )}
 
@@ -702,6 +710,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     padding: 12,
     borderRadius: 8,
+  },
+  evidenceGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8,
+  },
+  evidenceGridItem: {
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  evidenceGridImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 10,
+    backgroundColor: "#F3F4F6",
   },
   evidenceRow: {
     marginTop: 8,

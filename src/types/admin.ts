@@ -101,6 +101,7 @@ export interface AdminDashboardData {
   usersJoinedThisWeek: number;
   verifiedUsers: number;
   userGrowthPct: number;
+  revenueGrowth: number;
   userReportsCount: number;
   fraudReportsCount: number;
   listingReportsCount: number;
