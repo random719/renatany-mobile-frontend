@@ -1,8 +1,8 @@
 import { useUser } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { ScreenLayout } from '../../components/common/ScreenLayout';
@@ -34,51 +34,52 @@ export const ConversationsScreen = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'sent' | 'inbox'>('sent');
 
-    useEffect(() => {
-        const fetchConversations = async () => {
-            if (!userEmail) {
-                setIsLoading(false);
-                return;
-            }
-            try {
-                setIsLoading(true);
-                const [asRenter, asOwner] = await Promise.all([
-                    getRentalRequests({ renter_email: userEmail }),
-                    getRentalRequests({ owner_email: userEmail })
-                ]);
+    const fetchConversations = useCallback(async () => {
+        if (!userEmail) {
+            setIsLoading(false);
+            return;
+        }
+        try {
+            setIsLoading(true);
+            const [asRenter, asOwner] = await Promise.all([
+                getRentalRequests({ renter_email: userEmail }),
+                getRentalRequests({ owner_email: userEmail })
+            ]);
 
-                const allRentals = [...asRenter, ...asOwner];
-                const uniqueRentals = Array.from(new Map(allRentals.map(r => [r.id, r])).values());
-                const activeRentals = uniqueRentals.filter(r => ['pending', 'approved', 'paid', 'inquiry'].includes(r.status));
-                activeRentals.sort((a, b) => new Date(b.updated_date).getTime() - new Date(a.updated_date).getTime());
-                setConversations(activeRentals);
+            const allRentals = [...asRenter, ...asOwner];
+            const uniqueRentals = Array.from(new Map(allRentals.map(r => [r.id, r])).values());
+            const activeRentals = uniqueRentals.filter(r => ['pending', 'approved', 'paid', 'inquiry'].includes(r.status));
+            activeRentals.sort((a, b) => new Date(b.updated_date).getTime() - new Date(a.updated_date).getTime());
+            setConversations(activeRentals);
 
-                // Fetch item details in background
-                const uniqueItemIds = [...new Set(activeRentals.map(r => r.item_id))];
-                const itemEntries = await Promise.all(
-                    uniqueItemIds.map(async id => {
-                        try {
-                            const res = await api.get(`/items/${id}`);
-                            const data = res.data.data || res.data;
-                            const item = data.item || data;
-                            return [id, item] as [string, Listing];
-                        } catch {
-                            return null;
-                        }
-                    })
-                );
-                const map: Record<string, Listing> = {};
-                itemEntries.forEach(entry => { if (entry) map[entry[0]] = entry[1]; });
-                setItemsMap(map);
-            } catch (error) {
-                console.error('Error fetching conversations:', error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchConversations();
+            const uniqueItemIds = [...new Set(activeRentals.map(r => r.item_id))];
+            const itemEntries = await Promise.all(
+                uniqueItemIds.map(async id => {
+                    try {
+                        const res = await api.get(`/items/${id}`);
+                        const data = res.data.data || res.data;
+                        const item = data.item || data;
+                        return [id, item] as [string, Listing];
+                    } catch {
+                        return null;
+                    }
+                })
+            );
+            const map: Record<string, Listing> = {};
+            itemEntries.forEach(entry => { if (entry) map[entry[0]] = entry[1]; });
+            setItemsMap(map);
+        } catch (error) {
+            console.error('Error fetching conversations:', error);
+        } finally {
+            setIsLoading(false);
+        }
     }, [userEmail]);
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchConversations();
+        }, [fetchConversations])
+    );
 
     const sentByMe = conversations.filter(c => c.renter_email === userEmail);
     const inInbox = conversations.filter(c => c.owner_email === userEmail);

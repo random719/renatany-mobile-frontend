@@ -45,6 +45,48 @@ export interface Message {
   read_at?: string;
 }
 
+export interface ConditionReport {
+  id: string;
+  rental_request_id: string;
+  report_type: 'pickup' | 'return';
+  reported_by_email: string;
+  condition_photos: string[];
+  notes?: string;
+  damages_reported: {
+    severity: 'minor' | 'moderate' | 'severe';
+    description: string;
+    photo_url?: string;
+  }[];
+  signature?: string;
+  created_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RentalExtension {
+  id: string;
+  rental_request_id: string;
+  requested_by_email: string;
+  new_end_date: string;
+  additional_cost: number;
+  message?: string;
+  status: 'pending' | 'approved' | 'declined';
+  payment_intent_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PublicUserProfile {
+  id: string;
+  email: string;
+  username?: string;
+  full_name?: string;
+  profile_picture?: string;
+  bio?: string;
+  verification_status?: string;
+  created_at?: string;
+}
+
 export interface AppNotification {
   id: string;
   user_email: string;

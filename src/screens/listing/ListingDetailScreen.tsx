@@ -32,7 +32,8 @@ import { getRentalRequests } from '../../services/bookingService';
 import { sendMessage } from '../../services/messageService';
 import { colors, typography } from '../../theme';
 import { Listing } from '../../types/listing';
-import { HomeStackParamList } from '../../types/navigation';
+import { HomeStackParamList, RootStackParamList } from '../../types/navigation';
+import { AIChatAssistant } from './AIChatAssistant';
 
 type Route = RouteProp<HomeStackParamList, 'ListingDetail'>;
 
@@ -106,6 +107,7 @@ export const ListingDetailScreen = () => {
   // Image zoom
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -875,12 +877,21 @@ export const ListingDetailScreen = () => {
             </View>
           </View>
 
-          {/* Ask Question - only for non-owners */}
+          {/* Ask Question & AI Assistant - only for non-owners */}
           {!isOwner && (
-            <TouchableOpacity style={styles.askQuestionBtn} onPress={() => setShowInquiryModal(true)}>
-              <MaterialCommunityIcons name="chat-outline" size={20} color={colors.textPrimary} />
-              <Text style={styles.askQuestionText}>Ask a Question</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity style={[styles.askQuestionBtn, { flex: 1 }]} onPress={() => setShowInquiryModal(true)}>
+                <MaterialCommunityIcons name="chat-outline" size={20} color={colors.textPrimary} />
+                <Text style={styles.askQuestionText}>Ask Owner</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.askQuestionBtn, { flex: 1, borderColor: '#8B5CF6' }]}
+                onPress={() => setShowAIChat(true)}
+              >
+                <MaterialCommunityIcons name="robot" size={20} color="#8B5CF6" />
+                <Text style={[styles.askQuestionText, { color: '#8B5CF6' }]}>AI Assistant</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           {/* Info Grid */}
@@ -991,6 +1002,14 @@ export const ListingDetailScreen = () => {
                   : owner?.full_name || 'A user'}
               </Text>
             </View>
+            {!isOwner && owner?.email && (
+              <TouchableOpacity
+                style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#F3F4F6', borderRadius: 8 }}
+                onPress={() => (navigation as any).navigate('PublicProfile', { userEmail: owner.email })}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>View Profile</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -1773,11 +1792,21 @@ export const ListingDetailScreen = () => {
       </Modal>
 
       {/* Floating Action Button */}
-      <TouchableOpacity style={styles.fab}>
+      <TouchableOpacity style={styles.fab} onPress={() => setShowAIChat(true)}>
         <View style={styles.fabGradient}>
           <MaterialCommunityIcons name="robot" size={24} color="#FFFFFF" />
         </View>
       </TouchableOpacity>
+
+      {/* AI Chat Assistant */}
+      {listing && (
+        <AIChatAssistant
+          visible={showAIChat}
+          onClose={() => setShowAIChat(false)}
+          itemId={listing.id}
+          itemTitle={listing.title}
+        />
+      )}
     </View>
   );
 };

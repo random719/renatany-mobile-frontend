@@ -55,6 +55,11 @@ export const SidebarMenu = () => {
   // Resolve fresh on every render when sidebar is visible
   const latestRoute = isVisible ? getActiveRouteName() : "Home";
   const isAdminDashboard = latestRoute === "AdminDashboard";
+  const isAdminModeration = latestRoute === "AdminModeration";
+  const isAdminListingReports = latestRoute === "AdminListingReports";
+  const isAdminDisputes = latestRoute === "AdminDisputes";
+  const isAdminUserReports = latestRoute === "AdminUserReports";
+  const isAdminSecurity = latestRoute === "AdminSecurity";
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [isMounted, setIsMounted] = React.useState(isVisible);
@@ -201,6 +206,7 @@ export const SidebarMenu = () => {
             const isDisputes = ["Disputes", "DisputeDetail"].includes(latestRoute);
             const isSavedSearches = latestRoute === "SavedSearches";
             const isBulkEditItems = ["BulkEditItems", "EditItem"].includes(latestRoute);
+            const isReferral = latestRoute === "Referral";
             const isBrowseAll = ["Home", "HomeTab", "ListingDetail", "Search", "SearchTab", "Categories", "CategoryDetail"].includes(latestRoute);
 
             return (
@@ -267,6 +273,13 @@ export const SidebarMenu = () => {
                     () => navigation.navigate("Disputes"),
                     isDisputes,
                   )}
+                {!isAdmin &&
+                  renderNavItem(
+                    "account-group",
+                    "Referral",
+                    () => navigation.navigate("Referral"),
+                    isReferral,
+                  )}
               </>
             );
           })()}
@@ -285,31 +298,31 @@ export const SidebarMenu = () => {
                 "clock-outline",
                 "Admin: Review Pending Requests",
                 () => navigation.navigate("AdminModeration"),
+                isAdminModeration,
               )}
               {renderAdminNavItem(
                 "file-document-outline",
                 "Admin: Reports Listing",
                 () => navigation.navigate("AdminListingReports"),
+                isAdminListingReports,
               )}
               {renderAdminNavItem(
                 "alert-outline",
                 "Admin: Disputes",
                 () => navigation.navigate("AdminDisputes"),
+                isAdminDisputes,
               )}
               {renderAdminNavItem(
                 "alert-rhombus-outline",
                 "Admin: User Reports",
                 () => navigation.navigate("AdminUserReports"),
-              )}
-              {renderAdminNavItem(
-                "shield-check-outline",
-                "Admin: Fraud Reports",
-                () => navigation.navigate("AdminFraudReports"),
+                isAdminUserReports,
               )}
               {renderAdminNavItem(
                 "shield-cog-outline",
                 "Admin: Security",
                 () => navigation.navigate("AdminSecurity"),
+                isAdminSecurity,
               )}
             </>
           )}

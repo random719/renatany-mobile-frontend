@@ -7,7 +7,6 @@ export const navigationRef = createNavigationContainerRef();
 import { SidebarMenu } from '../components/common/SidebarMenu';
 import { AdminDashboardScreen } from '../screens/admin/AdminDashboardScreen';
 import { AdminDisputesScreen } from '../screens/admin/AdminDisputesScreen';
-import { AdminFraudReportsScreen } from '../screens/admin/AdminFraudReportsScreen';
 import { AdminListingReportsScreen } from '../screens/admin/AdminListingReportsScreen';
 import { AdminModerationScreen } from '../screens/admin/AdminModerationScreen';
 import { AdminSecurityScreen } from '../screens/admin/AdminSecurityScreen';
@@ -25,6 +24,10 @@ import { ConversationsScreen } from '../screens/messages/ConversationsScreen';
 import { NotificationsScreen } from '../screens/notifications/NotificationsScreen';
 import { RentalDetailScreen } from '../screens/rentals/RentalDetailScreen';
 import { RentalHistoryScreen } from '../screens/rentals/RentalHistoryScreen';
+import { ConditionReportScreen } from '../screens/conditionReports/ConditionReportScreen';
+import { PublicProfileScreen } from '../screens/publicProfile/PublicProfileScreen';
+import { ReferralScreen } from '../screens/referral/ReferralScreen';
+import { RentalExtensionScreen } from '../screens/rentalExtensions/RentalExtensionScreen';
 import { SavedSearchesScreen } from '../screens/search/saved/SavedSearchesScreen';
 import { useAuthStore } from '../store/authStore';
 import { RootStackParamList } from '../types/navigation';
@@ -77,13 +80,16 @@ export const AppNavigator = () => {
             <Stack.Screen name="AdminModeration" component={AdminModerationScreen} />
             <Stack.Screen name="AdminDisputes" component={AdminDisputesScreen} />
             <Stack.Screen name="AdminUserReports" component={AdminUserReportsScreen} />
-            <Stack.Screen name="AdminFraudReports" component={AdminFraudReportsScreen} />
             <Stack.Screen name="AdminListingReports" component={AdminListingReportsScreen} />
             <Stack.Screen name="AdminSecurity" component={AdminSecurityScreen} />
             <Stack.Screen name="BulkEditItems" component={BulkEditItemsScreen} />
             <Stack.Screen name="CreateListing" component={CreateListingScreen} />
             <Stack.Screen name="EditItem" component={CreateListingScreen} />
             <Stack.Screen name="ManageAvailability" component={ManageAvailabilityScreen} />
+            <Stack.Screen name="ConditionReport" component={ConditionReportScreen} />
+            <Stack.Screen name="RentalExtension" component={RentalExtensionScreen} />
+            <Stack.Screen name="PublicProfile" component={PublicProfileScreen} />
+            <Stack.Screen name="Referral" component={ReferralScreen} />
           </>
         ) : (
           <Stack.Screen name="Auth" component={AuthNavigator} />

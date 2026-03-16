@@ -67,7 +67,6 @@ export type RootStackParamList = {
   AdminModeration: undefined;
   AdminDisputes: undefined;
   AdminUserReports: undefined;
-  AdminFraudReports: undefined;
   AdminListingReports: undefined;
   AdminSecurity: undefined;
   BulkEditItems: undefined;
@@ -80,4 +79,8 @@ export type RootStackParamList = {
   Chat: { rentalRequestId: string; otherUserEmail: string; itemId: string };
   Notifications: undefined;
   RentalDetail: { rentalId: string };
+  ConditionReport: { rentalRequestId: string; reportType: 'pickup' | 'return' };
+  RentalExtension: { rentalRequestId: string; currentEndDate: string; dailyRate: number; ownerEmail: string; isOwner: boolean };
+  PublicProfile: { userEmail: string };
+  Referral: undefined;
 };

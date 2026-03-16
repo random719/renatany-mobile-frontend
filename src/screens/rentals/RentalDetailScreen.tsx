@@ -316,6 +316,62 @@ export const RentalDetailScreen = () => {
           >
             Download Receipt
           </Button>
+
+          {/* Condition Reports - only for paid/completed rentals */}
+          {rental && ['paid', 'completed'].includes(rental.status) && (
+            <>
+              <Button
+                mode="outlined"
+                onPress={() =>
+                  navigation.navigate('ConditionReport', {
+                    rentalRequestId: rental.id,
+                    reportType: 'pickup',
+                  })
+                }
+                style={styles.receiptBtn}
+                contentStyle={styles.btnContent}
+                icon="clipboard-check-outline"
+              >
+                Pickup Report
+              </Button>
+              <Button
+                mode="outlined"
+                onPress={() =>
+                  navigation.navigate('ConditionReport', {
+                    rentalRequestId: rental.id,
+                    reportType: 'return',
+                  })
+                }
+                style={styles.receiptBtn}
+                contentStyle={styles.btnContent}
+                icon="clipboard-arrow-left-outline"
+              >
+                Return Report
+              </Button>
+            </>
+          )}
+
+          {/* Rental Extension - only for paid rentals */}
+          {rental && rental.status === 'paid' && (
+            <Button
+              mode="outlined"
+              onPress={() =>
+                navigation.navigate('RentalExtension', {
+                  rentalRequestId: rental.id,
+                  currentEndDate: rental.end_date,
+                  dailyRate: itemInfo?.daily_rate || 0,
+                  ownerEmail: rental.owner_email,
+                  isOwner: !isRenter,
+                })
+              }
+              style={styles.receiptBtn}
+              contentStyle={styles.btnContent}
+              icon="calendar-plus"
+            >
+              {isRenter ? 'Request Extension' : 'View Extensions'}
+            </Button>
+          )}
+
           <Button
             mode="outlined"
             onPress={() => navigation.goBack()}

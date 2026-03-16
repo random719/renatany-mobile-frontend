@@ -10,3 +10,15 @@ export const getRentalRequestById = async (id: string): Promise<RentalRequest> =
   const response = await api.get('/rental-requests', { params: { ids: id } });
   return response.data.data[0];
 };
+
+export const updateRentalRequestStatus = async (
+  id: string,
+  status: 'approved' | 'declined' | 'cancelled',
+  message?: string,
+): Promise<RentalRequest> => {
+  const response = await api.put(`/rental-requests/${id}`, {
+    status,
+    ...(message?.trim() ? { message } : {}),
+  });
+  return response.data.data || response.data;
+};

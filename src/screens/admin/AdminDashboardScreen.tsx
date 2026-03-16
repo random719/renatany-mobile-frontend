@@ -586,12 +586,12 @@ export const AdminDashboardScreen = () => {
               </TouchableOpacity>
               <TouchableOpacity style={styles.userActionBtn}>
                 <MaterialCommunityIcons
-                  name="shield-alert-outline"
+                  name="file-document-outline"
                   size={iconSize.md}
                   color="#111827"
                 />
                 <Text style={styles.userActionText}>
-                  Fraud Reports ({dashboardData.fraudReportsCount})
+                  Listing Reports ({dashboardData.listingReportsCount || 0})
                 </Text>
               </TouchableOpacity>
             </View>
@@ -654,8 +654,8 @@ export const AdminDashboardScreen = () => {
               color="#D97706"
             />
             <UsersMetricCard
-              title="Fraud Alerts"
-              value={String(dashboardData.fraudReportsCount)}
+              title="Listing Reports"
+              value={String(dashboardData.listingReportsCount || 0)}
               subtitle="Pending review"
               color="#A855F7"
             />
@@ -679,10 +679,6 @@ export const AdminDashboardScreen = () => {
               <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('AdminUserReports')}>
                 <MaterialCommunityIcons name="account-group-outline" size={iconSize.md} color="#D97706" />
                 <Text style={styles.quickActionText}>Review User Reports ({dashboardData.userReportsCount})</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('AdminFraudReports')}>
-                <MaterialCommunityIcons name="shield-outline" size={iconSize.md} color="#A855F7" />
-                <Text style={styles.quickActionText}>Review Fraud Reports ({dashboardData.fraudReportsCount})</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('AdminListingReports')}>
                 <MaterialCommunityIcons name="package-variant-closed" size={iconSize.md} color="#0EA5E9" />

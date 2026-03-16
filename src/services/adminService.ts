@@ -16,7 +16,7 @@ export interface RentalRequest {
 }
 
 export const getPendingRequests = async (): Promise<RentalRequest[]> => {
-  return api.get('/rental-requests', { params: { status: 'pending' } }).then((r) => r.data);
+  return api.get('/rental-requests', { params: { status: 'pending' } }).then((r) => r.data?.data || r.data || []);
 };
 
 export const updateRentalRequestStatus = async (
@@ -79,6 +79,11 @@ export interface FraudReport {
   severity: 'low' | 'medium' | 'high' | 'critical';
   status: 'pending' | 'investigating' | 'resolved';
   details: string;
+  reported_user_email?: string;
+  reported_item_id?: string;
+  reporter_email?: string;
+  admin_notes?: string;
+  created_date: string;
   created_at: string;
 }
 
