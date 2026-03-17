@@ -3,7 +3,6 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
     Image,
     Modal,
     ScrollView,
@@ -20,6 +19,7 @@ import { api } from '../../services/api';
 import { colors, typography } from '../../theme';
 import { Dispute } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
+import { toast } from '../../store/toastStore';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 
@@ -171,7 +171,7 @@ export const DisputesScreen = () => {
             }
             setNewEvidenceUrls((prev) => [...prev, ...uploadedUrls]);
         } catch {
-            Alert.alert('Error', 'Failed to upload images.');
+            toast.error('Failed to upload images.');
         } finally {
             setIsUploading(false);
         }
@@ -186,10 +186,10 @@ export const DisputesScreen = () => {
             setShowEvidenceModal(false);
             setNewEvidenceUrls([]);
             setSelectedDispute(null);
-            Alert.alert('Success', 'Evidence added successfully!');
+            toast.success('Evidence added successfully!');
             await loadData();
         } catch {
-            Alert.alert('Error', 'Failed to add evidence.');
+            toast.error('Failed to add evidence.');
         } finally {
             setIsUploading(false);
         }

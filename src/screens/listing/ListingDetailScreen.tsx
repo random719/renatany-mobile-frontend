@@ -1,8 +1,9 @@
+import { useUser } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { Calendar } from 'react-native-calendars';
+import * as WebBrowser from 'expo-web-browser';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Dimensions,
@@ -19,20 +20,20 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ActivityIndicator, Avatar, Button, Text } from 'react-native-paper';
-import { useUser } from '@clerk/expo';
+import { Calendar } from 'react-native-calendars';
+import { ActivityIndicator, Avatar, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { ListingCard } from '../../components/listing/ListingCard';
-import { useListingStore } from '../../store/listingStore';
-import * as WebBrowser from 'expo-web-browser';
-import * as listingService from '../../services/listingService';
 import { api } from '../../services/api';
 import { getRentalRequests } from '../../services/bookingService';
+import * as listingService from '../../services/listingService';
 import { sendMessage } from '../../services/messageService';
+import { useListingStore } from '../../store/listingStore';
+import { toast } from '../../store/toastStore';
 import { colors, typography } from '../../theme';
 import { Listing } from '../../types/listing';
-import { HomeStackParamList, RootStackParamList } from '../../types/navigation';
+import { HomeStackParamList } from '../../types/navigation';
 import { AIChatAssistant } from './AIChatAssistant';
 
 type Route = RouteProp<HomeStackParamList, 'ListingDetail'>;
@@ -118,10 +119,11 @@ export const ListingDetailScreen = () => {
     }
   }, [listingId, fetchListingById]);
 
-  // Fetch item details
-  useEffect(() => {
-    fetchListingById(listingId);
-  }, [listingId, fetchListingById]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchListingById(listingId);
+    }, [listingId, fetchListingById])
+  );
 
   useEffect(() => {
     setHasOpenListingReport(false);
@@ -186,10 +188,7 @@ export const ListingDetailScreen = () => {
 
   const handleReport = () => {
     if (hasOpenListingReport) {
-      Alert.alert(
-        'Report Already Submitted',
-        'You have already reported this listing. Our team is still reviewing your existing report.'
-      );
+      toast.info('You have already reported this listing. Our team is still reviewing your existing report.');
       return;
     }
     setShowReportReasons(false);
@@ -213,7 +212,7 @@ export const ListingDetailScreen = () => {
       );
       setReportEvidence((prev) => [...prev, ...uploaded]);
     } catch (error: any) {
-      Alert.alert('Upload Failed', 'Could not add evidence. Please try again.');
+      toast.error('Could not add evidence. Please try again.');
     } finally {
       setIsUploadingReportEvidence(false);
     }
@@ -231,15 +230,15 @@ export const ListingDetailScreen = () => {
 
   const handleSubmitReport = async () => {
     if (!listing || !userEmail) {
-      Alert.alert('Sign In Required', 'You must be signed in to submit a report.');
+      toast.warning('You must be signed in to submit a report.');
       return;
     }
     if (!reportReason) {
-      Alert.alert('Reason Required', 'Please select a reason for your report.');
+      toast.warning('Please select a reason for your report.');
       return;
     }
     if (!reportDetails.trim()) {
-      Alert.alert('Details Required', 'Please provide detailed information about the issue.');
+      toast.warning('Please provide detailed information about the issue.');
       return;
     }
 
@@ -254,18 +253,18 @@ export const ListingDetailScreen = () => {
         status: 'pending',
       });
       setHasOpenListingReport(true);
-      Alert.alert('Report Submitted', 'Thank you. Our team will review this listing report.');
+      toast.success('Thank you. Our team will review this listing report.');
       resetReportForm();
     } catch (error: any) {
       const statusCode = error?.response?.status;
       const errorMessage = error?.response?.data?.error || 'Could not submit your report. Please try again.';
       if (statusCode === 409) {
         setHasOpenListingReport(true);
-        Alert.alert('Report Already Submitted', errorMessage);
+        toast.info(errorMessage);
         resetReportForm();
         return;
       }
-      Alert.alert('Submission Failed', errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmittingReport(false);
     }
@@ -368,7 +367,7 @@ export const ListingDetailScreen = () => {
       }
       // Check if any blocked dates are in the range
       if (dates.some(d => blockedDates.includes(d))) {
-        Alert.alert('Unavailable', 'Some dates in this range are blocked by the owner. Please choose a different range.');
+        toast.warning('Some dates in this range are blocked by the owner. Please choose a different range.');
         return;
       }
       setSelectedDates(dates);
@@ -480,6 +479,38 @@ export const ListingDetailScreen = () => {
       const sorted = [...selectedDates].sort();
       const startDate = new Date(sorted[0]).toISOString();
       const endDate = new Date(sorted[sorted.length - 1]).toISOString();
+
+      const kycCheckRes = await api.get('/rental-requests/kyc-check', {
+        params: {
+          item_id: listing.id,
+          start_date: startDate,
+          end_date: endDate,
+        },
+      }).catch(() => null);
+      const kycCheck = kycCheckRes?.data?.data;
+
+      if (kycCheck?.user_kyc_status) {
+        setBackendUser((prev: any) => ({
+          ...(prev || {}),
+          kyc_status: kycCheck.user_kyc_status,
+        }));
+      }
+
+      if (kycCheck?.kyc_required) {
+        if (kycCheck.user_kyc_status === 'pending') {
+          toast.info('Your ID verification is still processing. Please wait a moment and try again.');
+          return;
+        }
+        const riskLabel = kycCheck.risk_trigger === 'amount'
+          ? 'High rental value'
+          : kycCheck.risk_trigger === 'category'
+            ? 'High-risk category'
+            : 'Item requires verification';
+        setIdentityVerificationReason(riskLabel);
+        setShowIdentityVerificationCard(true);
+        return;
+      }
+
       const ownerEmail = owner?.email ?? listing.ownerId;
       const res = await api.post('/rental-requests', {
         item_id: listing.id,
@@ -512,11 +543,15 @@ export const ListingDetailScreen = () => {
     } catch (err: any) {
       const data = err?.response?.data;
       if (data?.kyc_required) {
-        const riskLabel = data.risk_trigger === 'amount' ? 'High rental value' : data.risk_trigger === 'category' ? 'High-risk category' : 'Item requires verification';
-        setIdentityVerificationReason(riskLabel);
-        setShowIdentityVerificationCard(true);
+        if (backendUser?.kyc_status === 'pending') {
+          toast.info('Your ID verification is still processing. Please wait a moment and try again.');
+        } else {
+          const riskLabel = data.risk_trigger === 'amount' ? 'High rental value' : data.risk_trigger === 'category' ? 'High-risk category' : 'Item requires verification';
+          setIdentityVerificationReason(riskLabel);
+          setShowIdentityVerificationCard(true);
+        }
       } else {
-        Alert.alert('Error', data?.error || 'Failed to submit request. Please try again.');
+        toast.error(data?.error || 'Failed to submit request. Please try again.');
       }
     } finally {
       setIsSubmittingRental(false);
@@ -529,9 +564,27 @@ export const ListingDetailScreen = () => {
       await api.post('/stripe/payment-method/retrieve').catch(() => {});
       await api.get('/stripe/connect/status').catch(() => {});
       const userRes = await api.get('/users/me');
-      setBackendUser(userRes.data?.data || userRes.data);
-    } catch (_) {}
+      const nextUser = userRes.data?.data || userRes.data;
+      setBackendUser(nextUser);
+      return nextUser;
+    } catch (_) {
+      return null;
+    }
   }, []);
+
+  const waitForVerifiedKyc = useCallback(async (attempts = 8, delayMs = 2000) => {
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const latestUser = await refreshBackendUser();
+      const kycStatus = latestUser?.kyc_status;
+      if (kycStatus === 'verified' || kycStatus === 'failed') {
+        return latestUser;
+      }
+      if (attempt < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+    return backendUser;
+  }, [backendUser, refreshBackendUser]);
 
   // API base URL (without /api) used for mobile return pages
   const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://172.28.145.1:5000/api').replace(/\/api$/, '');
@@ -558,19 +611,31 @@ export const ListingDetailScreen = () => {
       });
       const url = res.data?.data?.url || res.data?.url;
       if (!url) {
-        Alert.alert('Error', 'Could not start identity verification. Please try again.');
+        toast.error('Could not start identity verification. Please try again.');
         setIsStartingKyc(false);
         return;
       }
       openStripeAndWatchReturn(url, nativeIdentityCallback, async () => {
-        await refreshBackendUser();
-        setShowIdentityVerificationCard(false);
-        setIdentityVerificationReason(null);
+        const latestUser = await waitForVerifiedKyc();
+        const latestKycStatus = latestUser?.kyc_status;
+
+        if (latestKycStatus === 'verified') {
+          setShowIdentityVerificationCard(false);
+          setIdentityVerificationReason(null);
+          toast.success('Your ID verification is complete. You can now send your rental request.');
+        } else if (latestKycStatus === 'failed') {
+          setShowIdentityVerificationCard(true);
+          toast.error('ID verification needs more information. Please try again.');
+        } else {
+          setShowIdentityVerificationCard(false);
+          setIdentityVerificationReason(null);
+          toast.info('Your verification was submitted and is still processing. Please wait a moment, then try again.');
+        }
+
         setIsStartingKyc(false);
-        Alert.alert('Verification Submitted', 'Your ID verification has been submitted. Once approved, you can send your rental request.');
       });
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to start ID verification.');
+      toast.error(err?.response?.data?.error || 'Failed to start ID verification.');
       setIsStartingKyc(false);
     }
   };
@@ -589,7 +654,7 @@ export const ListingDetailScreen = () => {
         setIsConnectingCard(false);
       });
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to start card setup. Please try again.');
+      toast.error(err?.response?.data?.error || 'Failed to start card setup. Please try again.');
       setIsConnectingCard(false);
     }
   };
@@ -623,7 +688,7 @@ export const ListingDetailScreen = () => {
         }
       });
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to start bank setup. Please try again.');
+      toast.error(err?.response?.data?.error || 'Failed to start bank setup. Please try again.');
       setIsConnectingBank(false);
     }
   };
@@ -659,7 +724,7 @@ export const ListingDetailScreen = () => {
       (navigation as any).navigate('MyConversations');
     } catch (err: any) {
       const msg = err?.response?.data?.error || 'Failed to send message. Please try again.';
-      Alert.alert('Error', msg);
+      toast.error(msg);
     } finally {
       setIsSendingInquiry(false);
     }
@@ -681,7 +746,7 @@ export const ListingDetailScreen = () => {
               });
               fetchListingById(listingId);
             } catch {
-              Alert.alert('Error', 'Failed to update availability.');
+              toast.error('Failed to update availability.');
             }
           },
         },
@@ -704,7 +769,7 @@ export const ListingDetailScreen = () => {
               await deleteItem(listing.id);
               navigation.goBack();
             } catch {
-              Alert.alert('Error', 'Failed to delete item.');
+              toast.error('Failed to delete item.');
             }
           },
         },
@@ -713,7 +778,7 @@ export const ListingDetailScreen = () => {
   };
 
 
-  if (isLoading || !listing) {
+  if (isLoading || !listing || listing.id !== listingId) {
     return (
       <View style={styles.loader}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -1022,6 +1087,37 @@ export const ListingDetailScreen = () => {
               <Text style={styles.ownerManageTitle}>Manage This Listing</Text>
             </View>
             <View style={styles.ownerManageBody}>
+              {backendUser && !backendUser.payouts_enabled && (
+                <View style={styles.connectBankPromptCard}>
+                  <View style={styles.connectBankPromptHeader}>
+                    <View style={styles.connectBankPromptIcon}>
+                      <MaterialCommunityIcons name="bank-outline" size={18} color="#15803D" />
+                    </View>
+                    <View style={styles.connectBankPromptCopy}>
+                      <Text style={styles.connectBankPromptTitle}>Connect bank account</Text>
+                      <Text style={styles.connectBankPromptDesc}>
+                        Stripe Connect onboarding is required to receive payouts for this listing.
+                      </Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.connectBankPromptBtn, isConnectingBank && styles.connectCardBtnDisabled]}
+                    onPress={handleConnectBank}
+                    disabled={isConnectingBank}
+                  >
+                    {isConnectingBank ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <MaterialCommunityIcons name="bank-outline" size={18} color="#FFFFFF" />
+                        <Text style={styles.connectBankPromptBtnText}>Connect bank account</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Edit Item Details */}
               <TouchableOpacity
                 style={styles.manageBtn}
@@ -1045,7 +1141,7 @@ export const ListingDetailScreen = () => {
               {/* View Analytics */}
               <TouchableOpacity
                 style={styles.manageBtn}
-                onPress={() => Alert.alert('Analytics', 'View analytics coming soon.')}
+                onPress={() => toast.info('View analytics coming soon.')}
               >
                 <MaterialCommunityIcons name="trending-up" size={20} color="#475569" />
                 <Text style={styles.manageBtnText}>View Analytics</Text>
@@ -1117,7 +1213,7 @@ export const ListingDetailScreen = () => {
 
         {!isOwner && !isAdmin && listing.availability !== false && (
           backendUser && !backendUser.stripe_payment_method_id ? (
-            // Connect card section — matches frontend-v1 VerificationPrompt layout
+            // Connect card section — aligned with frontend-v1 VerificationPrompt layout
             <View style={[styles.sectionCard, styles.connectRentCard]}>
               <View style={styles.connectCardHeader}>
                 <View style={styles.connectCardIconBg}>
@@ -1125,7 +1221,7 @@ export const ListingDetailScreen = () => {
                 </View>
                 <Text variant="titleMedium" style={styles.connectCardTitle}>Connect card to rent</Text>
                 <Text style={styles.connectCardDesc}>
-                  Connect your payment card to make rental payments and start renting items.
+                  Connect your payment card to make rental payments.
                 </Text>
 
                 <View style={styles.connectStatusRow}>
@@ -1133,50 +1229,53 @@ export const ListingDetailScreen = () => {
                     <MaterialCommunityIcons name="shield-outline" size={12} color="#475569" />
                     <Text style={styles.statusBadgeText}>Card not connected</Text>
                   </View>
-                  <View
-                    style={[
-                      backendUser?.kyc_status === 'verified'
-                        ? styles.statusBadgeVerified
-                        : styles.statusBadgePending,
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name={backendUser?.kyc_status === 'verified' ? 'check-circle-outline' : 'clock-outline'}
-                      size={12}
-                      color={backendUser?.kyc_status === 'verified' ? '#15803D' : '#92400E'}
-                    />
-                    <Text
-                      style={[
-                        backendUser?.kyc_status === 'verified'
-                          ? styles.statusBadgeVerifiedText
-                          : styles.statusBadgePendingText,
-                      ]}
-                    >
-                      {backendUser?.kyc_status === 'verified' ? 'Verified' : 'Verification pending'}
-                    </Text>
-                  </View>
                 </View>
 
-                <Text style={styles.connectCardPrompt}>Connect your card to rent this item</Text>
-                <Text style={styles.stripeDisclaimer}>
-                  We use Stripe to securely process payments. Your payment information is encrypted and securely handled by Stripe.
-                </Text>
+                <View style={styles.connectInfoBox}>
+                  <MaterialCommunityIcons name="information-outline" size={18} color="#2563EB" />
+                  <Text style={styles.connectInfoText}>
+                    Connect your card to make rental payments.
+                  </Text>
+                </View>
               </View>
 
-              <TouchableOpacity
-                style={[styles.connectCardBtnRent, isConnectingCard && styles.connectCardBtnDisabled]}
-                onPress={handleConnectCard}
-                disabled={isConnectingCard}
-              >
-                {isConnectingCard ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <MaterialCommunityIcons name="credit-card-outline" size={18} color="#FFFFFF" />
-                    <Text style={styles.connectCardBtnText}>Connect Card</Text>
-                  </>
+              <View style={styles.connectActions}>
+                <TouchableOpacity
+                  style={[styles.connectCardBtnRent, isConnectingCard && styles.connectCardBtnDisabled]}
+                  onPress={handleConnectCard}
+                  disabled={isConnectingCard}
+                >
+                  {isConnectingCard ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name="shield-outline" size={18} color="#2563EB" />
+                      <Text style={styles.connectCardBtnText}>Connect Card (to Rent)</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {(backendUser?.verification_status === 'unverified' || !backendUser?.verification_status) && (
+                  <TouchableOpacity
+                    style={[styles.connectBankBtn2, isConnectingBank && styles.connectCardBtnDisabled]}
+                    onPress={handleConnectBank}
+                    disabled={isConnectingBank}
+                  >
+                    {isConnectingBank ? (
+                      <ActivityIndicator size="small" color="#2563EB" />
+                    ) : (
+                      <>
+                        <MaterialCommunityIcons name="shield-outline" size={18} color="#2563EB" />
+                        <Text style={styles.connectBankBtnText}>Connect Bank Account (to Lend)</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
+              </View>
+
+              <Text style={styles.stripeDisclaimer}>
+                We use Stripe to securely process payments. Your payment information is encrypted and securely handled by Stripe.
+              </Text>
             </View>
           ) : (
             // Availability calendar + rental request
@@ -2431,6 +2530,56 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 8,
   },
+  connectBankPromptCard: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 14,
+    padding: 14,
+    gap: 14,
+    marginBottom: 4,
+  },
+  connectBankPromptHeader: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  connectBankPromptIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  connectBankPromptCopy: {
+    flex: 1,
+  },
+  connectBankPromptTitle: {
+    color: '#14532D',
+    fontWeight: '800',
+    fontSize: typography.body,
+    marginBottom: 4,
+  },
+  connectBankPromptDesc: {
+    color: '#166534',
+    fontSize: typography.small,
+    lineHeight: 18,
+  },
+  connectBankPromptBtn: {
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: '#16A34A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  connectBankPromptBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: typography.body,
+  },
   manageBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2561,51 +2710,54 @@ const styles = StyleSheet.create({
   },
   connectCardHeader: {
     alignItems: 'center',
-    marginBottom: 22,
+    marginBottom: 18,
   },
   connectCardIconBg: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#DBEAFE',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 18,
+    marginBottom: 16,
   },
   connectCardTitle: {
     fontWeight: '800',
     color: '#111827',
-    fontSize: 16,
-    marginBottom: 10,
+    fontSize: 18,
+    marginBottom: 8,
     textAlign: 'center',
   },
   connectCardDesc: {
     color: '#64748B',
     textAlign: 'center',
     fontSize: typography.body,
-    lineHeight: 24,
-    marginBottom: 18,
+    lineHeight: 22,
+    marginBottom: 16,
   },
   connectStatusRow: {
     alignItems: 'center',
     gap: 10,
-    marginBottom: 18,
+    marginBottom: 16,
     flexWrap: 'wrap',
     justifyContent: 'center',
   },
   connectInfoBox: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
     backgroundColor: '#EFF6FF',
-    borderRadius: 10,
-    padding: 12,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
   },
   connectInfoText: {
     flex: 1,
     color: '#1D4ED8',
-    fontSize: typography.small,
+    fontSize: typography.body,
     lineHeight: 18,
   },
   connectRentCard: {
@@ -2614,8 +2766,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 18,
     elevation: 6,
-    paddingTop: 30,
-    paddingBottom: 26,
+    paddingTop: 24,
+    paddingBottom: 24,
+  },
+  connectActions: {
+    gap: 12,
+    marginBottom: 16,
   },
   statusBadgeVerified: {
     flexDirection: 'row',
@@ -2655,9 +2811,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#2563EB',
     borderRadius: 14,
-    height: 50,
+    height: 52,
     gap: 8,
   },
   connectCardBtn2: {
@@ -2699,7 +2855,7 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 12,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   // Calendar
   calendarCard: {

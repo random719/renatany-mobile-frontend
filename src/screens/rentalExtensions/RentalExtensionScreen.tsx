@@ -18,6 +18,7 @@ import {
   createRentalExtension,
   updateRentalExtension,
 } from '../../services/rentalExtensionService';
+import { toast } from '../../store/toastStore';
 import { colors } from '../../theme';
 import { RentalExtension } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
@@ -75,7 +76,7 @@ export const RentalExtensionScreen = () => {
     if (!userEmail) return;
     const days = parseInt(extraDays);
     if (!days || days < 1) {
-      Alert.alert('Invalid', 'Please enter at least 1 extra day.');
+      toast.warning('Please enter at least 1 extra day.');
       return;
     }
 
@@ -89,12 +90,10 @@ export const RentalExtensionScreen = () => {
         message: message.trim() || undefined,
       });
 
-      Alert.alert('Extension Requested', 'Your extension request has been sent to the owner.', [
-        { text: 'OK', onPress: () => { setExtraDays(''); setMessage(''); loadExtensions(); } },
-      ]);
+      toast.success('Your extension request has been sent to the owner.', () => { setExtraDays(''); setMessage(''); loadExtensions(); });
     } catch (error: any) {
       const msg = error?.response?.data?.error || 'Failed to request extension.';
-      Alert.alert('Error', msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -104,10 +103,10 @@ export const RentalExtensionScreen = () => {
     setIsSubmitting(true);
     try {
       await updateRentalExtension(extensionId, { status });
-      Alert.alert('Done', `Extension ${status}.`);
+      toast.success(`Extension ${status}.`);
       loadExtensions();
     } catch (error: any) {
-      Alert.alert('Error', error?.response?.data?.error || `Failed to ${status} extension.`);
+      toast.error(error?.response?.data?.error || `Failed to ${status} extension.`);
     } finally {
       setIsSubmitting(false);
     }

@@ -2,7 +2,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -20,6 +19,7 @@ import {
   updateSecurityItemOverride,
   updateSecuritySettings,
 } from "../../services/adminService";
+import { toast } from "../../store/toastStore";
 import { colors, typography } from "../../theme";
 
 const CATEGORIES = [
@@ -59,7 +59,7 @@ export const AdminSecurityScreen = () => {
     try {
       await loadSettings();
     } catch {
-      Alert.alert('Error', 'Failed to load security settings.');
+      toast.error('Failed to load security settings.');
     } finally {
       setLoading(false);
     }
@@ -91,7 +91,7 @@ export const AdminSecurityScreen = () => {
   const handleSaveSettings = async () => {
     const threshold = parseInt(thresholdInput, 10);
     if (Number.isNaN(threshold) || threshold < 0) {
-      Alert.alert('Invalid Threshold', 'Please enter a valid threshold number greater than or equal to 0.');
+      toast.warning('Please enter a valid threshold number greater than or equal to 0.');
       return;
     }
 
@@ -103,9 +103,9 @@ export const AdminSecurityScreen = () => {
       });
       setThresholdInput(String(updated.kyc_amount_threshold));
       setSelectedCategories(updated.kyc_high_risk_categories || []);
-      Alert.alert('Saved', 'Security settings saved successfully.');
+      toast.success('Security settings saved successfully.');
     } catch {
-      Alert.alert('Error', 'Failed to save security settings.');
+      toast.error('Failed to save security settings.');
     } finally {
       setSavingSettings(false);
     }
@@ -121,10 +121,10 @@ export const AdminSecurityScreen = () => {
       });
       setItems(data);
       if (data.length === 0) {
-        Alert.alert('No Items Found', 'Try a different search term.');
+        toast.info('No items found. Try a different search term.');
       }
     } catch {
-      Alert.alert('Error', 'Failed to load items.');
+      toast.error('Failed to load items.');
       setItems([]);
     } finally {
       setSearchingItems(false);
@@ -137,7 +137,7 @@ export const AdminSecurityScreen = () => {
       const updated = await updateSecurityItemOverride(item.id, !item.high_risk_override);
       setItems((prev) => prev.map((entry) => (entry.id === item.id ? updated : entry)));
     } catch {
-      Alert.alert('Error', 'Failed to update item override.');
+      toast.error('Failed to update item override.');
     } finally {
       setTogglingId(null);
     }

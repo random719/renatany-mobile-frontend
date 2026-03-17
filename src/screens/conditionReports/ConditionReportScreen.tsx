@@ -23,9 +23,12 @@ import {
   getConditionReports,
   createConditionReport,
 } from '../../services/conditionReportService';
+import { getRentalRequestById } from '../../services/rentalService';
+import { toast } from '../../store/toastStore';
 import { colors } from '../../theme';
-import { ConditionReport } from '../../types/models';
+import { ConditionReport, RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
+import { getConditionReportRules } from '../../utils/conditionReportRules';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'ConditionReport'>;
@@ -44,6 +47,7 @@ export const ConditionReportScreen = () => {
   const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress;
 
   const [existingReports, setExistingReports] = useState<ConditionReport[]>([]);
+  const [rental, setRental] = useState<RentalRequest | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -60,8 +64,12 @@ export const ConditionReportScreen = () => {
 
   const loadReports = useCallback(async () => {
     try {
-      const reports = await getConditionReports({ rental_request_id: rentalRequestId });
+      const [reports, rentalRequest] = await Promise.all([
+        getConditionReports({ rental_request_id: rentalRequestId }),
+        getRentalRequestById(rentalRequestId),
+      ]);
       setExistingReports(reports);
+      setRental(rentalRequest);
     } catch (error) {
       console.error('Error loading condition reports:', error);
     }
@@ -74,6 +82,13 @@ export const ConditionReportScreen = () => {
 
   const existingReport = existingReports.find((r) => r.report_type === reportType);
   const hasExistingReport = !!existingReport;
+  const rules = rental ? getConditionReportRules(rental, existingReports, userEmail) : null;
+  const canCreateReport = reportType === 'pickup'
+    ? rules?.canCreatePickupReport
+    : rules?.canCreateReturnReport;
+  const blockedMessage = reportType === 'pickup'
+    ? rules?.pickupStatusMessage
+    : rules?.returnStatusMessage;
 
   const pickImages = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -101,7 +116,7 @@ export const ConditionReportScreen = () => {
         }
         setPhotos((prev) => [...prev, ...uploadedUrls]);
       } catch (error) {
-        Alert.alert('Upload Failed', 'Could not upload photos. Please try again.');
+        toast.error('Could not upload photos. Please try again.');
       } finally {
         setIsUploading(false);
       }
@@ -111,7 +126,7 @@ export const ConditionReportScreen = () => {
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Needed', 'Camera permission is required to take photos.');
+      toast.warning('Camera permission is required to take photos.');
       return;
     }
 
@@ -135,7 +150,7 @@ export const ConditionReportScreen = () => {
         const url = res.data?.file_url || res.data?.data?.file_url;
         if (url) setPhotos((prev) => [...prev, url]);
       } catch (error) {
-        Alert.alert('Upload Failed', 'Could not upload photo. Please try again.');
+        toast.error('Could not upload photo. Please try again.');
       } finally {
         setIsUploading(false);
       }
@@ -148,7 +163,7 @@ export const ConditionReportScreen = () => {
 
   const addDamage = () => {
     if (!newDamageDescription.trim()) {
-      Alert.alert('Required', 'Please describe the damage.');
+      toast.warning('Please describe the damage.');
       return;
     }
     setDamages((prev) => [
@@ -168,7 +183,7 @@ export const ConditionReportScreen = () => {
     if (!userEmail) return;
 
     if (photos.length === 0) {
-      Alert.alert('Photos Required', 'Please add at least one photo documenting the item condition.');
+      toast.warning('Please add at least one photo documenting the item condition.');
       return;
     }
 
@@ -183,14 +198,10 @@ export const ConditionReportScreen = () => {
         damages_reported: damages.length > 0 ? damages : undefined,
       });
 
-      Alert.alert(
-        'Report Submitted',
-        `Your ${reportType} condition report has been submitted successfully.`,
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      toast.success(`Your ${reportType} condition report has been submitted successfully.`, () => navigation.goBack());
     } catch (error: any) {
       const msg = error?.response?.data?.error || 'Failed to submit report. Please try again.';
-      Alert.alert('Error', msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -202,6 +213,23 @@ export const ConditionReportScreen = () => {
         <ScreenLayout showBottomNav bottomNavActiveKey="none">
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        </ScreenLayout>
+      </View>
+    );
+  }
+
+  if (!rental) {
+    return (
+      <View style={{ flex: 1 }}>
+        <ScreenLayout showBottomNav={false}>
+          <View style={styles.contentWrapper}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <MaterialCommunityIcons name="arrow-left" size={24} color="#0F172A" />
+              <Text style={styles.backText}>Back</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Condition Report</Text>
+            <Text style={styles.subtitle}>We could not load this rental right now.</Text>
           </View>
         </ScreenLayout>
       </View>
@@ -263,6 +291,43 @@ export const ConditionReportScreen = () => {
             <Text style={styles.dateText}>
               Submitted: {new Date(existingReport.created_date).toLocaleDateString()}
             </Text>
+          </View>
+        </ScreenLayout>
+      </View>
+    );
+  }
+
+  if (!canCreateReport) {
+    return (
+      <View style={{ flex: 1 }}>
+        <ScreenLayout showBottomNav={false}>
+          <View style={styles.contentWrapper}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <MaterialCommunityIcons name="arrow-left" size={24} color="#0F172A" />
+              <Text style={styles.backText}>Back</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.title}>
+              {reportType === 'pickup' ? 'Pickup' : 'Return'} Condition Report
+            </Text>
+            <View style={styles.infoCard}>
+              <MaterialCommunityIcons name="information-outline" size={22} color="#2563EB" />
+              <View style={styles.infoCardBody}>
+                <Text style={styles.infoCardTitle}>Not available yet</Text>
+                <Text style={styles.infoCardText}>
+                  {blockedMessage || 'This report is not available right now.'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.metaCard}>
+              <Text style={styles.metaLabel}>Rental status</Text>
+              <Text style={styles.metaValue}>{rental.status}</Text>
+              <Text style={styles.metaLabel}>Pickup reports</Text>
+              <Text style={styles.metaValue}>{rules?.pickupReports.length || 0}/2</Text>
+              <Text style={styles.metaLabel}>Return reports</Text>
+              <Text style={styles.metaValue}>{rules?.returnReports.length || 0}/2</Text>
+            </View>
           </View>
         </ScreenLayout>
       </View>
@@ -482,6 +547,30 @@ const styles = StyleSheet.create({
   // Existing report styles
   submittedBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ECFDF5', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, alignSelf: 'flex-start', marginBottom: 24 },
   submittedText: { fontSize: 14, fontWeight: '600', color: '#10B981' },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+  },
+  infoCardBody: { flex: 1 },
+  infoCardTitle: { fontSize: 15, fontWeight: '700', color: '#1E3A8A', marginBottom: 4 },
+  infoCardText: { fontSize: 14, color: '#1D4ED8', lineHeight: 20 },
+  metaCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    padding: 16,
+    gap: 6,
+  },
+  metaLabel: { fontSize: 12, color: '#6B7280', textTransform: 'uppercase' },
+  metaValue: { fontSize: 15, color: '#0F172A', fontWeight: '600', marginBottom: 6 },
   existingPhoto: { width: 120, height: 120, borderRadius: 10, marginRight: 10 },
   notesText: { fontSize: 14, color: '#374151', lineHeight: 20, backgroundColor: '#F9FAFB', padding: 14, borderRadius: 10 },
   damageItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },

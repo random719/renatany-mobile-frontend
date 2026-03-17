@@ -3,7 +3,6 @@ import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
   FlatList,
   Image,
   Linking,
@@ -25,6 +24,7 @@ import {
   UserReport,
 } from "../../services/adminService";
 import { api } from "../../services/api";
+import { toast } from "../../store/toastStore";
 import { colors, typography } from "../../theme";
 import { RootStackParamList } from "../../types/navigation";
 
@@ -172,12 +172,12 @@ export const AdminUserReportsScreen = () => {
         // Notifications best-effort
       }
 
-      Alert.alert("Success", `Report ${status === "dismissed" ? "dismissed" : status === "under_review" ? "marked as under review" : "updated"} successfully.`);
+      toast.success(`Report ${status === "dismissed" ? "dismissed" : status === "under_review" ? "marked as under review" : "updated"} successfully.`);
       setSelectedReport(null);
       await loadData();
     } catch (e: any) {
       const msg = e?.response?.data?.error || "Failed to update report.";
-      Alert.alert("Error", msg);
+      toast.error(msg);
     } finally {
       setIsUpdating(false);
     }
@@ -185,7 +185,7 @@ export const AdminUserReportsScreen = () => {
 
   const handleTakeAction = async () => {
     if (!selectedReport || actionTaken === "none") {
-      Alert.alert("Required", "Please select an action to take.");
+      toast.warning("Please select an action to take.");
       return;
     }
     setIsUpdating(true);
@@ -196,12 +196,12 @@ export const AdminUserReportsScreen = () => {
         action_taken: actionTaken,
       });
 
-      Alert.alert("Success", `Action taken: ${actionTaken.replace(/_/g, " ")}. Parties have been notified.`);
+      toast.success(`Action taken: ${actionTaken.replace(/_/g, " ")}. Parties have been notified.`);
       setSelectedReport(null);
       await loadData();
     } catch (e: any) {
       const msg = e?.response?.data?.error || "Failed to take action.";
-      Alert.alert("Error", msg);
+      toast.error(msg);
     } finally {
       setIsUpdating(false);
     }

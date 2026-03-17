@@ -4,7 +4,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   RefreshControl,
@@ -26,6 +25,7 @@ import { useAuthStore } from '../../store/authStore';
 import { colors, typography } from '../../theme';
 import { RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
+import { toast } from '../../store/toastStore';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 type FilterKey = 'all' | 'as_renter' | 'as_owner' | 'completed' | 'active' | 'pending' | 'cancelled';
@@ -168,7 +168,7 @@ export const RentalHistoryScreen = () => {
       // Get a fresh Clerk session token
       const token = await getToken();
       if (!token) {
-        Alert.alert('Error', 'Session expired. Please log in again.');
+        toast.error('Session expired. Please log in again.');
         setDownloadingId(null);
         return;
       }
@@ -189,16 +189,16 @@ export const RentalHistoryScreen = () => {
           dialogTitle: `Receipt - ${rentalId}`,
         });
       } else {
-        Alert.alert('Success', 'Receipt downloaded successfully.');
+        toast.success('Receipt downloaded successfully.');
       }
     } catch (err: any) {
       const msg = err?.message || '';
       if (msg.includes('401') || msg.includes('Unauthorized')) {
-        Alert.alert('Session Expired', 'Please log in again to download receipts.');
+        toast.error('Session Expired: Please log in again to download receipts.');
       } else if (msg.includes('400') || msg.includes('only available')) {
-        Alert.alert('Receipt Unavailable', 'Receipts are only available for paid or completed rentals.');
+        toast.warning('Receipt Unavailable: Receipts are only available for paid or completed rentals.');
       } else {
-        Alert.alert('Download Failed', 'Unable to download receipt. Please try again.');
+        toast.error('Download Failed: Unable to download receipt. Please try again.');
       }
     } finally {
       setDownloadingId(null);

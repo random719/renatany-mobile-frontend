@@ -1,7 +1,7 @@
+import { useUser } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -17,13 +17,16 @@ import {
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
+import { getConditionReports } from '../../services/conditionReportService';
 import { getMessages, sendMessage } from '../../services/messageService';
-import { createCheckoutSession, releaseRentalPayment } from '../../services/paymentService';
+import { createCheckoutSession, releaseRentalPayment, syncPaymentStatus } from '../../services/paymentService';
 import { getRentalRequestById, updateRentalRequestStatus } from '../../services/rentalService';
 import { useAuthStore } from '../../store/authStore';
+import { toast } from '../../store/toastStore';
 import { colors, typography } from '../../theme';
-import { Message, RentalRequest } from '../../types/models';
+import { ConditionReport, Message, RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
+import { getConditionReportRules } from '../../utils/conditionReportRules';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'Chat'>;
@@ -108,6 +111,7 @@ export const ChatScreen = () => {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [rental, setRental] = useState<RentalRequest | null>(null);
+  const [conditionReports, setConditionReports] = useState<ConditionReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -120,18 +124,22 @@ export const ChatScreen = () => {
     try {
       const data = await getMessages(rentalRequestId);
       setMessages(data.sort((a, b) =>
-        new Date(b.created_date).getTime() - new Date(a.created_date).getTime()
+        new Date(a.created_date).getTime() - new Date(b.created_date).getTime()
       ));
     } catch {
       // silently fail
     } finally {
-      setIsLoading(false);
+      if (!quiet) setIsLoading(false);
     }
   }, [rentalRequestId]);
 
   const loadRental = useCallback(async () => {
-    const data = await getRentalRequestById(rentalRequestId);
+    const [data, reports] = await Promise.all([
+      getRentalRequestById(rentalRequestId),
+      getConditionReports({ rental_request_id: rentalRequestId }),
+    ]);
     setRental(data);
+    setConditionReports(reports);
     return data;
   }, [rentalRequestId]);
 
@@ -178,7 +186,7 @@ export const ChatScreen = () => {
         sender_email: userEmail,
         content,
       });
-      setMessages((prev) => [newMsg, ...prev]);
+      setMessages((prev) => [...prev, newMsg]);
     } catch {
       setInputText(content);
     } finally {
@@ -216,7 +224,7 @@ export const ChatScreen = () => {
             await sendSystemNote(options.systemMessage);
             await loadChatData(true);
           } catch (error: any) {
-            Alert.alert('Action failed', error?.response?.data?.error || error?.message || 'Please try again.');
+            toast.error(error?.response?.data?.error || error?.message || 'Action failed. Please try again.');
           } finally {
             setIsUpdatingStatus(false);
           }
@@ -234,28 +242,51 @@ export const ChatScreen = () => {
         return_url: checkoutReturnUrl,
       });
       const checkoutUrl = response.url || response.checkout_url;
+      const checkoutSessionId = response.session_id;
       if (!checkoutUrl) {
         throw new Error('No checkout URL received.');
       }
 
       const authResult = await WebBrowser.openAuthSessionAsync(checkoutUrl, nativeCheckoutCallback);
+
       if (authResult.type === 'cancel') {
-        Alert.alert('Payment cancelled', 'Checkout was cancelled before payment completed.');
+        toast.warning('Checkout was cancelled before payment completed.');
         return;
+      }
+
+      // Try to extract session_id from the redirect URL first
+      let resolvedSessionId = checkoutSessionId;
+      if (authResult.type === 'success' && authResult.url) {
+        try {
+          const urlObj = new URL(authResult.url);
+          const searchParams = new URLSearchParams(urlObj.search);
+          const urlSessionId = searchParams.get('session_id');
+          if (urlSessionId && !urlSessionId.includes('CHECKOUT_SESSION_ID')) {
+            resolvedSessionId = urlSessionId;
+          }
+        } catch (e) {
+          console.warn('Failed to parse redirect URL', e);
+        }
+      }
+
+      // Sync payment status using the session ID from the checkout response
+      if (resolvedSessionId) {
+        try {
+          await syncPaymentStatus(resolvedSessionId, rental.id);
+        } catch (e) {
+          console.warn('Failed to sync payment status', e);
+        }
       }
 
       const updatedRental = await refreshRentalUntilSettled();
       if (updatedRental?.status === 'paid' || updatedRental?.status === 'completed') {
         await sendSystemNote('Payment received. This rental is now confirmed and active.');
-        Alert.alert('Payment received', 'Your rental payment was submitted successfully.');
+        toast.success('Your rental payment was submitted successfully.');
       } else {
-        Alert.alert(
-          'Payment submitted',
-          'We are still waiting for payment confirmation. Pull to refresh or reopen this chat in a moment.',
-        );
+        toast.info('Payment submitted. We are still waiting for confirmation. Pull to refresh or reopen this chat in a moment.');
       }
     } catch (error: any) {
-      Alert.alert('Payment failed', error?.response?.data?.error || error?.message || 'Please try again.');
+      toast.error(error?.response?.data?.error || error?.message || 'Payment failed. Please try again.');
     } finally {
       setIsProcessingPayment(false);
       await loadChatData(true);
@@ -277,12 +308,9 @@ export const ChatScreen = () => {
               await releaseRentalPayment(rental.id);
               await sendSystemNote('Payment released. This rental is now completed.');
               await loadChatData(true);
-              Alert.alert('Rental completed', 'Payment was released successfully.');
+              toast.success('Rental completed. Payment was released successfully.');
             } catch (error: any) {
-              Alert.alert(
-                'Unable to complete rental',
-                error?.response?.data?.error || error?.message || 'Please try again later.',
-              );
+              toast.error(error?.response?.data?.error || error?.message || 'Unable to complete rental. Please try again later.');
             } finally {
               setIsUpdatingStatus(false);
             }
@@ -294,10 +322,11 @@ export const ChatScreen = () => {
 
   const isOwner = rental?.owner_email === userEmail;
   const isRenter = rental?.renter_email === userEmail;
+  const reportRules = rental ? getConditionReportRules(rental, conditionReports, userEmail) : null;
   const canApproveDecline = isOwner && rental?.status === 'pending';
   const canPay = isRenter && rental?.status === 'approved';
   const canCancel = isRenter && (rental?.status === 'pending' || rental?.status === 'approved');
-  const canCompleteRental = isOwner && rental?.status === 'paid';
+  const canCompleteRental = isOwner && !!reportRules?.canReleasePayment;
   const rentalCost = rental?.total_amount ?? 0;
   const platformFee = typeof rental?.platform_fee === 'number' ? rental.platform_fee : rentalCost * 0.15;
   const securityDeposit = typeof rental?.security_deposit === 'number' ? rental.security_deposit : 0;
@@ -322,6 +351,200 @@ export const ChatScreen = () => {
     }
   }, [rental?.status]);
 
+  const scrollToLatestMessage = useCallback((animated = true) => {
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToEnd({ animated });
+    });
+  }, []);
+
+  const renderSummaryCard = useCallback(() => {
+    if (!rental) return null;
+
+    return (
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryTopRow}>
+          <View style={[styles.statusBadge, { backgroundColor: statusTone.bg }]}>
+            <Text style={[styles.statusBadgeText, { color: statusTone.text }]}>
+              {statusTone.label.toUpperCase()}
+            </Text>
+          </View>
+          <Text style={styles.summaryDates}>
+            {new Date(rental.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            {' - '}
+            {new Date(rental.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          </Text>
+        </View>
+        <Text style={styles.summaryAmount}>${totalPaid.toFixed(2)}</Text>
+        <Text style={styles.summaryBreakdown}>
+          Rental ${rentalCost.toFixed(2)} · Fee ${platformFee.toFixed(2)} · Deposit ${securityDeposit.toFixed(2)}
+        </Text>
+        {canApproveDecline || canPay || canCancel || canCompleteRental ? (
+          <View style={styles.actionRow}>
+            {canApproveDecline ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.primaryAction]}
+                  onPress={() => handleStatusAction('approved', {
+                    title: 'Approve request',
+                    message: 'Approving will let the renter proceed to payment.',
+                    systemMessage: 'Request approved. The renter can now proceed with payment.',
+                  })}
+                  disabled={isUpdatingStatus}
+                >
+                  <MaterialCommunityIcons name="check" size={18} color="#FFFFFF" />
+                  <Text style={styles.primaryActionText}>Approve</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.secondaryDangerAction]}
+                  onPress={() => handleStatusAction('declined', {
+                    title: 'Decline request',
+                    message: 'This request will be declined for the renter.',
+                    systemMessage: 'Request declined.',
+                  })}
+                  disabled={isUpdatingStatus}
+                >
+                  <MaterialCommunityIcons name="close" size={18} color="#B91C1C" />
+                  <Text style={styles.secondaryDangerText}>Decline</Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
+            {canPay ? (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.primaryAction]}
+                onPress={handleCheckout}
+                disabled={isProcessingPayment}
+              >
+                {isProcessingPayment ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <MaterialCommunityIcons name="credit-card-outline" size={18} color="#FFFFFF" />
+                )}
+                <Text style={styles.primaryActionText}>
+                  {isProcessingPayment ? 'Opening checkout...' : 'Pay now'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            {canCancel ? (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.secondaryAction]}
+                onPress={() => handleStatusAction('cancelled', {
+                  title: 'Cancel request',
+                  message: 'This rental request will be cancelled.',
+                  systemMessage: 'Rental request cancelled by renter.',
+                })}
+                disabled={isUpdatingStatus}
+              >
+                <MaterialCommunityIcons name="close-circle-outline" size={18} color="#475569" />
+                <Text style={styles.secondaryActionText}>Cancel</Text>
+              </TouchableOpacity>
+            ) : null}
+            {canCompleteRental ? (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.primaryAction]}
+                onPress={handleRelease}
+                disabled={isUpdatingStatus}
+              >
+                <MaterialCommunityIcons name="cash-check" size={18} color="#FFFFFF" />
+                <Text style={styles.primaryActionText}>Complete rental</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
+        {rental.status === 'approved' && isRenter ? (
+          <Text style={styles.statusHint}>Owner approved this request. Complete payment to activate the rental.</Text>
+        ) : null}
+        {rental.status === 'paid' ? (
+          <>
+            <View style={styles.reportMeta}>
+              <Text style={styles.reportMetaText}>
+                Pickup reports: {reportRules?.pickupReports.length || 0}/2
+              </Text>
+              <Text style={styles.reportMetaText}>
+                Return reports: {reportRules?.returnReports.length || 0}/2
+              </Text>
+            </View>
+            <View style={styles.reportActionRow}>
+              <TouchableOpacity
+                style={[
+                  styles.reportActionButton,
+                  !reportRules?.canCreatePickupReport && !reportRules?.userPickupReport && styles.reportActionDisabled,
+                ]}
+                onPress={() =>
+                  navigation.navigate('ConditionReport', {
+                    rentalRequestId: rental.id,
+                    reportType: 'pickup',
+                  })
+                }
+                disabled={!reportRules?.canCreatePickupReport && !reportRules?.userPickupReport}
+              >
+                <MaterialCommunityIcons name="clipboard-check-outline" size={18} color="#1F2937" />
+                <Text style={styles.reportActionText}>
+                  {reportRules?.userPickupReport ? 'View Pickup Report' : 'Pickup Report'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.reportActionButton,
+                  !reportRules?.canCreateReturnReport && !reportRules?.userReturnReport && styles.reportActionDisabled,
+                ]}
+                onPress={() =>
+                  navigation.navigate('ConditionReport', {
+                    rentalRequestId: rental.id,
+                    reportType: 'return',
+                  })
+                }
+                disabled={!reportRules?.canCreateReturnReport && !reportRules?.userReturnReport}
+              >
+                <MaterialCommunityIcons name="clipboard-arrow-left-outline" size={18} color="#1F2937" />
+                <Text style={styles.reportActionText}>
+                  {reportRules?.userReturnReport ? 'View Return Report' : 'Return Report'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.statusHint}>
+              {canCompleteRental
+                ? 'Payment is confirmed and all condition report checks have passed. The owner can complete the rental.'
+                : 'Payment is confirmed. Completion unlocks only after the rental end time and both pickup and return reports are submitted.'}
+            </Text>
+            {!reportRules?.canCreatePickupReport && !reportRules?.userPickupReport && reportRules?.pickupStatusMessage ? (
+              <Text style={styles.statusHint}>{reportRules.pickupStatusMessage}</Text>
+            ) : null}
+            {!reportRules?.canCreateReturnReport && !reportRules?.userReturnReport && reportRules?.returnStatusMessage ? (
+              <Text style={styles.statusHint}>{reportRules.returnStatusMessage}</Text>
+            ) : null}
+          </>
+        ) : null}
+      </View>
+    );
+  }, [
+    canApproveDecline,
+    canCancel,
+    canCompleteRental,
+    canPay,
+    handleCheckout,
+    handleRelease,
+    handleStatusAction,
+    isProcessingPayment,
+    isRenter,
+    isUpdatingStatus,
+    navigation,
+    platformFee,
+    rental,
+    rentalCost,
+    reportRules,
+    securityDeposit,
+    statusTone.bg,
+    statusTone.label,
+    statusTone.text,
+    totalPaid,
+  ]);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToLatestMessage(false);
+    }
+  }, [messages.length, scrollToLatestMessage]);
+
   return (
     <View style={styles.container}>
       <GlobalHeader />
@@ -334,7 +557,7 @@ export const ChatScreen = () => {
           <Text style={styles.chatTitle} numberOfLines={1}>{otherUserEmail}</Text>
           <Text style={styles.chatSub}>Rental Request Chat</Text>
         </View>
-        <TouchableOpacity onPress={() => loadMessages(true)} style={styles.refreshBtn}>
+        <TouchableOpacity onPress={() => loadChatData(false)} style={styles.refreshBtn}>
           <MaterialCommunityIcons name="refresh" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -350,113 +573,19 @@ export const ChatScreen = () => {
           </View>
         ) : (
           <>
-            {rental ? (
-              <View style={styles.summaryCard}>
-                <View style={styles.summaryTopRow}>
-                  <View style={[styles.statusBadge, { backgroundColor: statusTone.bg }]}>
-                    <Text style={[styles.statusBadgeText, { color: statusTone.text }]}>
-                      {statusTone.label.toUpperCase()}
-                    </Text>
-                  </View>
-                  <Text style={styles.summaryDates}>
-                    {new Date(rental.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    {' - '}
-                    {new Date(rental.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </Text>
-                </View>
-                <Text style={styles.summaryAmount}>${totalPaid.toFixed(2)}</Text>
-                <Text style={styles.summaryBreakdown}>
-                  Rental ${rentalCost.toFixed(2)} · Fee ${platformFee.toFixed(2)} · Deposit ${securityDeposit.toFixed(2)}
-                </Text>
-                {canApproveDecline || canPay || canCancel || canCompleteRental ? (
-                  <View style={styles.actionRow}>
-                    {canApproveDecline ? (
-                      <>
-                        <TouchableOpacity
-                          style={[styles.actionButton, styles.primaryAction]}
-                          onPress={() => handleStatusAction('approved', {
-                            title: 'Approve request',
-                            message: 'Approving will let the renter proceed to payment.',
-                            systemMessage: 'Request approved. The renter can now proceed with payment.',
-                          })}
-                          disabled={isUpdatingStatus}
-                        >
-                          <MaterialCommunityIcons name="check" size={18} color="#FFFFFF" />
-                          <Text style={styles.primaryActionText}>Approve</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.actionButton, styles.secondaryDangerAction]}
-                          onPress={() => handleStatusAction('declined', {
-                            title: 'Decline request',
-                            message: 'This request will be declined for the renter.',
-                            systemMessage: 'Request declined.',
-                          })}
-                          disabled={isUpdatingStatus}
-                        >
-                          <MaterialCommunityIcons name="close" size={18} color="#B91C1C" />
-                          <Text style={styles.secondaryDangerText}>Decline</Text>
-                        </TouchableOpacity>
-                      </>
-                    ) : null}
-                    {canPay ? (
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.primaryAction]}
-                        onPress={handleCheckout}
-                        disabled={isProcessingPayment}
-                      >
-                        {isProcessingPayment ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <MaterialCommunityIcons name="credit-card-outline" size={18} color="#FFFFFF" />
-                        )}
-                        <Text style={styles.primaryActionText}>
-                          {isProcessingPayment ? 'Opening checkout...' : 'Pay now'}
-                        </Text>
-                      </TouchableOpacity>
-                    ) : null}
-                    {canCancel ? (
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.secondaryAction]}
-                        onPress={() => handleStatusAction('cancelled', {
-                          title: 'Cancel request',
-                          message: 'This rental request will be cancelled.',
-                          systemMessage: 'Rental request cancelled by renter.',
-                        })}
-                        disabled={isUpdatingStatus}
-                      >
-                        <MaterialCommunityIcons name="close-circle-outline" size={18} color="#475569" />
-                        <Text style={styles.secondaryActionText}>Cancel</Text>
-                      </TouchableOpacity>
-                    ) : null}
-                    {canCompleteRental ? (
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.primaryAction]}
-                        onPress={handleRelease}
-                        disabled={isUpdatingStatus}
-                      >
-                        <MaterialCommunityIcons name="cash-check" size={18} color="#FFFFFF" />
-                        <Text style={styles.primaryActionText}>Complete rental</Text>
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-                ) : null}
-                {rental.status === 'approved' && isRenter ? (
-                  <Text style={styles.statusHint}>Owner approved this request. Complete payment to activate the rental.</Text>
-                ) : null}
-                {rental.status === 'paid' ? (
-                  <Text style={styles.statusHint}>Payment is confirmed. The owner can complete the rental after the end date and backend checks.</Text>
-                ) : null}
-              </View>
-            ) : null}
             <FlatList
               ref={flatListRef}
               data={messages}
-              inverted
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <MessageBubble msg={item} isOwn={item.sender_email === userEmail} />
               )}
+              style={styles.messageListView}
               contentContainerStyle={styles.messageList}
+              keyboardShouldPersistTaps="handled"
+              onLayout={() => scrollToLatestMessage(false)}
+              onContentSizeChange={() => scrollToLatestMessage(false)}
+              ListHeaderComponent={renderSummaryCard}
               ListEmptyComponent={
                 <View style={styles.emptyState}>
                   <MaterialCommunityIcons name="chat-outline" size={56} color="#CBD5E1" />
@@ -520,8 +649,9 @@ const styles = StyleSheet.create({
   refreshBtn: { padding: 6 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   summaryCard: {
-    margin: 16,
-    marginBottom: 0,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
@@ -608,8 +738,42 @@ const styles = StyleSheet.create({
     fontSize: typography.small,
     lineHeight: 18,
   },
-  messageList: { paddingVertical: 12, flexGrow: 1 },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
+  reportMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  reportMetaText: {
+    color: '#334155',
+    fontSize: typography.small,
+    fontWeight: '600',
+  },
+  reportActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  reportActionButton: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  reportActionDisabled: { opacity: 0.45 },
+  reportActionText: {
+    color: '#1F2937',
+    fontWeight: '700',
+    fontSize: typography.small,
+  },
+  messageListView: { flex: 1 },
+  messageList: { paddingBottom: 16, flexGrow: 1 },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingTop: 80, gap: 12 },
   emptyText: { color: '#94A3B8', fontSize: typography.body, textAlign: 'center' },
   inputBar: {
     flexDirection: 'row',

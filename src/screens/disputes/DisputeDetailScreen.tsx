@@ -1,13 +1,16 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import * as DocumentPicker from 'expo-document-picker';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
 import { useUser } from '@clerk/expo';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { createDispute, getDisputeById } from '../../services/disputeService';
 import { api } from '../../services/api';
+import { uploadFile } from '../../services/listingService';
+import { toast } from '../../store/toastStore';
 import { colors, typography } from '../../theme';
 import { Dispute } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
@@ -23,11 +26,11 @@ const STATUS_COLOR: Record<Dispute['status'], string> = {
 };
 
 const REASONS = [
-  'Item not as described',
-  'Item damaged',
-  'No-show',
-  'Payment issue',
-  'Other',
+  { value: 'item_damaged', label: 'Item Was Damaged' },
+  { value: 'item_not_returned', label: 'Item Not Returned' },
+  { value: 'item_not_as_described', label: 'Item Not As Described' },
+  { value: 'payment_issue', label: 'Payment Issue' },
+  { value: 'other', label: 'Other' },
 ];
 
 export const DisputeDetailScreen = () => {
@@ -50,6 +53,8 @@ export const DisputeDetailScreen = () => {
   const [reason, setReason] = useState('');
   const [showReasonPicker, setShowReasonPicker] = useState(false);
   const [description, setDescription] = useState('');
+  const [evidenceFiles, setEvidenceFiles] = useState<Array<{ name: string; uri: string; uploadedUrl: string }>>([]);
+  const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const fieldPositions = useRef<Record<string, number>>({});
@@ -125,13 +130,44 @@ export const DisputeDetailScreen = () => {
     return `${itemTitle} — ${date}`;
   };
 
+  const handlePickEvidence = async () => {
+    try {
+      setIsUploadingEvidence(true);
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*'],
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const uploaded = await Promise.all(
+        result.assets.map(async (asset) => {
+          const uploadedUrl = await uploadFile(asset.uri, 'image');
+          return {
+            name: asset.name || `evidence-${Date.now()}.jpg`,
+            uri: asset.uri,
+            uploadedUrl,
+          };
+        })
+      );
+      setEvidenceFiles((prev) => [...prev, ...uploaded]);
+    } catch {
+      toast.error('Could not add evidence. Please try again.');
+    } finally {
+      setIsUploadingEvidence(false);
+    }
+  };
+
+  const removeEvidence = (indexToRemove: number) => {
+    setEvidenceFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
+  };
+
   const handleSubmit = async () => {
     if (!selectedRentalId || !reason || !description.trim()) {
-      Alert.alert('Missing fields', 'Please select a rental, reason, and provide a description.');
+      toast.warning('Please select a rental, reason, and provide a description.');
       return;
     }
     if (!userEmail) {
-      Alert.alert('Error', 'You must be logged in.');
+      toast.error('You must be logged in.');
       return;
     }
     setIsSubmitting(true);
@@ -142,13 +178,12 @@ export const DisputeDetailScreen = () => {
         against_email: againstEmail,
         reason,
         description: description.trim(),
+        evidence_urls: evidenceFiles.map((file) => file.uploadedUrl).filter(Boolean),
       });
-      Alert.alert('Dispute filed', 'Your dispute has been submitted and our team will review it shortly.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to file dispute.';
-      Alert.alert('Error', msg);
+      toast.success('Your dispute has been submitted and our team will review it shortly.', () => navigation.goBack());
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Failed to file dispute.';
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -186,9 +221,27 @@ export const DisputeDetailScreen = () => {
 
         {isNew ? (
           <>
+            <View style={styles.heroCard}>
+              <View style={styles.heroIcon}>
+                <MaterialCommunityIcons name="alert-outline" size={22} color="#C2410C" />
+              </View>
+              <View style={styles.heroContent}>
+                <Text style={styles.heroTitle}>Tell us what went wrong</Text>
+                <Text style={styles.heroText}>
+                  Select the rental, explain the issue clearly, and attach photos if you have them. We&apos;ll notify the other party and review the case.
+                </Text>
+              </View>
+            </View>
+
             {/* Rental Request Picker */}
             <View style={styles.card} onLayout={(e) => { fieldPositions.current.rental = e.nativeEvent.layout.y; }}>
-              <Text style={styles.sectionLabel}>Select Rental *</Text>
+              <View style={styles.sectionHeaderRow}>
+                <View>
+                  <Text style={styles.sectionLabel}>Select Rental *</Text>
+                  <Text style={styles.sectionHint}>Only paid or completed rentals can be disputed.</Text>
+                </View>
+                <MaterialCommunityIcons name="calendar-check-outline" size={20} color="#64748B" />
+              </View>
               {isLoadingRentals ? (
                 <ActivityIndicator size="small" color={colors.primary} style={{ paddingVertical: 12 }} />
               ) : rentalRequests.length === 0 ? (
@@ -234,21 +287,41 @@ export const DisputeDetailScreen = () => {
                 </>
               )}
               {selectedRental && (
-                <View style={styles.againstInfoBox}>
-                  <Text style={styles.againstInfoLabel}>Dispute against:</Text>
-                  <Text style={styles.againstInfoValue}>{againstEmail}</Text>
+                <View style={styles.selectedRentalCard}>
+                  <View style={styles.selectedRentalTop}>
+                    <View style={styles.selectedRentalIcon}>
+                      <MaterialCommunityIcons name="cube-outline" size={18} color="#1D4ED8" />
+                    </View>
+                    <View style={styles.selectedRentalContent}>
+                      <Text style={styles.selectedRentalTitle}>{itemsMap[selectedRental.item_id]?.title || 'Selected rental'}</Text>
+                      <Text style={styles.selectedRentalMeta}>
+                        {selectedRental.status.toUpperCase()} · {new Date(selectedRental.start_date || selectedRental.created_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {selectedRental.end_date ? ` - ${new Date(selectedRental.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.againstInfoBox}>
+                    <Text style={styles.againstInfoLabel}>Dispute against</Text>
+                    <Text style={styles.againstInfoValue}>{againstEmail}</Text>
+                  </View>
                 </View>
               )}
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.sectionLabel}>Reason *</Text>
+              <View style={styles.sectionHeaderRow}>
+                <View>
+                  <Text style={styles.sectionLabel}>Reason *</Text>
+                  <Text style={styles.sectionHint}>Choose the option that best describes the problem.</Text>
+                </View>
+                <MaterialCommunityIcons name="format-list-bulleted" size={20} color="#64748B" />
+              </View>
               <TouchableOpacity
                 style={styles.reasonSelector}
                 onPress={() => setShowReasonPicker(!showReasonPicker)}
               >
                 <Text style={reason ? styles.reasonSelected : styles.reasonPlaceholder}>
-                  {reason || 'Select a reason'}
+                  {REASONS.find(r => r.value === reason)?.label || 'Select a reason'}
                 </Text>
                 <MaterialCommunityIcons
                   name={showReasonPicker ? 'chevron-up' : 'chevron-down'}
@@ -260,14 +333,14 @@ export const DisputeDetailScreen = () => {
                 <View style={styles.reasonList}>
                   {REASONS.map((r) => (
                     <TouchableOpacity
-                      key={r}
-                      style={[styles.reasonItem, reason === r && styles.reasonItemActive]}
-                      onPress={() => { setReason(r); setShowReasonPicker(false); }}
+                      key={r.value}
+                      style={[styles.reasonItem, reason === r.value && styles.reasonItemActive]}
+                      onPress={() => { setReason(r.value); setShowReasonPicker(false); }}
                     >
-                      <Text style={[styles.reasonItemText, reason === r && styles.reasonItemTextActive]}>
-                        {r}
+                      <Text style={[styles.reasonItemText, reason === r.value && styles.reasonItemTextActive]}>
+                        {r.label}
                       </Text>
-                      {reason === r && <MaterialCommunityIcons name="check" size={16} color={colors.primary} />}
+                      {reason === r.value && <MaterialCommunityIcons name="check" size={16} color={colors.primary} />}
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -275,17 +348,73 @@ export const DisputeDetailScreen = () => {
             </View>
 
             <View style={styles.card} onLayout={(e) => { fieldPositions.current.description = e.nativeEvent.layout.y; }}>
-              <Text style={styles.sectionLabel}>Description *</Text>
+              <View style={styles.sectionHeaderRow}>
+                <View>
+                  <Text style={styles.sectionLabel}>Description *</Text>
+                  <Text style={styles.sectionHint}>Share the timeline, what happened, and what outcome you expect.</Text>
+                </View>
+                <MaterialCommunityIcons name="text-box-outline" size={20} color="#64748B" />
+              </View>
               <TextInput
                 value={description}
                 onChangeText={setDescription}
                 mode="outlined"
-                placeholder="Describe the issue in detail..."
+                placeholder="Please provide detailed information about the issue..."
                 multiline
-                numberOfLines={4}
+                numberOfLines={6}
                 style={styles.input}
                 onFocus={() => scrollToField('description')}
               />
+            </View>
+
+            <View style={styles.card}>
+              <View style={styles.sectionHeaderRow}>
+                <View>
+                  <Text style={styles.sectionLabel}>Additional Evidence</Text>
+                  <Text style={styles.sectionHint}>Upload photos that support your dispute. This is optional but recommended.</Text>
+                </View>
+                <MaterialCommunityIcons name="image-multiple-outline" size={20} color="#64748B" />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.uploadButton, isUploadingEvidence && styles.uploadButtonDisabled]}
+                onPress={handlePickEvidence}
+                disabled={isUploadingEvidence}
+              >
+                {isUploadingEvidence ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <MaterialCommunityIcons name="upload-outline" size={18} color={colors.primary} />
+                )}
+                <Text style={styles.uploadButtonText}>
+                  {isUploadingEvidence ? 'Uploading...' : 'Add Evidence'}
+                </Text>
+              </TouchableOpacity>
+
+              {evidenceFiles.length > 0 ? (
+                <View style={styles.evidenceGrid}>
+                  {evidenceFiles.map((file, index) => (
+                    <View key={`${file.uploadedUrl}-${index}`} style={styles.evidenceCard}>
+                      <Image source={{ uri: file.uri }} style={styles.evidenceImage} />
+                      <TouchableOpacity style={styles.evidenceRemove} onPress={() => removeEvidence(index)}>
+                        <MaterialCommunityIcons name="close" size={14} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.emptyEvidenceBox}>
+                  <MaterialCommunityIcons name="image-off-outline" size={24} color="#94A3B8" />
+                  <Text style={styles.emptyEvidenceText}>No evidence added yet.</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.noteCard}>
+              <MaterialCommunityIcons name="information-outline" size={18} color="#C2410C" />
+              <Text style={styles.noteText}>
+                Filing a dispute notifies the other party and the admin team. Please include clear details and any relevant evidence.
+              </Text>
             </View>
 
             <View onLayout={(e) => { fieldPositions.current.submit = e.nativeEvent.layout.y; }} />
@@ -323,7 +452,7 @@ export const DisputeDetailScreen = () => {
               <InfoRow label="Rental ID" value={dispute.rental_request_id} />
               <InfoRow label="Filed by" value={dispute.filed_by_email} />
               <InfoRow label="Against" value={dispute.against_email} />
-              <InfoRow label="Reason" value={dispute.reason} />
+              <InfoRow label="Reason" value={REASONS.find(r => r.value === dispute.reason)?.label || dispute.reason.replace(/_/g, ' ')} />
             </View>
 
             <View style={styles.card}>
@@ -395,6 +524,28 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   headerTitle: { fontWeight: '700', color: '#0F172A' },
+  heroCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    gap: 12,
+  },
+  heroIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFEDD5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroContent: { flex: 1, gap: 4 },
+  heroTitle: { color: '#9A3412', fontWeight: '800', fontSize: typography.body },
+  heroText: { color: '#9A3412', fontSize: typography.small, lineHeight: 18 },
   card: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
@@ -406,7 +557,15 @@ const styles = StyleSheet.create({
   },
   adminCard: { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' },
   sectionLabel: { fontWeight: '700', color: '#0F172A', fontSize: typography.body, marginBottom: 12 },
-  input: { marginBottom: 4 },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 12,
+  },
+  sectionHint: { color: '#64748B', fontSize: typography.small, lineHeight: 18 },
+  input: { marginBottom: 4, backgroundColor: '#FFFFFF' },
   reasonSelector: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -439,6 +598,27 @@ const styles = StyleSheet.create({
   reasonItemActive: { backgroundColor: '#EFF6FF' },
   reasonItemText: { color: '#475569', fontSize: typography.body },
   reasonItemTextActive: { color: colors.primary, fontWeight: '600' },
+  selectedRentalCard: {
+    marginTop: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+  },
+  selectedRentalTop: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  selectedRentalIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedRentalContent: { flex: 1 },
+  selectedRentalTitle: { color: '#0F172A', fontWeight: '700', fontSize: typography.body },
+  selectedRentalMeta: { color: '#64748B', fontSize: typography.small, marginTop: 2 },
   submitBtn: { marginHorizontal: 16, backgroundColor: colors.primary, borderRadius: 12 },
   closeBtn: { marginHorizontal: 16, borderColor: colors.primary, borderRadius: 12 },
   submitBtnContent: { paddingVertical: 6 },
@@ -477,23 +657,91 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   againstInfoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#EFF6FF',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginTop: 10,
-    gap: 6,
+    paddingVertical: 10,
+    gap: 4,
   },
   againstInfoLabel: {
-    fontSize: 13,
-    color: '#64748B',
+    fontSize: 12,
+    color: '#1D4ED8',
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   againstInfoValue: {
     fontSize: 13,
     fontWeight: '600',
     color: '#0F172A',
+  },
+  uploadButton: {
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  uploadButtonDisabled: { opacity: 0.7 },
+  uploadButtonText: { color: colors.primary, fontWeight: '700', fontSize: typography.body },
+  evidenceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 14,
+  },
+  evidenceCard: {
+    width: 92,
+    height: 92,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#E2E8F0',
+    position: 'relative',
+  },
+  evidenceImage: { width: '100%', height: '100%' },
+  evidenceRemove: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(15, 23, 42, 0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyEvidenceBox: {
+    marginTop: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+    paddingVertical: 18,
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F8FAFC',
+  },
+  emptyEvidenceText: { color: '#64748B', fontSize: typography.small },
+  noteCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FED7AA',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  noteText: {
     flex: 1,
+    color: '#9A3412',
+    fontSize: typography.small,
+    lineHeight: 18,
   },
 });

@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View, Image } from 'react-native';
+import { toast } from '../../store/toastStore';
 import { ActivityIndicator, Button, Checkbox, Menu, Text, TextInput, Surface } from 'react-native-paper';
 import { useUser } from '@clerk/expo';
 import { ScreenLayout } from '../../components/common/ScreenLayout';
@@ -71,7 +72,7 @@ export const BulkEditItemsScreen = () => {
 
     const handleBulkDelete = useCallback(async () => {
         if (selectedItems.length === 0) {
-            Alert.alert('No Selection', 'Please select at least one item to delete.');
+            toast.warning('Please select at least one item to delete.');
             return;
         }
         Alert.alert(
@@ -88,12 +89,12 @@ export const BulkEditItemsScreen = () => {
                             for (const itemId of selectedItems) {
                                 await deleteItem(itemId);
                             }
-                            Alert.alert('Success', `Deleted ${selectedItems.length} item(s).`);
+                            toast.success(`Deleted ${selectedItems.length} item(s).`);
                             setSelectedItems([]);
                             if (user?.id) fetchUserItems(user.id);
                         } catch (error) {
                             console.error('Bulk delete error:', error);
-                            Alert.alert('Error', 'Failed to delete some items. Please try again.');
+                            toast.error('Failed to delete some items. Please try again.');
                         } finally {
                             setIsDeleting(false);
                         }
@@ -105,12 +106,12 @@ export const BulkEditItemsScreen = () => {
 
     const handleBulkUpdate = useCallback(async () => {
         if (selectedItems.length === 0) {
-            Alert.alert('No Selection', 'Please select at least one item to update.');
+            toast.warning('Please select at least one item to update.');
             return;
         }
         const changesCount = Object.values(bulkChanges).filter(v => v !== null && v !== '').length;
         if (changesCount === 0) {
-            Alert.alert('No Changes', 'Please specify at least one change to apply.');
+            toast.warning('Please specify at least one change to apply.');
             return;
         }
 
@@ -144,13 +145,13 @@ export const BulkEditItemsScreen = () => {
                                 await updateItem(itemId, itemUpdates);
                             }
 
-                            Alert.alert('Success', `Updated ${selectedItems.length} item(s).`);
+                            toast.success(`Updated ${selectedItems.length} item(s).`);
                             setSelectedItems([]);
                             setBulkChanges(INITIAL_BULK_CHANGES);
                             if (user?.id) fetchUserItems(user.id);
                         } catch (error) {
                             console.error('Bulk update error:', error);
-                            Alert.alert('Error', 'Failed to update some items. Please try again.');
+                            toast.error('Failed to update some items. Please try again.');
                         }
                     },
                 },

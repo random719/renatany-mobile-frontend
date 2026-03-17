@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { useUser } from '@clerk/expo';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
@@ -10,6 +10,7 @@ import { createRentalRequest } from '../../services/bookingService';
 import { useAuthStore } from '../../store/authStore';
 import { colors, typography } from '../../theme';
 import { RootStackParamList } from '../../types/navigation';
+import { toast } from '../../store/toastStore';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'BookingConfirm'>;
@@ -31,7 +32,7 @@ export const BookingConfirmScreen = () => {
 
   const handleConfirm = async () => {
     if (!userEmail) {
-      Alert.alert('Error', 'You must be logged in to make a rental request.');
+      toast.error('You must be logged in to make a rental request.');
       return;
     }
     setIsLoading(true);
@@ -53,7 +54,7 @@ export const BookingConfirmScreen = () => {
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to send rental request.';
-      Alert.alert('Error', msg);
+      toast.error(msg);
     } finally {
       setIsLoading(false);
     }

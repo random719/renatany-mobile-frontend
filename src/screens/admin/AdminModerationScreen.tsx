@@ -19,6 +19,7 @@ import {
   updateRentalRequestStatus,
 } from "../../services/adminService";
 import { api } from "../../services/api";
+import { toast } from "../../store/toastStore";
 import { colors, typography } from "../../theme";
 import { RootStackParamList } from "../../types/navigation";
 
@@ -97,10 +98,7 @@ export const AdminModerationScreen = () => {
                 return updated;
               });
             } catch (e) {
-              Alert.alert(
-                "Error",
-                `Failed to ${actionLabel} request. Please try again.`
-              );
+              toast.error(`Failed to ${actionLabel} request. Please try again.`);
             } finally {
               setProcessingId(null);
             }

@@ -12,3 +12,8 @@ export const releaseRentalPayment = async (rental_request_id: string) => {
   const response = await api.post('/payments/release', { rental_request_id });
   return response.data.data || response.data;
 };
+
+export const syncPaymentStatus = async (session_id: string, rental_request_id: string) => {
+  const response = await api.post('/payments/process', { session_id, rental_request_id });
+  return response.data;
+};

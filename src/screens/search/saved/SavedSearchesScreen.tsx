@@ -3,6 +3,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
+import { toast } from '../../../store/toastStore';
 import { GlobalHeader } from '../../../components/common/GlobalHeader';
 import { Footer } from '../../../components/home/Footer';
 import { useListingStore } from '../../../store/listingStore';
@@ -56,7 +57,7 @@ export const SavedSearchesScreen = () => {
                 notify_new_items: !search.notify_new_items,
             });
         } catch {
-            Alert.alert('Error', 'Failed to update notifications.');
+            toast.error('Failed to update notifications.');
         } finally {
             setUpdatingId(null);
         }
@@ -76,7 +77,7 @@ export const SavedSearchesScreen = () => {
                         try {
                             await deleteSavedSearch(search.id);
                         } catch {
-                            Alert.alert('Error', 'Failed to delete saved search.');
+                            toast.error('Failed to delete saved search.');
                         } finally {
                             setDeletingId(null);
                         }

@@ -3,7 +3,6 @@ import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
   FlatList,
   Image,
   Modal,
@@ -24,6 +23,7 @@ import {
   Dispute,
 } from "../../services/adminService";
 import { api } from "../../services/api";
+import { toast } from "../../store/toastStore";
 import { colors, typography } from "../../theme";
 import { RootStackParamList } from "../../types/navigation";
 
@@ -154,7 +154,7 @@ export const AdminDisputesScreen = () => {
       await loadData();
     } catch (e: any) {
       const msg = e?.response?.data?.error || e?.message || "Failed to update status.";
-      Alert.alert("Error", msg);
+      toast.error(msg);
     }
   };
 
@@ -183,11 +183,11 @@ export const AdminDisputesScreen = () => {
   const handleResolve = async () => {
     if (!selectedDispute) return;
     if (!decision) {
-      Alert.alert("Required", "Please select a decision (Favor Renter, Favor Owner, or Split).");
+      toast.warning("Please select a decision (Favor Renter, Favor Owner, or Split).");
       return;
     }
     if (!resolution.trim()) {
-      Alert.alert("Required", "Please provide a resolution message.");
+      toast.warning("Please provide a resolution message.");
       return;
     }
 
@@ -225,12 +225,12 @@ export const AdminDisputesScreen = () => {
         // Notifications are best-effort
       }
 
-      Alert.alert("Success", "Dispute resolved successfully! Both parties have been notified.");
+      toast.success("Dispute resolved successfully! Both parties have been notified.");
       setSelectedDispute(null);
       await loadData();
     } catch (e: any) {
       const msg = e?.response?.data?.error || e?.message || "Failed to resolve dispute. Please try again.";
-      Alert.alert("Error", msg);
+      toast.error(msg);
     } finally {
       setIsUpdating(false);
     }

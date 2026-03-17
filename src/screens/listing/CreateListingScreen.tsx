@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useCallback, useState, useEffect } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Button, Checkbox, Menu, Text, TextInput, Surface } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
@@ -13,6 +13,7 @@ import { useAuthStore } from '../../store/authStore';
 import { uploadFile } from '../../services/listingService';
 import { geocodeLocation } from '../../utils/geocodeLocation';
 import { RootStackParamList } from '../../types/navigation';
+import { toast } from '../../store/toastStore';
 
 const CATEGORIES = [
     { value: 'electronics', label: 'Electronics', icon: 'laptop' },
@@ -128,17 +129,17 @@ export const CreateListingScreen = () => {
 
     const addPricingTier = useCallback(() => {
         if (!newTier.days || !newTier.price) {
-            Alert.alert('Missing Info', 'Please enter both days and price for the tier.');
+            toast.warning('Please enter both days and price for the tier.');
             return;
         }
         const days = parseInt(newTier.days);
         const price = parseFloat(newTier.price);
         if (isNaN(days) || isNaN(price) || days <= 0 || price <= 0) {
-            Alert.alert('Invalid Values', 'Days and price must be positive numbers.');
+            toast.error('Days and price must be positive numbers.');
             return;
         }
         if (formData.pricing_tiers.some(t => t.days === days)) {
-            Alert.alert('Duplicate', 'A pricing tier for this duration already exists.');
+            toast.warning('A pricing tier for this duration already exists.');
             return;
         }
         setFormData(prev => ({
@@ -158,7 +159,7 @@ export const CreateListingScreen = () => {
     const pickImages = useCallback(async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            Alert.alert('Permission needed', 'Please grant photo library access to upload images.');
+            toast.warning('Please grant photo library access to upload images.');
             return;
         }
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -179,7 +180,7 @@ export const CreateListingScreen = () => {
             setUploadedImages(prev => [...prev, ...urls].slice(0, 10));
         } catch (error) {
             console.error('Image upload failed:', error);
-            Alert.alert('Upload Failed', 'Failed to upload images. Please try again.');
+            toast.error('Failed to upload images. Please try again.');
         } finally {
             setIsUploading(false);
         }
@@ -188,7 +189,7 @@ export const CreateListingScreen = () => {
     const pickVideos = useCallback(async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            Alert.alert('Permission needed', 'Please grant photo library access to upload videos.');
+            toast.warning('Please grant photo library access to upload videos.');
             return;
         }
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -204,7 +205,7 @@ export const CreateListingScreen = () => {
             setUploadedVideos(prev => [...prev, url]);
         } catch (error) {
             console.error('Video upload failed:', error);
-            Alert.alert('Upload Failed', 'Failed to upload video. Please try again.');
+            toast.error('Failed to upload video. Please try again.');
         } finally {
             setIsUploading(false);
         }
@@ -238,7 +239,7 @@ export const CreateListingScreen = () => {
                 2: 'Please upload at least one photo.',
                 3: 'Please set a daily rate.',
             };
-            Alert.alert('Incomplete', messages[step] || 'Please complete all required fields.');
+            toast.warning(messages[step] || 'Please complete all required fields.');
             return;
         }
         setStep(prev => prev + 1);
@@ -246,7 +247,7 @@ export const CreateListingScreen = () => {
 
     const handleSubmit = useCallback(async () => {
         if (!isStepValid(3)) {
-            Alert.alert('Incomplete', 'Please set a daily rate.');
+            toast.warning('Please set a daily rate.');
             return;
         }
 
@@ -291,18 +292,14 @@ export const CreateListingScreen = () => {
 
             if (isEditMode && itemId) {
                 await updateItem(itemId, payload);
-                Alert.alert('Success', 'Your item has been updated!', [
-                    { text: 'OK', onPress: () => navigation.goBack() },
-                ]);
+                toast.success('Your item has been updated!', () => navigation.goBack());
             } else {
                 await createItem(payload);
-                Alert.alert('Success', 'Your item has been listed!', [
-                    { text: 'OK', onPress: () => navigation.goBack() },
-                ]);
+                toast.success('Your item has been listed!', () => navigation.goBack());
             }
         } catch (error) {
             console.error('Error saving item:', error);
-            Alert.alert('Error', 'Failed to save listing. Please try again.');
+            toast.error('Failed to save listing. Please try again.');
         }
     }, [formData, uploadedImages, uploadedVideos, createItem, updateItem, navigation, isStepValid, isEditMode, itemId]);
 

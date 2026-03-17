@@ -8,6 +8,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import { lightTheme } from './src/theme';
 import { AppNavigator } from './src/navigation/AppNavigator';
+import { Toast } from './src/components/common/Toast';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -86,6 +87,7 @@ export default function App() {
         <PaperProvider theme={lightTheme}>
           <StatusBar style="auto" />
           <AppNavigator />
+          <Toast />
         </PaperProvider>
       </SafeAreaProvider>
     </ClerkProvider>

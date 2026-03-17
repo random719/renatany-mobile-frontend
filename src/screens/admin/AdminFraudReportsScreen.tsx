@@ -17,6 +17,7 @@ import {
   updateFraudReportStatus,
   FraudReport,
 } from "../../services/adminService";
+import { toast } from "../../store/toastStore";
 import { colors, typography } from "../../theme";
 
 export const AdminFraudReportsScreen = () => {
@@ -68,10 +69,7 @@ export const AdminFraudReportsScreen = () => {
                 return updated;
               });
             } catch (e) {
-              Alert.alert(
-                "Error",
-                `Failed to ${actionLabel}. Please try again.`
-              );
+              toast.error(`Failed to ${actionLabel}. Please try again.`);
             } finally {
               setProcessingId(null);
             }

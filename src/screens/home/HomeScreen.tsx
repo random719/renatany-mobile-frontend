@@ -3,7 +3,6 @@ import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -32,6 +31,7 @@ import { useUIStore } from "../../store/uiStore";
 import { colors, typography } from "../../theme";
 import { Category, Listing, ListingFilter } from "../../types/listing";
 import { HomeStackParamList } from "../../types/navigation";
+import { toast } from "../../store/toastStore";
 
 // Extend the local type for this specific navigation call
 type ExtendedHomeStackParamList = HomeStackParamList & { SearchTab: undefined };
@@ -149,7 +149,7 @@ export const HomeScreen = () => {
 
   const handleSaveSearch = () => {
     if (!query.trim() && !location.trim() && !selectedCategory) {
-      Alert.alert("No Search", "Enter a search query, location, or select a category first.");
+      toast.warning("No Search: Enter a search query, location, or select a category first.");
       return;
     }
     setSaveSearchName("");
@@ -158,7 +158,7 @@ export const HomeScreen = () => {
 
   const handleConfirmSaveSearch = async () => {
     if (!saveSearchName.trim()) {
-      Alert.alert("Error", "Please enter a name for your saved search.");
+      toast.error("Please enter a name for your saved search.");
       return;
     }
     setIsSavingSearch(true);
@@ -169,9 +169,9 @@ export const HomeScreen = () => {
       if (selectedCategory) filter.category = selectedCategory;
       await createSavedSearch(saveSearchName.trim(), filter);
       setSaveSearchModalVisible(false);
-      Alert.alert("Search Saved", "You'll receive notifications when new items match your criteria.");
+      toast.success("Search Saved: You'll receive notifications when new items match your criteria.");
     } catch {
-      Alert.alert("Error", "Failed to save search. Please try again.");
+      toast.error("Failed to save search. Please try again.");
     } finally {
       setIsSavingSearch(false);
     }
@@ -196,7 +196,7 @@ export const HomeScreen = () => {
   };
  
   const handleGrowingCommunityPress = () => {
-    Alert.alert("Growing Community", "Join thousands of users sharing items in your neighborhood!");
+    toast.info("Growing Community: Join thousands of users sharing items in your neighborhood!");
   };
 
   const getActiveFiltersCount = () => {

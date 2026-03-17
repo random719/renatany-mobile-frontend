@@ -2,19 +2,22 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Button, Text } from 'react-native-paper';
 import { useAuth, useUser } from '@clerk/expo';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
+import { getConditionReports } from '../../services/conditionReportService';
 import { getRentalRequestById } from '../../services/rentalService';
 import { getListingById } from '../../services/listingService';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { toast } from '../../store/toastStore';
 import { colors, typography } from '../../theme';
-import { RentalRequest } from '../../types/models';
+import { ConditionReport, RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
+import { getConditionReportRules } from '../../utils/conditionReportRules';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'RentalDetail'>;
@@ -59,14 +62,19 @@ export const RentalDetailScreen = () => {
 
   const [rental, setRental] = useState<RentalRequest | null>(null);
   const [itemInfo, setItemInfo] = useState<ItemInfo | null>(null);
+  const [conditionReports, setConditionReports] = useState<ConditionReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [downloadingReceipt, setDownloadingReceipt] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const data = await getRentalRequestById(rentalId);
+        const [data, reports] = await Promise.all([
+          getRentalRequestById(rentalId),
+          getConditionReports({ rental_request_id: rentalId }),
+        ]);
         setRental(data);
+        setConditionReports(reports);
 
         // Fetch item details
         if (data?.item_id) {
@@ -89,9 +97,7 @@ export const RentalDetailScreen = () => {
           }
         }
       } catch {
-        Alert.alert('Error', 'Failed to load rental details.', [
-          { text: 'OK', onPress: () => navigation.goBack() },
-        ]);
+        toast.error('Failed to load rental details.', () => navigation.goBack());
       } finally {
         setIsLoading(false);
       }
@@ -105,7 +111,7 @@ export const RentalDetailScreen = () => {
       const baseUrl = api.defaults.baseURL || '';
       const token = await getToken();
       if (!token) {
-        Alert.alert('Error', 'Session expired. Please log in again.');
+        toast.error('Session expired. Please log in again.');
         setDownloadingReceipt(false);
         return;
       }
@@ -126,16 +132,16 @@ export const RentalDetailScreen = () => {
           dialogTitle: `Receipt - ${rental.id}`,
         });
       } else {
-        Alert.alert('Success', 'Receipt downloaded successfully.');
+        toast.success('Receipt downloaded successfully.');
       }
     } catch (err: any) {
       const msg = err?.message || '';
       if (msg.includes('401') || msg.includes('Unauthorized')) {
-        Alert.alert('Session Expired', 'Please log in again to download receipts.');
+        toast.error('Session expired. Please log in again to download receipts.');
       } else if (msg.includes('400') || msg.includes('only available')) {
-        Alert.alert('Receipt Unavailable', 'Receipts are only available for paid or completed rentals.');
+        toast.warning('Receipts are only available for paid or completed rentals.');
       } else {
-        Alert.alert('Download Failed', 'Unable to download receipt. Please try again.');
+        toast.error('Unable to download receipt. Please try again.');
       }
     } finally {
       setDownloadingReceipt(false);
@@ -180,6 +186,7 @@ export const RentalDetailScreen = () => {
   const securityDeposit = typeof rental.security_deposit === 'number' ? rental.security_deposit : 0;
   const totalPaid = typeof rental.total_paid === 'number' ? rental.total_paid : rentalCost + platformFee + securityDeposit;
   const ownerPayout = rentalCost - platformFee;
+  const reportRules = getConditionReportRules(rental, conditionReports, userEmail);
 
   const locationStr = itemInfo?.location
     ? typeof itemInfo.location === 'string'
@@ -317,9 +324,18 @@ export const RentalDetailScreen = () => {
             Download Receipt
           </Button>
 
-          {/* Condition Reports - only for paid/completed rentals */}
-          {rental && ['paid', 'completed'].includes(rental.status) && (
+          {/* Condition Reports */}
+          {rental && (
             <>
+              <View style={styles.conditionSummaryCard}>
+                <Text style={styles.sectionLabel}>Condition Reports</Text>
+                <Text style={styles.conditionSummaryText}>
+                  Pickup reports: {reportRules.pickupReports.length}/2
+                </Text>
+                <Text style={styles.conditionSummaryText}>
+                  Return reports: {reportRules.returnReports.length}/2
+                </Text>
+              </View>
               <Button
                 mode="outlined"
                 onPress={() =>
@@ -331,9 +347,13 @@ export const RentalDetailScreen = () => {
                 style={styles.receiptBtn}
                 contentStyle={styles.btnContent}
                 icon="clipboard-check-outline"
+                disabled={!reportRules.canCreatePickupReport && !reportRules.userPickupReport}
               >
-                Pickup Report
+                {reportRules.userPickupReport ? 'View Pickup Report' : 'Pickup Report'}
               </Button>
+              {!reportRules.canCreatePickupReport && !reportRules.userPickupReport && reportRules.pickupStatusMessage ? (
+                <Text style={styles.conditionHint}>{reportRules.pickupStatusMessage}</Text>
+              ) : null}
               <Button
                 mode="outlined"
                 onPress={() =>
@@ -345,9 +365,13 @@ export const RentalDetailScreen = () => {
                 style={styles.receiptBtn}
                 contentStyle={styles.btnContent}
                 icon="clipboard-arrow-left-outline"
+                disabled={!reportRules.canCreateReturnReport && !reportRules.userReturnReport}
               >
-                Return Report
+                {reportRules.userReturnReport ? 'View Return Report' : 'Return Report'}
               </Button>
+              {!reportRules.canCreateReturnReport && !reportRules.userReturnReport && reportRules.returnStatusMessage ? (
+                <Text style={styles.conditionHint}>{reportRules.returnStatusMessage}</Text>
+              ) : null}
             </>
           )}
 
@@ -479,6 +503,15 @@ const styles = StyleSheet.create({
   actions: { marginHorizontal: 16, gap: 10 },
   chatBtn: { backgroundColor: colors.primary, borderRadius: 12 },
   receiptBtn: { borderColor: '#111827', borderRadius: 12 },
+  conditionSummaryCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  conditionSummaryText: { color: '#475569', fontSize: typography.small, marginTop: 4 },
+  conditionHint: { color: '#64748B', fontSize: typography.small, lineHeight: 18, marginTop: -4 },
   backBtnAction: { borderColor: colors.primary, borderRadius: 12 },
   btnContent: { paddingVertical: 6 },
   notFoundText: { color: '#94A3B8', fontSize: typography.body },

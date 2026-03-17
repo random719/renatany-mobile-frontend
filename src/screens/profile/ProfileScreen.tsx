@@ -1,34 +1,33 @@
 import { useClerk, useUser } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  Image,
-  Linking,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    Linking,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { ActivityIndicator, Button, Surface, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { ListingCard } from '../../components/listing/ListingCard';
 import { api } from '../../services/api';
+import * as disputeService from '../../services/disputeService';
 import * as listingService from '../../services/listingService';
 import * as rentalService from '../../services/rentalService';
-import * as disputeService from '../../services/disputeService';
 import { useAuthStore } from '../../store/authStore';
 import { useListingStore } from '../../store/listingStore';
-import { RentalRequest, Dispute } from '../../types/models';
+import { toast } from '../../store/toastStore';
+import { Dispute, RentalRequest } from '../../types/models';
 
 interface BackendUser {
   id: string;
@@ -376,7 +375,7 @@ export const ProfileScreen = () => {
 
       // Check file size (50MB max per backend)
       if (file.size && file.size > 50 * 1024 * 1024) {
-        Alert.alert('File Too Large', 'Maximum file size is 50MB.');
+        toast.warning('Maximum file size is 50MB.');
         return;
       }
 
@@ -422,10 +421,10 @@ export const ProfileScreen = () => {
       await api.put('/users/me', { documents: [...currentDocs, fileUrl] });
       await loadProfile();
 
-      Alert.alert('Success', 'Document uploaded successfully.');
+      toast.success('Document uploaded successfully.');
     } catch (err: any) {
       console.error('Document upload failed:', err);
-      Alert.alert('Upload Failed', err?.message || 'Could not upload document. Please try again.');
+      toast.error(err?.message || 'Could not upload document. Please try again.');
     } finally {
       setIsUploading(false);
     }
@@ -445,7 +444,7 @@ export const ProfileScreen = () => {
             await api.put('/users/me', { documents: updated });
             await loadProfile();
           } catch {
-            Alert.alert('Error', 'Failed to delete document.');
+            toast.error('Failed to delete document.');
           }
         },
       },
@@ -487,7 +486,7 @@ export const ProfileScreen = () => {
       await WebBrowser.openAuthSessionAsync(url, nativeCardCallback);
       await refreshPaymentStatus();
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to start card setup.');
+      toast.error(err?.response?.data?.error || 'Failed to start card setup.');
     }
   };
 
@@ -516,7 +515,7 @@ export const ProfileScreen = () => {
         );
       }
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to start bank setup.');
+      toast.error(err?.response?.data?.error || 'Failed to start bank setup.');
     }
   };
 

@@ -36,6 +36,12 @@ export const LoginScreen = ({ navigation }: Props) => {
     setPasswordTouched(true);
     if (!canSubmit || !isLoaded) return;
 
+    // Check if there is already a complete session waiting to be activated
+    if (signIn.status === 'complete' && signIn.createdSessionId) {
+      await setActive({ session: signIn.createdSessionId });
+      return;
+    }
+
     setIsLoading(true);
     setClerkError(null);
     try {
@@ -51,7 +57,17 @@ export const LoginScreen = ({ navigation }: Props) => {
         console.log(JSON.stringify(completeSignIn, null, 2));
       }
     } catch (err: any) {
-      setClerkError(err.errors?.[0]?.message || 'Invalid email or password');
+      const errorMessage = err.errors?.[0]?.message;
+      
+      // Handle "Session already exists" specifically
+      if (errorMessage === 'Session already exists') {
+        if (signIn.status === 'complete' && signIn.createdSessionId) {
+          await setActive({ session: signIn.createdSessionId });
+          return;
+        }
+      }
+
+      setClerkError(errorMessage || 'Invalid email or password');
     } finally {
       setIsLoading(false);
     }

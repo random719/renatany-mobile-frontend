@@ -2,7 +2,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
   FlatList,
   Linking,
   RefreshControl,
@@ -21,6 +20,7 @@ import {
   ListingReport,
 } from "../../services/adminService";
 import { getListings } from "../../services/listingService";
+import { toast } from "../../store/toastStore";
 import { colors, typography } from "../../theme";
 
 const reasonLabels: Record<string, string> = {
@@ -114,9 +114,9 @@ export const AdminListingReportsScreen = () => {
       setSelectedReport(null);
       setAdminNotes("");
       setActionTaken("none");
-      Alert.alert("Success", `Report marked as ${newStatus}`);
+      toast.success(`Report marked as ${newStatus}`);
     } catch (e) {
-      Alert.alert("Error", "Failed to update report status");
+      toast.error("Failed to update report status");
     } finally {
       setProcessingId(null);
     }
@@ -161,7 +161,7 @@ export const AdminListingReportsScreen = () => {
   const handleTakeAction = async () => {
     if (!selectedReport) return;
     if (actionTaken === 'none') {
-      Alert.alert("Action Required", "Please select an action to take.");
+      toast.warning("Please select an action to take.");
       return;
     }
 
@@ -183,9 +183,9 @@ export const AdminListingReportsScreen = () => {
 
       const actionLabel = actionLabels[actionTaken] || actionTaken;
       closeReview();
-      Alert.alert("Success", `${actionLabel} applied and report resolved.`);
+      toast.success(`${actionLabel} applied and report resolved.`);
     } catch (e) {
-      Alert.alert("Error", "Failed to take action on this report.");
+      toast.error("Failed to take action on this report.");
     } finally {
       setProcessingId(null);
     }

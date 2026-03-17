@@ -2,12 +2,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, StyleSheet, TextInput, TouchableOpacity, View, Modal, ScrollView } from 'react-native';
+import { FlatList, StyleSheet, TextInput, TouchableOpacity, View, Modal, ScrollView } from 'react-native';
 import { ActivityIndicator, Menu, Text, Checkbox } from 'react-native-paper';
 import { useUser } from '@clerk/expo';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { ListingCard } from '../../components/listing/ListingCard';
 import { useListingStore } from '../../store/listingStore';
+import { toast } from '../../store/toastStore';
 import { colors, typography } from '../../theme';
 import { ListingFilter } from '../../types/listing';
 import { SearchStackParamList } from '../../types/navigation';
@@ -171,7 +172,7 @@ export const SearchScreen = () => {
 
   const handleSaveSearch = () => {
     if (!query.trim() && !location.trim() && !activeFilter.category) {
-      Alert.alert('No Search', 'Enter a search query, location, or select a category first.');
+      toast.warning('Enter a search query, location, or select a category first.');
       return;
     }
     setSaveSearchName('');
@@ -180,16 +181,16 @@ export const SearchScreen = () => {
 
   const handleConfirmSaveSearch = async () => {
     if (!saveSearchName.trim()) {
-      Alert.alert('Error', 'Please enter a name for your saved search.');
+      toast.error('Please enter a name for your saved search.');
       return;
     }
     setIsSavingSearch(true);
     try {
       await createSavedSearch(saveSearchName.trim(), activeFilter);
       setSaveSearchModalVisible(false);
-      Alert.alert('Search Saved', "You'll receive notifications when new items match your criteria.");
+      toast.success("Search saved! You'll receive notifications when new items match your criteria.");
     } catch {
-      Alert.alert('Error', 'Failed to save search. Please try again.');
+      toast.error('Failed to save search. Please try again.');
     } finally {
       setIsSavingSearch(false);
     }

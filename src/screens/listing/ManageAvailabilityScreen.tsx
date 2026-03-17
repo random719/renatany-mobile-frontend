@@ -15,6 +15,7 @@ import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { api } from '../../services/api';
 import { colors, typography } from '../../theme';
 import { RootStackParamList } from '../../types/navigation';
+import { toast } from '../../store/toastStore';
 
 type Route = RouteProp<RootStackParamList, 'ManageAvailability'>;
 
@@ -152,14 +153,14 @@ export const ManageAvailabilityScreen = () => {
 
       const failures = results.filter((r) => r.status === 'rejected');
       if (failures.length > 0) {
-        Alert.alert('Error', `Failed to block ${failures.length} date(s).`);
+        toast.error(`Failed to block ${failures.length} date(s).`);
       } else {
-        Alert.alert('Success', `Blocked ${selectedDates.length} date${selectedDates.length !== 1 ? 's' : ''}.`);
+        toast.success(`Blocked ${selectedDates.length} date${selectedDates.length !== 1 ? 's' : ''}.`);
       }
       setSelectedDates([]);
       await loadAvailability();
     } catch {
-      Alert.alert('Error', 'Failed to block dates.');
+      toast.error('Failed to block dates.');
     } finally {
       setIsBlocking(false);
     }
@@ -171,7 +172,7 @@ export const ManageAvailabilityScreen = () => {
         await api.delete(`/item-availability/${id}`);
         await loadAvailability();
       } catch {
-        Alert.alert('Error', 'Failed to unblock date.');
+        toast.error('Failed to unblock date.');
       }
     },
     [loadAvailability]
