@@ -101,8 +101,13 @@ export const SavedSearchesScreen = () => {
             <View key={search.id} style={styles.card}>
                 <View style={styles.cardHeader}>
                     <View style={styles.cardTitleRow}>
-                        <MaterialCommunityIcons name="bookmark" size={20} color="#CA8A04" />
-                        <Text style={styles.cardTitle} numberOfLines={1}>{search.name}</Text>
+                        <View style={styles.cardIconWrap}>
+                            <MaterialCommunityIcons name="bookmark" size={18} color="#CA8A04" />
+                        </View>
+                        <View style={styles.cardTitleBlock}>
+                            <Text style={styles.cardTitle} numberOfLines={1}>{search.name}</Text>
+                            <Text style={styles.cardMeta}>Saved {formatDate(search.created_at)}</Text>
+                        </View>
                     </View>
                     {search.notify_new_items ? (
                         <View style={styles.notifBadgeOn}>
@@ -117,6 +122,10 @@ export const SavedSearchesScreen = () => {
                     )}
                 </View>
 
+                <View style={styles.criteriaHeader}>
+                    <MaterialCommunityIcons name="tune-variant" size={14} color="#64748B" />
+                    <Text style={styles.criteriaHeaderText}>Search criteria</Text>
+                </View>
                 <View style={styles.filterBadges}>
                     {filters?.search_query ? (
                         <View style={styles.badge}>
@@ -170,17 +179,13 @@ export const SavedSearchesScreen = () => {
                         style={[styles.outlineBtn, styles.deleteBtn]}
                         onPress={() => handleDelete(search)}
                         disabled={isDeleting}
-                    >
-                        {isDeleting ? (
-                            <ActivityIndicator size={14} color="#DC2626" />
-                        ) : (
-                            <MaterialCommunityIcons name="trash-can-outline" size={16} color="#DC2626" />
-                        )}
-                    </TouchableOpacity>
-
-                    <Text style={styles.dateText}>
-                        {formatDate(search.created_at)}
-                    </Text>
+                        >
+                            {isDeleting ? (
+                                <ActivityIndicator size={14} color="#DC2626" />
+                            ) : (
+                                <MaterialCommunityIcons name="trash-can-outline" size={16} color="#DC2626" />
+                            )}
+                        </TouchableOpacity>
                 </View>
             </View>
         );
@@ -206,14 +211,26 @@ export const SavedSearchesScreen = () => {
                         <Text style={styles.backBtnText}>Back to Browse</Text>
                     </TouchableOpacity>
 
-                    <View style={styles.titleRow}>
-                        <MaterialCommunityIcons name="bookmark" size={32} color="#2563EB" />
-                        <Text style={styles.title}>Saved Searches</Text>
-                    </View>
+                    <View style={styles.headerCard}>
+                        <View style={styles.titleRow}>
+                            <View style={styles.headerIconWrap}>
+                                <MaterialCommunityIcons name="bookmark" size={24} color="#2563EB" />
+                            </View>
+                            <View style={styles.headerTextBlock}>
+                                <Text style={styles.title}>Saved Searches</Text>
+                                <Text style={styles.countText}>
+                                    {isSavedSearchesLoading ? 'Loading...' : `${savedSearches.length} saved search${savedSearches.length !== 1 ? 'es' : ''}`}
+                                </Text>
+                            </View>
+                        </View>
 
-                    <Text style={styles.countText}>
-                        {isSavedSearchesLoading ? 'Loading...' : `${savedSearches.length} saved search${savedSearches.length !== 1 ? 'es' : ''}`}
-                    </Text>
+                        <View style={styles.headerHintBox}>
+                            <MaterialCommunityIcons name="bell-ring-outline" size={16} color="#1D4ED8" />
+                            <Text style={styles.headerHintText}>
+                                Reuse your favorite filters and get alerts when matching items are added.
+                            </Text>
+                        </View>
+                    </View>
                 </View>
 
                 {isSavedSearchesLoading && savedSearches.length === 0 ? (
@@ -241,6 +258,7 @@ export const SavedSearchesScreen = () => {
                     </View>
                 )}
 
+                <View style={styles.footerSpacer} />
                 <Footer />
             </ScrollView>
         </View>
@@ -250,46 +268,88 @@ export const SavedSearchesScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#F8FAFC',
     },
     scroll: {
         flex: 1,
     },
     scrollContent: {
         flexGrow: 1,
+        paddingBottom: 0,
     },
     headerSection: {
-        paddingHorizontal: 24,
-        paddingTop: 32,
+        paddingHorizontal: 20,
+        paddingTop: 28,
         paddingBottom: 8,
     },
     backBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        marginBottom: 28,
+        marginBottom: 18,
+        alignSelf: 'flex-start',
     },
     backBtnText: {
         color: '#475569',
         fontSize: 15,
         fontWeight: '500',
     },
+    headerCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        padding: 18,
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.05,
+        shadowRadius: 18,
+        elevation: 3,
+    },
     titleRow: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: 12,
-        marginBottom: 8,
+        marginBottom: 14,
+    },
+    headerIconWrap: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#DBEAFE',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerTextBlock: {
+        flex: 1,
     },
     title: {
-        fontSize: 30,
-        fontWeight: 'bold',
+        fontSize: 28,
+        fontWeight: '800',
         color: '#0F172A',
         letterSpacing: -0.5,
     },
     countText: {
         color: '#64748B',
-        fontSize: 16,
-        marginBottom: 24,
+        fontSize: 15,
+        marginTop: 4,
+    },
+    headerHintBox: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 10,
+        backgroundColor: '#EFF6FF',
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+    },
+    headerHintText: {
+        flex: 1,
+        color: '#1D4ED8',
+        fontSize: 14,
+        lineHeight: 20,
     },
     loadingContainer: {
         alignItems: 'center',
@@ -301,7 +361,7 @@ const styles = StyleSheet.create({
     },
     emptyCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 12,
+        borderRadius: 20,
         borderWidth: 1,
         borderColor: '#E2E8F0',
         paddingVertical: 56,
@@ -318,9 +378,9 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     emptyTitle: {
-        fontSize: 20,
-        fontWeight: '500',
-        color: '#64748B',
+        fontSize: 22,
+        fontWeight: '700',
+        color: '#334155',
         marginBottom: 12,
         textAlign: 'center',
     },
@@ -346,36 +406,55 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         gap: 16,
     },
+    footerSpacer: {
+        height: 28,
+    },
     card: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 12,
+        borderRadius: 18,
         borderWidth: 2,
         borderColor: '#FDE047',
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        padding: 18,
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowRadius: 16,
+        elevation: 3,
     },
     cardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         marginBottom: 12,
     },
     cardTitleRow: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: 8,
         flex: 1,
         marginRight: 8,
     },
+    cardIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#FEF9C3',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cardTitleBlock: {
+        flex: 1,
+    },
     cardTitle: {
         fontSize: 17,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#111827',
         flex: 1,
+    },
+    cardMeta: {
+        color: '#94A3B8',
+        fontSize: 12,
+        marginTop: 4,
     },
     notifBadgeOn: {
         flexDirection: 'row',
@@ -409,6 +488,18 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: '#6B7280',
     },
+    criteriaHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 10,
+    },
+    criteriaHeaderText: {
+        color: '#64748B',
+        fontSize: 13,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+    },
     filterBadges: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -418,9 +509,10 @@ const styles = StyleSheet.create({
     badge: {
         borderWidth: 1,
         borderColor: '#E5E7EB',
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
+        borderRadius: 999,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: '#F8FAFC',
     },
     badgeText: {
         fontSize: 13,
@@ -441,9 +533,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 6,
         backgroundColor: '#111827',
-        borderRadius: 8,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 11,
+        shadowColor: '#111827',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 10,
+        elevation: 2,
     },
     applyBtnText: {
         color: '#FFFFFF',
@@ -453,17 +550,12 @@ const styles = StyleSheet.create({
     outlineBtn: {
         borderWidth: 1,
         borderColor: '#E5E7EB',
-        borderRadius: 8,
+        borderRadius: 12,
         padding: 10,
         alignItems: 'center',
         justifyContent: 'center',
     },
     deleteBtn: {
         borderColor: '#FECACA',
-    },
-    dateText: {
-        marginLeft: 'auto',
-        fontSize: 13,
-        color: '#9CA3AF',
     },
 });
