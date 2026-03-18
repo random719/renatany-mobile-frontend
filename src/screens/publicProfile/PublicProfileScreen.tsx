@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 import { ScreenLayout } from '../../components/common/ScreenLayout';
+import { useI18n } from '../../i18n';
 import { api } from '../../services/api';
 import { colors } from '../../theme';
 import { PublicUserProfile } from '../../types/models';
@@ -43,6 +44,7 @@ interface Review {
 
 export const PublicProfileScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { t } = useI18n();
   const route = useRoute<Route>();
   const { userEmail } = route.params;
 
@@ -118,7 +120,7 @@ export const PublicProfileScreen = () => {
       )}
       <View style={styles.listingInfo}>
         <Text style={styles.listingTitle} numberOfLines={2}>{item.title}</Text>
-        <Text style={styles.listingPrice}>${item.daily_rate}/day</Text>
+        <Text style={styles.listingPrice}>{t('publicProfile.perDay', { price: item.daily_rate })}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -155,11 +157,11 @@ export const PublicProfileScreen = () => {
           <View style={styles.contentWrapper}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
               <MaterialCommunityIcons name="arrow-left" size={24} color="#0F172A" />
-              <Text style={styles.backText}>Back</Text>
+              <Text style={styles.backText}>{t('common.back')}</Text>
             </TouchableOpacity>
             <View style={styles.emptyCard}>
               <MaterialCommunityIcons name="account-off" size={48} color="#D1D5DB" />
-              <Text style={styles.emptyText}>User not found</Text>
+              <Text style={styles.emptyText}>{t('publicProfile.userNotFound')}</Text>
             </View>
           </View>
         </ScreenLayout>
@@ -173,7 +175,7 @@ export const PublicProfileScreen = () => {
         <View style={styles.contentWrapper}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <MaterialCommunityIcons name="arrow-left" size={24} color="#0F172A" />
-            <Text style={styles.backText}>Back</Text>
+            <Text style={styles.backText}>{t('common.back')}</Text>
           </TouchableOpacity>
 
           {/* Profile Header */}
@@ -186,7 +188,7 @@ export const PublicProfileScreen = () => {
               </View>
             )}
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{profile.full_name || profile.username || 'User'}</Text>
+              <Text style={styles.profileName}>{profile.full_name || profile.username || t('common.user')}</Text>
               {profile.username && (
                 <Text style={styles.profileUsername}>@{profile.username}</Text>
               )}
@@ -202,13 +204,13 @@ export const PublicProfileScreen = () => {
                 {profile.verification_status === 'verified' && (
                   <View style={styles.verifiedBadge}>
                     <MaterialCommunityIcons name="check-decagram" size={16} color="#3B82F6" />
-                    <Text style={styles.verifiedText}>Verified</Text>
+                    <Text style={styles.verifiedText}>{t('common.verified')}</Text>
                   </View>
                 )}
               </View>
               {profile.created_at && (
                 <Text style={styles.memberSince}>
-                  Member since {new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  {t('publicProfile.memberSince', { date: new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) })}
                 </Text>
               )}
             </View>
@@ -225,7 +227,7 @@ export const PublicProfileScreen = () => {
               onPress={() => setActiveTab('listings')}
             >
               <Text style={[styles.tabText, activeTab === 'listings' && styles.tabTextActive]}>
-                Items ({listings.length})
+                {t('publicProfile.itemsTab', { count: listings.length })}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -233,7 +235,7 @@ export const PublicProfileScreen = () => {
               onPress={() => setActiveTab('reviews')}
             >
               <Text style={[styles.tabText, activeTab === 'reviews' && styles.tabTextActive]}>
-                Reviews ({reviews.length})
+                {t('publicProfile.reviewsTab', { count: reviews.length })}
               </Text>
             </TouchableOpacity>
           </View>
@@ -243,7 +245,7 @@ export const PublicProfileScreen = () => {
             listings.length === 0 ? (
               <View style={styles.emptyCard}>
                 <MaterialCommunityIcons name="package-variant" size={48} color="#D1D5DB" />
-                <Text style={styles.emptyText}>No listings yet</Text>
+                <Text style={styles.emptyText}>{t('publicProfile.noListings')}</Text>
               </View>
             ) : (
               <View style={styles.listingsGrid}>
@@ -257,7 +259,7 @@ export const PublicProfileScreen = () => {
           ) : reviews.length === 0 ? (
             <View style={styles.emptyCard}>
               <MaterialCommunityIcons name="star-outline" size={48} color="#D1D5DB" />
-              <Text style={styles.emptyText}>No reviews yet</Text>
+              <Text style={styles.emptyText}>{t('publicProfile.noReviews')}</Text>
             </View>
           ) : (
             reviews.map((review) => (

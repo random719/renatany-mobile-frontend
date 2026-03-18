@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
+import { useI18n } from '../../i18n';
 import { typography } from '../../theme';
 
 interface Step {
@@ -12,46 +13,47 @@ interface Step {
     iconBg: string;
 }
 
-const STEPS: Step[] = [
-    {
-        id: 1,
-        title: 'Find What You Need',
-        description: 'Browse thousands of items from your neighbors - tools, electronics, sports gear, and more.',
-        icon: 'magnify',
-        iconBg: '#3B82F6', // Blue
-    },
-    {
-        id: 2,
-        title: 'Connect with Owner',
-        description: 'Send a rental request and chat directly with the item owner to arrange details.',
-        icon: 'chat-outline',
-        iconBg: '#A855F7', // Purple
-    },
-    {
-        id: 3,
-        title: 'Pay Securely',
-        description: 'Book with confidence using our secure payment system with deposit protection.',
-        icon: 'credit-card-outline',
-        iconBg: '#22C55E', // Green
-    },
-];
-
 export const HowItWorks = () => {
+    const { t } = useI18n();
+    const steps: Step[] = [
+        {
+            id: 1,
+            title: t('home.howItWorks.step1Title'),
+            description: t('home.howItWorks.step1Description'),
+            icon: 'magnify',
+            iconBg: '#3B82F6',
+        },
+        {
+            id: 2,
+            title: t('home.howItWorks.step2Title'),
+            description: t('home.howItWorks.step2Description'),
+            icon: 'chat-outline',
+            iconBg: '#A855F7',
+        },
+        {
+            id: 3,
+            title: t('home.howItWorks.step3Title'),
+            description: t('home.howItWorks.step3Description'),
+            icon: 'credit-card-outline',
+            iconBg: '#22C55E',
+        },
+    ];
+
     return (
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
                 <Text variant="headlineSmall" style={styles.title}>
-                    How It Works
+                    {t('home.howItWorks.title')}
                 </Text>
                 <Text variant="bodyMedium" style={styles.subtitle}>
-                    Rent anything in 4 simple steps. No commitments, no hassle.
+                    {t('home.howItWorks.subtitle')}
                 </Text>
             </View>
 
             {/* Steps List */}
             <View style={styles.stepsContainer}>
-                {STEPS.map((step) => (
+                {steps.map((step) => (
                     <View key={step.id} style={styles.stepCardWrapper}>
                         {/* Number Badge (floating) */}
                         <View style={styles.numberBadge}>
@@ -82,10 +84,10 @@ export const HowItWorks = () => {
                             <MaterialCommunityIcons name="package-variant-closed" size={28} color="#FFFFFF" />
                         </View>
                         <Text variant="titleMedium" style={styles.stepTitle}>
-                            Pick Up & Return
+                            {t('home.howItWorks.step4Title')}
                         </Text>
                         <Text variant="bodyMedium" style={styles.stepDescription}>
-                            Collect your item, use it, and return it when done. Leave a review!
+                            {t('home.howItWorks.step4Description')}
                         </Text>
                     </View>
                 </View>

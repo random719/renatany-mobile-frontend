@@ -8,6 +8,7 @@ import { useSignIn, useSignUp } from '@clerk/expo/legacy';
 import { GoogleIcon, FacebookIcon } from '../../components/SocialIcons';
 import { getEmailError, getPasswordError } from '../../utils/validators';
 import { colors, typography } from '../../theme';
+import { useI18n } from '../../i18n';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { AuthStackParamList } from '../../types/navigation';
 
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export const LoginScreen = ({ navigation }: Props) => {
+  const { t } = useI18n();
   const { signIn, setActive, isLoaded } = useSignIn();
   const { signUp, isLoaded: isSignUpLoaded } = useSignUp();
   const [email, setEmail] = useState('');
@@ -67,7 +69,7 @@ export const LoginScreen = ({ navigation }: Props) => {
         }
       }
 
-      setClerkError(errorMessage || 'Invalid email or password');
+      setClerkError(errorMessage || t('auth.invalidCredentials'));
     } finally {
       setIsLoading(false);
     }
@@ -83,16 +85,16 @@ export const LoginScreen = ({ navigation }: Props) => {
 
       const verificationUrl = signIn.firstFactorVerification?.externalVerificationRedirectURL?.toString();
       if (!verificationUrl) {
-        setClerkError('Google sign in could not be started');
+        setClerkError(t('auth.googleStartFailed'));
         return;
       }
 
       const authSessionResult = await WebBrowser.openAuthSessionAsync(verificationUrl, redirectUrl);
       if (authSessionResult.type !== 'success' || !authSessionResult.url) {
         if (authSessionResult?.type === 'cancel' || authSessionResult?.type === 'dismiss') {
-          setClerkError('Google sign in was cancelled');
+          setClerkError(t('auth.googleCancelled'));
         } else {
-          setClerkError('Google sign in could not be completed');
+          setClerkError(t('auth.googleIncomplete'));
         }
         return;
       }
@@ -114,9 +116,9 @@ export const LoginScreen = ({ navigation }: Props) => {
         }
       }
 
-      setClerkError('Google sign in could not be completed');
+      setClerkError(t('auth.googleIncomplete'));
     } catch (err: any) {
-      setClerkError(err?.errors?.[0]?.message || err?.message || 'Google sign in failed');
+      setClerkError(err?.errors?.[0]?.message || err?.message || t('auth.googleFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -132,16 +134,16 @@ export const LoginScreen = ({ navigation }: Props) => {
 
       const verificationUrl = signIn.firstFactorVerification?.externalVerificationRedirectURL?.toString();
       if (!verificationUrl) {
-        setClerkError('Facebook sign in could not be started');
+        setClerkError(t('auth.facebookStartFailed'));
         return;
       }
 
       const authSessionResult = await WebBrowser.openAuthSessionAsync(verificationUrl, redirectUrl);
       if (authSessionResult.type !== 'success' || !authSessionResult.url) {
         if (authSessionResult?.type === 'cancel' || authSessionResult?.type === 'dismiss') {
-          setClerkError('Facebook sign in was cancelled');
+          setClerkError(t('auth.facebookCancelled'));
         } else {
-          setClerkError('Facebook sign in could not be completed');
+          setClerkError(t('auth.facebookIncomplete'));
         }
         return;
       }
@@ -163,9 +165,9 @@ export const LoginScreen = ({ navigation }: Props) => {
         }
       }
 
-      setClerkError('Facebook sign in could not be completed');
+      setClerkError(t('auth.facebookIncomplete'));
     } catch (err: any) {
-      setClerkError(err?.errors?.[0]?.message || err?.message || 'Facebook sign in failed');
+      setClerkError(err?.errors?.[0]?.message || err?.message || t('auth.facebookFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -185,13 +187,13 @@ export const LoginScreen = ({ navigation }: Props) => {
           <View style={styles.logoContainer}>
             <View style={styles.logoCircle}>
               <MaterialCommunityIcons name="home-outline" size={32} color="#FFFFFF" />
-              <Text style={styles.logoText}>Rentable</Text>
+              <Text style={styles.logoText}>{t('auth.rentable')}</Text>
             </View>
           </View>
 
           {/* Title */}
-          <Text style={styles.title}>Welcome to Rentany</Text>
-          <Text style={styles.subtitle}>Sign in to continue</Text>
+          <Text style={styles.title}>{t('auth.welcomeTitle')}</Text>
+          <Text style={styles.subtitle}>{t('auth.signInSubtitle')}</Text>
 
           {/* Social Buttons */}
           <Button
@@ -203,7 +205,7 @@ export const LoginScreen = ({ navigation }: Props) => {
             labelStyle={styles.socialButtonLabel}
             icon={() => <GoogleIcon size={20} />}
           >
-            Continue with Google
+            {t('auth.continueWithGoogle')}
           </Button>
 
           <Button
@@ -215,25 +217,25 @@ export const LoginScreen = ({ navigation }: Props) => {
             labelStyle={styles.socialButtonLabel}
             icon={() => <FacebookIcon size={20} />}
           >
-            Continue with Facebook
+            {t('auth.continueWithFacebook')}
           </Button>
 
           {/* Divider */}
           <View style={styles.dividerRow}>
             <Divider style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
+            <Text style={styles.dividerText}>{t('auth.or')}</Text>
             <Divider style={styles.dividerLine} />
           </View>
 
           {/* Email */}
-          <Text style={styles.inputLabel}>Email</Text>
+          <Text style={styles.inputLabel}>{t('auth.email')}</Text>
           <TextInput
             mode="outlined"
             dense
             value={email}
             onChangeText={(t) => { setEmail(t); setClerkError(null); }}
             onBlur={() => setEmailTouched(true)}
-            placeholder="you@example.com"
+            placeholder={t('auth.emailPlaceholder')}
             keyboardType="email-address"
             autoCapitalize="none"
             left={<TextInput.Icon icon="email-outline" size={20} />}
@@ -246,14 +248,14 @@ export const LoginScreen = ({ navigation }: Props) => {
           {emailError && <HelperText type="error">{emailError}</HelperText>}
 
           {/* Password */}
-          <Text style={styles.inputLabel}>Password</Text>
+          <Text style={styles.inputLabel}>{t('auth.password')}</Text>
           <TextInput
             mode="outlined"
             dense
             value={password}
             onChangeText={(t) => { setPassword(t); setClerkError(null); }}
             onBlur={() => setPasswordTouched(true)}
-            placeholder="Enter your password"
+            placeholder={t('auth.passwordPlaceholder')}
             secureTextEntry={!showPassword}
             left={<TextInput.Icon icon="lock-outline" size={20} />}
             right={
@@ -285,7 +287,7 @@ export const LoginScreen = ({ navigation }: Props) => {
             labelStyle={styles.signInButtonLabel}
             buttonColor={colors.primary}
           >
-            Sign in
+            {t('auth.signIn')}
           </Button>
 
           {/* Footer Links */}
@@ -296,7 +298,7 @@ export const LoginScreen = ({ navigation }: Props) => {
               labelStyle={styles.footerLink}
               compact
             >
-              Forgot password?
+              {t('auth.forgotPassword')}
             </Button>
             <Button
               mode="text"
@@ -304,7 +306,7 @@ export const LoginScreen = ({ navigation }: Props) => {
               labelStyle={styles.footerLink}
               compact
             >
-              Need an account? Sign up
+              {t('auth.needAccount')}
             </Button>
           </View>
         </View>

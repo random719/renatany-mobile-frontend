@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { FAB } from 'react-native-paper';
+import { useI18n } from '../i18n';
 import { useIsAdmin } from '../hooks/useIsAdmin';
 import { CategoriesScreen } from '../screens/categories/CategoriesScreen';
 import { CategoryDetailScreen } from '../screens/categories/CategoryDetailScreen';
@@ -28,7 +29,10 @@ import {
 
 // --- Home Stack ---
 const HomeStack = createStackNavigator<HomeStackParamList>();
-const HomeStackNavigator = () => (
+const HomeStackNavigator = () => {
+  const { t } = useI18n();
+
+  return (
   <HomeStack.Navigator>
     <HomeStack.Screen
       name="Home"
@@ -43,19 +47,23 @@ const HomeStackNavigator = () => (
     <HomeStack.Screen
       name="Categories"
       component={CategoriesScreen}
-      options={{ title: 'All Categories' }}
+      options={{ title: t('home.allCategories') }}
     />
     <HomeStack.Screen
       name="CategoryDetail"
       component={CategoryDetailScreen}
-      options={{ title: 'Category' }}
+      options={{ title: t('savedSearches.searchCriteria') }}
     />
   </HomeStack.Navigator>
-);
+  );
+};
 
 // --- Search Stack ---
 const SearchStack = createStackNavigator<SearchStackParamList>();
-const SearchStackNavigator = () => (
+const SearchStackNavigator = () => {
+  const { t } = useI18n();
+
+  return (
   <SearchStack.Navigator>
     <SearchStack.Screen
       name="Search"
@@ -65,7 +73,7 @@ const SearchStackNavigator = () => (
     <SearchStack.Screen
       name="Filter"
       component={FilterScreen}
-      options={{ title: 'Filters', presentation: 'modal' }}
+      options={{ title: t('search.advancedFilters'), presentation: 'modal' }}
     />
     <SearchStack.Screen
       name="ListingDetail"
@@ -73,7 +81,8 @@ const SearchStackNavigator = () => (
       options={{ headerShown: false }}
     />
   </SearchStack.Navigator>
-);
+  );
+};
 
 // --- ListItem Stack ---
 const ListItemStack = createStackNavigator();
@@ -140,13 +149,16 @@ const TAB_SCREEN_OPTIONS = {
 
 // --- Admin Tab (no + button) ---
 const AdminTab = createBottomTabNavigator<MainTabParamList>();
-const AdminTabNavigator = () => (
+const AdminTabNavigator = () => {
+  const { t } = useI18n();
+
+  return (
   <AdminTab.Navigator screenOptions={TAB_SCREEN_OPTIONS}>
     <AdminTab.Screen
       name="HomeTab"
       component={HomeStackNavigator}
       options={{
-        tabBarLabel: 'Home',
+        tabBarLabel: t('nav.home'),
         tabBarIcon: ({ color, size }) => (
           <MaterialCommunityIcons name="home" size={size} color={color} />
         ),
@@ -156,7 +168,7 @@ const AdminTabNavigator = () => (
       name="SearchTab"
       component={SearchStackNavigator}
       options={{
-        tabBarLabel: 'Search',
+        tabBarLabel: t('nav.search'),
         tabBarIcon: ({ color, size }) => (
           <MaterialCommunityIcons name="magnify" size={size} color={color} />
         ),
@@ -166,24 +178,28 @@ const AdminTabNavigator = () => (
       name="ProfileTab"
       component={ProfileStackNavigator}
       options={{
-        tabBarLabel: 'Profile',
+        tabBarLabel: t('nav.profile'),
         tabBarIcon: ({ color, size }) => (
           <MaterialCommunityIcons name="account-outline" size={size} color={color} />
         ),
       }}
     />
   </AdminTab.Navigator>
-);
+  );
+};
 
 // --- User Tab (with + button) ---
 const UserTab = createBottomTabNavigator<MainTabParamList>();
-const UserTabNavigator = () => (
+const UserTabNavigator = () => {
+  const { t } = useI18n();
+
+  return (
   <UserTab.Navigator screenOptions={TAB_SCREEN_OPTIONS}>
     <UserTab.Screen
       name="HomeTab"
       component={HomeStackNavigator}
       options={{
-        tabBarLabel: 'Home',
+        tabBarLabel: t('nav.home'),
         tabBarIcon: ({ color, size }) => (
           <MaterialCommunityIcons name="home" size={size} color={color} />
         ),
@@ -193,7 +209,7 @@ const UserTabNavigator = () => (
       name="SearchTab"
       component={SearchStackNavigator}
       options={{
-        tabBarLabel: 'Search',
+        tabBarLabel: t('nav.search'),
         tabBarIcon: ({ color, size }) => (
           <MaterialCommunityIcons name="magnify" size={size} color={color} />
         ),
@@ -220,7 +236,7 @@ const UserTabNavigator = () => (
       name="FavoritesTab"
       component={FavoritesStackNavigator}
       options={{
-        tabBarLabel: 'Favorites',
+        tabBarLabel: t('nav.favorites'),
         tabBarIcon: ({ color, size }) => (
           <MaterialCommunityIcons name="heart-outline" size={size} color={color} />
         ),
@@ -230,14 +246,15 @@ const UserTabNavigator = () => (
       name="ProfileTab"
       component={ProfileStackNavigator}
       options={{
-        tabBarLabel: 'Profile',
+        tabBarLabel: t('nav.profile'),
         tabBarIcon: ({ color, size }) => (
           <MaterialCommunityIcons name="account-outline" size={size} color={color} />
         ),
       }}
     />
   </UserTab.Navigator>
-);
+  );
+};
 
 // --- Main Tab Navigator ---
 export const MainTabNavigator = () => {

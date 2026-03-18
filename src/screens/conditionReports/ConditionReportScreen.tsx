@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { ActivityIndicator, Button, Text } from 'react-native-paper';
 import { ScreenLayout } from '../../components/common/ScreenLayout';
+import { useI18n } from '../../i18n';
 import { api } from '../../services/api';
 import {
   getConditionReports,
@@ -34,13 +35,14 @@ type Nav = StackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'ConditionReport'>;
 
 const SEVERITY_OPTIONS = [
-  { value: 'minor' as const, label: 'Minor', color: '#F59E0B', icon: 'alert-circle-outline' },
-  { value: 'moderate' as const, label: 'Moderate', color: '#F97316', icon: 'alert' },
-  { value: 'severe' as const, label: 'Severe', color: '#EF4444', icon: 'alert-octagon' },
+  { value: 'minor' as const, color: '#F59E0B', icon: 'alert-circle-outline' },
+  { value: 'moderate' as const, color: '#F97316', icon: 'alert' },
+  { value: 'severe' as const, color: '#EF4444', icon: 'alert-octagon' },
 ];
 
 export const ConditionReportScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { t } = useI18n();
   const route = useRoute<Route>();
   const { rentalRequestId, reportType } = route.params;
   const { user: clerkUser } = useUser();
@@ -116,7 +118,7 @@ export const ConditionReportScreen = () => {
         }
         setPhotos((prev) => [...prev, ...uploadedUrls]);
       } catch (error) {
-        toast.error('Could not upload photos. Please try again.');
+        toast.error(t('conditionReport.uploadPhotosFailed'));
       } finally {
         setIsUploading(false);
       }
@@ -126,7 +128,7 @@ export const ConditionReportScreen = () => {
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      toast.warning('Camera permission is required to take photos.');
+      toast.warning(t('conditionReport.cameraPermission'));
       return;
     }
 
@@ -150,7 +152,7 @@ export const ConditionReportScreen = () => {
         const url = res.data?.file_url || res.data?.data?.file_url;
         if (url) setPhotos((prev) => [...prev, url]);
       } catch (error) {
-        toast.error('Could not upload photo. Please try again.');
+        toast.error(t('conditionReport.uploadPhotoFailed'));
       } finally {
         setIsUploading(false);
       }
@@ -163,7 +165,7 @@ export const ConditionReportScreen = () => {
 
   const addDamage = () => {
     if (!newDamageDescription.trim()) {
-      toast.warning('Please describe the damage.');
+      toast.warning(t('conditionReport.describeDamage'));
       return;
     }
     setDamages((prev) => [
@@ -183,7 +185,7 @@ export const ConditionReportScreen = () => {
     if (!userEmail) return;
 
     if (photos.length === 0) {
-      toast.warning('Please add at least one photo documenting the item condition.');
+      toast.warning(t('conditionReport.addPhotoRequired'));
       return;
     }
 
@@ -198,9 +200,9 @@ export const ConditionReportScreen = () => {
         damages_reported: damages.length > 0 ? damages : undefined,
       });
 
-      toast.success(`Your ${reportType} condition report has been submitted successfully.`, () => navigation.goBack());
+      toast.success(t('conditionReport.reportSubmitted', { type: reportType }), () => navigation.goBack());
     } catch (error: any) {
-      const msg = error?.response?.data?.error || 'Failed to submit report. Please try again.';
+      const msg = error?.response?.data?.error || t('conditionReport.submitFailed');
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -226,10 +228,10 @@ export const ConditionReportScreen = () => {
           <View style={styles.contentWrapper}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
               <MaterialCommunityIcons name="arrow-left" size={24} color="#0F172A" />
-              <Text style={styles.backText}>Back</Text>
+              <Text style={styles.backText}>{t('common.back')}</Text>
             </TouchableOpacity>
-            <Text style={styles.title}>Condition Report</Text>
-            <Text style={styles.subtitle}>We could not load this rental right now.</Text>
+            <Text style={styles.title}>{reportType === 'pickup' ? t('conditionReport.pickupTitle') : t('conditionReport.returnTitle')}</Text>
+            <Text style={styles.subtitle}>{t('conditionReport.backLoadFailed')}</Text>
           </View>
         </ScreenLayout>
       </View>
@@ -244,20 +246,20 @@ export const ConditionReportScreen = () => {
           <View style={styles.contentWrapper}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
               <MaterialCommunityIcons name="arrow-left" size={24} color="#0F172A" />
-              <Text style={styles.backText}>Back</Text>
+              <Text style={styles.backText}>{t('common.back')}</Text>
             </TouchableOpacity>
 
             <Text style={styles.title}>
-              {reportType === 'pickup' ? 'Pickup' : 'Return'} Condition Report
+              {reportType === 'pickup' ? t('conditionReport.pickupTitle') : t('conditionReport.returnTitle')}
             </Text>
             <View style={styles.submittedBadge}>
               <MaterialCommunityIcons name="check-circle" size={18} color="#10B981" />
-              <Text style={styles.submittedText}>Report Already Submitted</Text>
+              <Text style={styles.submittedText}>{t('conditionReport.submitted')}</Text>
             </View>
 
             {existingReport.condition_photos.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Photos</Text>
+                <Text style={styles.sectionTitle}>{t('conditionReport.photos')}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {existingReport.condition_photos.map((url, i) => (
                     <Image key={i} source={{ uri: url }} style={styles.existingPhoto} />
@@ -268,19 +270,19 @@ export const ConditionReportScreen = () => {
 
             {existingReport.notes && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Notes</Text>
+                <Text style={styles.sectionTitle}>{t('conditionReport.notes')}</Text>
                 <Text style={styles.notesText}>{existingReport.notes}</Text>
               </View>
             )}
 
             {existingReport.damages_reported.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Damages Reported</Text>
+                <Text style={styles.sectionTitle}>{t('conditionReport.damagesReported')}</Text>
                 {existingReport.damages_reported.map((d, i) => (
                   <View key={i} style={styles.damageItem}>
                     <View style={[styles.severityDot, { backgroundColor: SEVERITY_OPTIONS.find((s) => s.value === d.severity)?.color || '#999' }]} />
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.damageSeverity}>{d.severity.charAt(0).toUpperCase() + d.severity.slice(1)}</Text>
+                      <Text style={styles.damageSeverity}>{t(`conditionReport.severity.${d.severity}`)}</Text>
                       <Text style={styles.damageDesc}>{d.description}</Text>
                     </View>
                   </View>
@@ -289,7 +291,7 @@ export const ConditionReportScreen = () => {
             )}
 
             <Text style={styles.dateText}>
-              Submitted: {new Date(existingReport.created_date).toLocaleDateString()}
+              {t('conditionReport.submittedOn', { date: new Date(existingReport.created_date).toLocaleDateString() })}
             </Text>
           </View>
         </ScreenLayout>
@@ -304,28 +306,28 @@ export const ConditionReportScreen = () => {
           <View style={styles.contentWrapper}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
               <MaterialCommunityIcons name="arrow-left" size={24} color="#0F172A" />
-              <Text style={styles.backText}>Back</Text>
+              <Text style={styles.backText}>{t('common.back')}</Text>
             </TouchableOpacity>
 
             <Text style={styles.title}>
-              {reportType === 'pickup' ? 'Pickup' : 'Return'} Condition Report
+              {reportType === 'pickup' ? t('conditionReport.pickupTitle') : t('conditionReport.returnTitle')}
             </Text>
             <View style={styles.infoCard}>
               <MaterialCommunityIcons name="information-outline" size={22} color="#2563EB" />
               <View style={styles.infoCardBody}>
-                <Text style={styles.infoCardTitle}>Not available yet</Text>
+                <Text style={styles.infoCardTitle}>{t('conditionReport.notAvailableYet')}</Text>
                 <Text style={styles.infoCardText}>
-                  {blockedMessage || 'This report is not available right now.'}
+                  {blockedMessage || t('conditionReport.unavailableMessage')}
                 </Text>
               </View>
             </View>
 
             <View style={styles.metaCard}>
-              <Text style={styles.metaLabel}>Rental status</Text>
+              <Text style={styles.metaLabel}>{t('conditionReport.rentalStatus')}</Text>
               <Text style={styles.metaValue}>{rental.status}</Text>
-              <Text style={styles.metaLabel}>Pickup reports</Text>
+              <Text style={styles.metaLabel}>{t('conditionReport.pickupReports')}</Text>
               <Text style={styles.metaValue}>{rules?.pickupReports.length || 0}/2</Text>
-              <Text style={styles.metaLabel}>Return reports</Text>
+              <Text style={styles.metaLabel}>{t('conditionReport.returnReports')}</Text>
               <Text style={styles.metaValue}>{rules?.returnReports.length || 0}/2</Text>
             </View>
           </View>
@@ -340,24 +342,24 @@ export const ConditionReportScreen = () => {
         <View style={styles.contentWrapper}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <MaterialCommunityIcons name="arrow-left" size={24} color="#0F172A" />
-            <Text style={styles.backText}>Back</Text>
+            <Text style={styles.backText}>{t('common.back')}</Text>
           </TouchableOpacity>
 
           <Text style={styles.title}>
-            {reportType === 'pickup' ? 'Pickup' : 'Return'} Condition Report
+            {reportType === 'pickup' ? t('conditionReport.pickupTitle') : t('conditionReport.returnTitle')}
           </Text>
           <Text style={styles.subtitle}>
             {reportType === 'pickup'
-              ? 'Document the item condition at pickup to protect both parties.'
-              : 'Document the item condition at return for comparison with the pickup report.'}
+              ? t('conditionReport.pickupSubtitle')
+              : t('conditionReport.returnSubtitle')}
           </Text>
 
           {/* Photos Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
-              Photos <Text style={styles.required}>*</Text>
+              {t('conditionReport.photos')} <Text style={styles.required}>*</Text>
             </Text>
-            <Text style={styles.sectionHint}>Take clear photos of the item from multiple angles</Text>
+            <Text style={styles.sectionHint}>{t('conditionReport.requiredPhotosHint')}</Text>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
               {photos.map((url, i) => (
@@ -377,22 +379,22 @@ export const ConditionReportScreen = () => {
 
               <TouchableOpacity style={styles.addPhotoBtn} onPress={pickImages}>
                 <MaterialCommunityIcons name="image-plus" size={28} color="#6B7280" />
-                <Text style={styles.addPhotoText}>Gallery</Text>
+                <Text style={styles.addPhotoText}>{t('conditionReport.gallery')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.addPhotoBtn} onPress={takePhoto}>
                 <MaterialCommunityIcons name="camera" size={28} color="#6B7280" />
-                <Text style={styles.addPhotoText}>Camera</Text>
+                <Text style={styles.addPhotoText}>{t('conditionReport.camera')}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
 
           {/* Notes Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Notes</Text>
+            <Text style={styles.sectionTitle}>{t('conditionReport.notes')}</Text>
             <TextInput
               style={styles.textInput}
-              placeholder="Describe the overall condition of the item..."
+              placeholder={t('conditionReport.notesPlaceholder')}
               placeholderTextColor="#9CA3AF"
               value={notes}
               onChangeText={setNotes}
@@ -405,15 +407,15 @@ export const ConditionReportScreen = () => {
           {/* Damages Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Damages</Text>
+              <Text style={styles.sectionTitle}>{t('conditionReport.damages')}</Text>
               <TouchableOpacity style={styles.addDamageBtn} onPress={() => setShowAddDamage(true)}>
                 <MaterialCommunityIcons name="plus" size={18} color="#FFFFFF" />
-                <Text style={styles.addDamageBtnText}>Add Damage</Text>
+                <Text style={styles.addDamageBtnText}>{t('conditionReport.addDamage')}</Text>
               </TouchableOpacity>
             </View>
 
             {damages.length === 0 ? (
-              <Text style={styles.noDamagesText}>No damages reported — item is in good condition</Text>
+              <Text style={styles.noDamagesText}>{t('conditionReport.noDamages')}</Text>
             ) : (
               damages.map((d, i) => (
                 <View key={i} style={styles.damageCard}>
@@ -425,7 +427,7 @@ export const ConditionReportScreen = () => {
                         color={SEVERITY_OPTIONS.find((s) => s.value === d.severity)?.color}
                       />
                       <Text style={[styles.severityText, { color: SEVERITY_OPTIONS.find((s) => s.value === d.severity)?.color }]}>
-                        {d.severity.charAt(0).toUpperCase() + d.severity.slice(1)}
+                        {t(`conditionReport.severity.${d.severity}`)}
                       </Text>
                     </View>
                     <TouchableOpacity onPress={() => removeDamage(i)}>
@@ -449,7 +451,7 @@ export const ConditionReportScreen = () => {
             ) : (
               <>
                 <MaterialCommunityIcons name="check" size={20} color="#FFFFFF" />
-                <Text style={styles.submitBtnText}>Submit Report</Text>
+                <Text style={styles.submitBtnText}>{t('conditionReport.submit')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -462,9 +464,9 @@ export const ConditionReportScreen = () => {
           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowAddDamage(false)} />
           <View style={styles.modalContent}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Report Damage</Text>
+            <Text style={styles.modalTitle}>{t('conditionReport.reportDamage')}</Text>
 
-            <Text style={styles.modalLabel}>Severity</Text>
+            <Text style={styles.modalLabel}>{t('conditionReport.severityLabel')}</Text>
             <View style={styles.severityRow}>
               {SEVERITY_OPTIONS.map((opt) => (
                 <TouchableOpacity
@@ -477,16 +479,16 @@ export const ConditionReportScreen = () => {
                 >
                   <MaterialCommunityIcons name={opt.icon as any} size={18} color={newDamageSeverity === opt.value ? opt.color : '#9CA3AF'} />
                   <Text style={[styles.severityOptionText, newDamageSeverity === opt.value && { color: opt.color, fontWeight: '600' }]}>
-                    {opt.label}
+                    {t(`conditionReport.severity.${opt.value}`)}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={styles.modalLabel}>Description</Text>
+            <Text style={styles.modalLabel}>{t('conditionReport.description')}</Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="Describe the damage..."
+              placeholder={t('conditionReport.damagePlaceholder')}
               placeholderTextColor="#9CA3AF"
               value={newDamageDescription}
               onChangeText={setNewDamageDescription}
@@ -497,14 +499,14 @@ export const ConditionReportScreen = () => {
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => { setShowAddDamage(false); setNewDamageDescription(''); }}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalConfirmBtn, !newDamageDescription.trim() && { opacity: 0.5 }]}
                 onPress={addDamage}
                 disabled={!newDamageDescription.trim()}
               >
-                <Text style={styles.modalConfirmText}>Add Damage</Text>
+                <Text style={styles.modalConfirmText}>{t('conditionReport.addDamage')}</Text>
               </TouchableOpacity>
             </View>
           </View>

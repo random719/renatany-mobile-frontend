@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
+import { useI18n } from '../../i18n';
 import {
   deleteNotification,
   getNotifications,
@@ -37,40 +38,41 @@ const TYPE_COLOR: Record<AppNotification['type'], string> = {
   promotion: '#9333EA',
 };
 
-const relativeTime = (iso: string) => {
+const relativeTime = (iso: string, t: (key: string, params?: Record<string, string | number>) => string) => {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t('common.justNow');
+  if (mins < 60) return t('notifications.minutesAgo', { count: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return t('notifications.hoursAgo', { count: hrs });
   const days = Math.floor(hrs / 24);
-  if (days === 1) return 'Yesterday';
+  if (days === 1) return t('common.yesterday');
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-const dayGroup = (iso: string) => {
+const dayGroup = (iso: string, t: (key: string) => string) => {
   const diff = Date.now() - new Date(iso).getTime();
-  if (diff < 86400000) return 'Today';
-  if (diff < 172800000) return 'Yesterday';
-  return 'Older';
+  if (diff < 86400000) return t('common.today');
+  if (diff < 172800000) return t('common.yesterday');
+  return t('common.older');
 };
 
 type Section = { title: string; data: AppNotification[] };
 
-const groupNotifications = (notifications: AppNotification[]): Section[] => {
+const groupNotifications = (notifications: AppNotification[], t: (key: string) => string): Section[] => {
   const groups: Record<string, AppNotification[]> = {};
   notifications.forEach((n) => {
-    const g = dayGroup(n.created_date);
+    const g = dayGroup(n.created_date, t);
     if (!groups[g]) groups[g] = [];
     groups[g].push(n);
   });
-  const order = ['Today', 'Yesterday', 'Older'];
+  const order = [t('common.today'), t('common.yesterday'), t('common.older')];
   return order.filter((g) => groups[g]).map((g) => ({ title: g, data: groups[g] }));
 };
 
 export const NotificationsScreen = () => {
   const navigation = useNavigation();
+  const { t } = useI18n();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -109,7 +111,7 @@ export const NotificationsScreen = () => {
     try { await deleteNotification(id); } catch { /* ignore */ }
   };
 
-  const sections = groupNotifications(notifications);
+  const sections = groupNotifications(notifications, t as any);
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const renderItem = ({ item }: { item: AppNotification }) => {
@@ -131,7 +133,7 @@ export const NotificationsScreen = () => {
             {!item.is_read && <View style={styles.unreadDot} />}
           </View>
           <Text style={styles.notifBodyText} numberOfLines={2}>{item.body}</Text>
-          <Text style={styles.notifTime}>{relativeTime(item.created_date)}</Text>
+          <Text style={styles.notifTime}>{relativeTime(item.created_date, t as any)}</Text>
         </View>
         <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <MaterialCommunityIcons name="close" size={16} color="#94A3B8" />
@@ -159,10 +161,10 @@ export const NotificationsScreen = () => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text variant="titleLarge" style={styles.title}>Notifications</Text>
+        <Text variant="titleLarge" style={styles.title}>{t('notifications.title')}</Text>
         {unreadCount > 0 && (
           <TouchableOpacity onPress={handleMarkAllRead}>
-            <Text style={styles.markAllText}>Mark all read</Text>
+            <Text style={styles.markAllText}>{t('notifications.markAllRead')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -191,8 +193,8 @@ export const NotificationsScreen = () => {
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="bell-off-outline" size={64} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>No notifications yet</Text>
-              <Text style={styles.emptySubtitle}>You're all caught up!</Text>
+              <Text style={styles.emptyTitle}>{t('notifications.emptyTitle')}</Text>
+              <Text style={styles.emptySubtitle}>{t('notifications.emptySubtitle')}</Text>
             </View>
           }
         />

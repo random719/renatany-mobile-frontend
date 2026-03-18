@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
+import { useI18n } from '../../i18n';
 import { typography } from '../../theme';
 
 interface Testimonial {
@@ -53,14 +54,16 @@ const TESTIMONIALS: Testimonial[] = [
 ];
 
 export const Testimonials = () => {
+    const { t } = useI18n();
+
     return (
         <View style={styles.container}>
             <View style={styles.header}>
                 <Text variant="titleLarge" style={styles.title}>
-                    What Our Users Say
+                    {t('home.testimonials.title')}
                 </Text>
                 <Text variant="bodyMedium" style={styles.subtitle}>
-                    Join thousands of happy renters and owners in your community
+                    {t('home.testimonials.subtitle')}
                 </Text>
             </View>
 

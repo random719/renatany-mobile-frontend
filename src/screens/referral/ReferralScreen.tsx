@@ -14,36 +14,37 @@ import {
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import { ScreenLayout } from '../../components/common/ScreenLayout';
+import { useI18n } from '../../i18n';
 import { colors } from '../../theme';
 import { RootStackParamList } from '../../types/navigation';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 
-const STEPS = [
-  {
-    icon: 'link-variant' as const,
-    title: 'Share Your Link',
-    description: 'Copy your unique referral link and share it with friends.',
-  },
-  {
-    icon: 'account-plus' as const,
-    title: 'Friend Signs Up',
-    description: 'Your friend creates an account using your referral link.',
-  },
-  {
-    icon: 'gift' as const,
-    title: 'Both Benefit',
-    description: 'You and your friend both enjoy the Rentany platform!',
-  },
-];
-
 export const ReferralScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { t } = useI18n();
   const { user: clerkUser } = useUser();
   const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress;
   const userId = clerkUser?.id;
 
   const [copied, setCopied] = useState(false);
+  const steps = [
+    {
+      icon: 'link-variant' as const,
+      title: t('referral.shareYourLink'),
+      description: t('referral.shareYourLinkDesc'),
+    },
+    {
+      icon: 'account-plus' as const,
+      title: t('referral.friendSignsUp'),
+      description: t('referral.friendSignsUpDesc'),
+    },
+    {
+      icon: 'gift' as const,
+      title: t('referral.bothBenefit'),
+      description: t('referral.bothBenefitDesc'),
+    },
+  ];
 
   const referralCode = userId ? userId.slice(-8).toUpperCase() : 'RENTANY';
   const referralLink = `https://rentany.com/signup?ref=${referralCode}`;
@@ -57,8 +58,8 @@ export const ReferralScreen = () => {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Join me on Rentany — the best way to rent anything! Use my referral link: ${referralLink}`,
-        title: 'Join Rentany',
+        message: t('referral.shareMessage', { link: referralLink }),
+        title: t('referral.shareTitle'),
       });
     } catch (error) {
       console.error('Error sharing:', error);
@@ -71,7 +72,7 @@ export const ReferralScreen = () => {
         <View style={styles.contentWrapper}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <MaterialCommunityIcons name="arrow-left" size={24} color="#0F172A" />
-            <Text style={styles.backText}>Back</Text>
+            <Text style={styles.backText}>{t('common.back')}</Text>
           </TouchableOpacity>
 
           {/* Hero */}
@@ -79,15 +80,15 @@ export const ReferralScreen = () => {
             <View style={styles.heroIcon}>
               <MaterialCommunityIcons name="account-group" size={40} color="#FFFFFF" />
             </View>
-            <Text style={styles.heroTitle}>Invite Friends to Rentany</Text>
+            <Text style={styles.heroTitle}>{t('referral.inviteTitle')}</Text>
             <Text style={styles.heroSubtitle}>
-              Share the joy of renting! Invite your friends and grow the community.
+              {t('referral.inviteSubtitle')}
             </Text>
           </View>
 
           {/* Referral Link */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Your Referral Link</Text>
+            <Text style={styles.sectionTitle}>{t('referral.yourReferralLink')}</Text>
             <View style={styles.linkCard}>
               <View style={styles.linkRow}>
                 <Text style={styles.linkText} numberOfLines={1}>{referralLink}</Text>
@@ -98,13 +99,13 @@ export const ReferralScreen = () => {
                     color={copied ? '#10B981' : '#6B7280'}
                   />
                   <Text style={[styles.copyBtnText, copied && { color: '#10B981' }]}>
-                    {copied ? 'Copied!' : 'Copy'}
+                    {copied ? t('referral.copied') : t('referral.copy')}
                   </Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.codeRow}>
-                <Text style={styles.codeLabel}>Your code:</Text>
+                <Text style={styles.codeLabel}>{t('referral.yourCode')}</Text>
                 <View style={styles.codeBadge}>
                   <Text style={styles.codeText}>{referralCode}</Text>
                 </View>
@@ -116,14 +117,14 @@ export const ReferralScreen = () => {
           <View style={styles.shareRow}>
             <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
               <MaterialCommunityIcons name="share-variant" size={22} color="#FFFFFF" />
-              <Text style={styles.shareBtnText}>Share Link</Text>
+              <Text style={styles.shareBtnText}>{t('referral.shareLink')}</Text>
             </TouchableOpacity>
           </View>
 
           {/* How It Works */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>How It Works</Text>
-            {STEPS.map((step, index) => (
+            <Text style={styles.sectionTitle}>{t('referral.howItWorks')}</Text>
+            {steps.map((step, index) => (
               <View key={index} style={styles.stepCard}>
                 <View style={styles.stepNumber}>
                   <Text style={styles.stepNumberText}>{index + 1}</Text>

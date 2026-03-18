@@ -6,6 +6,7 @@ import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { useUser } from '@clerk/expo';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
+import { useI18n } from '../../i18n';
 import { createRentalRequest } from '../../services/bookingService';
 import { useAuthStore } from '../../store/authStore';
 import { colors, typography } from '../../theme';
@@ -17,6 +18,7 @@ type Route = RouteProp<RootStackParamList, 'BookingConfirm'>;
 
 export const BookingConfirmScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { t } = useI18n();
   const route = useRoute<Route>();
   const { user: clerkUser } = useUser();
   const { user } = useAuthStore();
@@ -32,7 +34,7 @@ export const BookingConfirmScreen = () => {
 
   const handleConfirm = async () => {
     if (!userEmail) {
-      toast.error('You must be logged in to make a rental request.');
+      toast.error(t('bookingConfirm.loginRequired'));
       return;
     }
     setIsLoading(true);
@@ -53,7 +55,7 @@ export const BookingConfirmScreen = () => {
         listingTitle,
       });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to send rental request.';
+      const msg = err instanceof Error ? err.message : t('bookingConfirm.requestFailed');
       toast.error(msg);
     } finally {
       setIsLoading(false);
@@ -68,11 +70,11 @@ export const BookingConfirmScreen = () => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text variant="titleLarge" style={styles.headerTitle}>Confirm Request</Text>
+          <Text variant="titleLarge" style={styles.headerTitle}>{t('bookingConfirm.title')}</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Rental Summary</Text>
+          <Text style={styles.sectionLabel}>{t('bookingConfirm.rentalSummary')}</Text>
           <Text style={styles.itemTitle}>{listingTitle}</Text>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="calendar-range" size={16} color={colors.textSecondary} />
@@ -80,38 +82,38 @@ export const BookingConfirmScreen = () => {
           </View>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="clock-outline" size={16} color={colors.textSecondary} />
-            <Text style={styles.infoText}>{totalDays} day{totalDays > 1 ? 's' : ''}</Text>
+            <Text style={styles.infoText}>{t(totalDays > 1 ? 'bookingConfirm.days_plural' : 'bookingConfirm.days', { count: totalDays })}</Text>
           </View>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="account-outline" size={16} color={colors.textSecondary} />
-            <Text style={styles.infoText}>Owner: {ownerEmail}</Text>
+            <Text style={styles.infoText}>{t('bookingConfirm.owner', { email: ownerEmail })}</Text>
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Pricing Breakdown</Text>
+          <Text style={styles.sectionLabel}>{t('bookingConfirm.pricing')}</Text>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Rental subtotal</Text>
+            <Text style={styles.priceLabel}>{t('bookingConfirm.rentalSubtotal')}</Text>
             <Text style={styles.priceValue}>${dailyRate.toFixed(2)}</Text>
           </View>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Platform fee (10%)</Text>
+            <Text style={styles.priceLabel}>{t('bookingConfirm.platformFee')}</Text>
             <Text style={styles.priceValue}>${platformFee.toFixed(2)}</Text>
           </View>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Security deposit (20%)</Text>
+            <Text style={styles.priceLabel}>{t('bookingConfirm.securityDeposit')}</Text>
             <Text style={styles.priceValue}>${deposit.toFixed(2)}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.priceRow}>
-            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalLabel}>{t('bookingConfirm.total')}</Text>
             <Text style={styles.totalValue}>${totalAmount.toFixed(2)}</Text>
           </View>
         </View>
 
         {message ? (
           <View style={styles.card}>
-            <Text style={styles.sectionLabel}>Your Message</Text>
+            <Text style={styles.sectionLabel}>{t('bookingConfirm.yourMessage')}</Text>
             <Text style={styles.messageText}>"{message}"</Text>
           </View>
         ) : null}
@@ -119,7 +121,7 @@ export const BookingConfirmScreen = () => {
         <View style={styles.noticeBox}>
           <MaterialCommunityIcons name="information-outline" size={18} color="#2563EB" />
           <Text style={styles.noticeText}>
-            Your request will be sent to the owner. They have 48 hours to approve or decline.
+            {t('bookingConfirm.notice')}
           </Text>
         </View>
 
@@ -132,7 +134,7 @@ export const BookingConfirmScreen = () => {
           contentStyle={styles.confirmBtnContent}
           icon="send"
         >
-          Send Rental Request
+          {t('bookingConfirm.send')}
         </Button>
       </ScrollView>
     </View>

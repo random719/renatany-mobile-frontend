@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 import { Text } from "react-native-paper";
+import { useI18n } from "../../i18n";
 import { useIsAdmin } from "../../hooks/useIsAdmin";
 import { useAuthStore } from "../../store/authStore";
 import { useListingStore } from "../../store/listingStore";
@@ -28,6 +29,7 @@ export const SidebarMenu = () => {
   const { signOut } = useClerk();
   const { user: clerkUser } = useUser();
   const { isAdmin } = useIsAdmin();
+  const { t } = useI18n();
   const { isSidebarVisible: isVisible, closeSidebar: onClose } = useUIStore();
   const { logout } = useAuthStore();
   const { activeFilter, applyFilter } = useListingStore();
@@ -160,6 +162,19 @@ export const SidebarMenu = () => {
     </TouchableOpacity>
   );
 
+  const categoryLabels: Record<string, string> = {
+    Electronics: t("home.category.electronics"),
+    Tools: t("home.category.tools"),
+    Fashion: t("home.category.fashion"),
+    Sports: t("home.category.sports"),
+    Vehicles: t("home.category.vehicles"),
+    Home: t("home.category.home"),
+    Books: t("home.category.books"),
+    Music: t("home.category.music"),
+    Photography: t("home.category.photography"),
+    Other: t("home.category.other"),
+  };
+
   return (
     <View style={styles.overlayContainer}>
       <TouchableWithoutFeedback onPress={onClose}>
@@ -189,14 +204,14 @@ export const SidebarMenu = () => {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.tagline}>Rent anything, from anyone.</Text>
+        <Text style={styles.tagline}>{t("footer.description")}</Text>
         <View style={styles.divider} />
 
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          <Text style={styles.sectionTitle}>NAVIGATE</Text>
+          <Text style={styles.sectionTitle}>{t("nav.navigate")}</Text>
           {(() => {
             const isFavorites = ["Favorites", "FavoritesTab"].includes(latestRoute);
             const isProfile = ["Profile", "ProfileTab", "EditProfile", "Settings", "MyListingReports"].includes(latestRoute);
@@ -213,70 +228,70 @@ export const SidebarMenu = () => {
               <>
                 {renderNavItem(
                   "home-outline",
-                  "Browse All",
+                  t("nav.browseAll"),
                   () => navigation.navigate("Main", { screen: "HomeTab" }),
                   isBrowseAll,
                 )}
                 {!isAdmin &&
                   renderNavItem(
                     "heart-outline",
-                    "Favorites",
+                    t("nav.favorites"),
                     () => navigation.navigate("Main", { screen: "FavoritesTab" }),
                     isFavorites,
                   )}
                 {!isAdmin &&
                   renderNavItem(
                     "bookmark-outline",
-                    "Saved Searches",
+                    t("nav.savedSearches"),
                     () => navigation.navigate("Main", { screen: "FavoritesTab", params: { screen: "SavedSearches" } }),
                     isSavedSearches,
                   )}
                 {!isAdmin &&
                   renderNavItem(
                     "clock-outline",
-                    "Rental History",
+                    t("nav.rentalHistory"),
                     () => navigation.navigate("RentalHistory"),
                     isRentalHistory,
                   )}
                 {!isAdmin &&
                   renderNavItem(
                     "plus",
-                    "List Item",
+                    t("nav.listItem"),
                     () => navigation.navigate("Main", { screen: "ListItemTab" }),
                     isListItem,
                   )}
                 {!isAdmin &&
                   renderNavItem(
                     "square-edit-outline",
-                    "Bulk Edit Items",
+                    t("nav.bulkEditItems"),
                     () => navigation.navigate("BulkEditItems"),
                     isBulkEditItems
                   )}
                 {!isAdmin &&
                   renderNavItem(
                     "account-outline",
-                    "My Profile",
+                    t("nav.myProfile"),
                     () => navigation.navigate("Main", { screen: "ProfileTab" }),
                     isProfile,
                   )}
                 {!isAdmin &&
                   renderNavItem(
                     "chat-outline",
-                    "My Conversations",
+                    t("nav.conversations"),
                     () => navigation.navigate("MyConversations"),
                     isConversations,
                   )}
                 {!isAdmin &&
                   renderNavItem(
                     "alert-outline",
-                    "Disputes",
+                    t("nav.disputes"),
                     () => navigation.navigate("Disputes"),
                     isDisputes,
                   )}
                 {!isAdmin &&
                   renderNavItem(
                     "account-group",
-                    "Referral",
+                    t("nav.referralProgram"),
                     () => navigation.navigate("Referral"),
                     isReferral,
                   )}
@@ -287,40 +302,40 @@ export const SidebarMenu = () => {
           {isAdmin && (
             <>
               <View style={styles.divider} />
-              <Text style={styles.sectionTitle}>ADMIN</Text>
+              <Text style={styles.sectionTitle}>{t("nav.admin")}</Text>
               {renderAdminNavItem(
                 "chart-bar",
-                "Admin: Dashboard",
+                t("nav.adminDashboard"),
                 () => navigation.navigate("AdminDashboard"),
                 isAdminDashboard,
               )}
               {renderAdminNavItem(
                 "clock-outline",
-                "Admin: Review Pending Requests",
+                t("nav.moderation"),
                 () => navigation.navigate("AdminModeration"),
                 isAdminModeration,
               )}
               {renderAdminNavItem(
                 "file-document-outline",
-                "Admin: Reports Listing",
+                t("nav.listingReports"),
                 () => navigation.navigate("AdminListingReports"),
                 isAdminListingReports,
               )}
               {renderAdminNavItem(
                 "alert-outline",
-                "Admin: Disputes",
+                t("nav.disputeCenter"),
                 () => navigation.navigate("AdminDisputes"),
                 isAdminDisputes,
               )}
               {renderAdminNavItem(
                 "alert-rhombus-outline",
-                "Admin: User Reports",
+                t("nav.userReports"),
                 () => navigation.navigate("AdminUserReports"),
                 isAdminUserReports,
               )}
               {renderAdminNavItem(
                 "shield-cog-outline",
-                "Admin: Security",
+                t("nav.security"),
                 () => navigation.navigate("AdminSecurity"),
                 isAdminSecurity,
               )}
@@ -329,44 +344,44 @@ export const SidebarMenu = () => {
 
           <View style={styles.divider} />
 
-          <Text style={styles.sectionTitle}>CATEGORIES</Text>
-          {renderNavItem("cellphone", "Electronics", () => {
+          <Text style={styles.sectionTitle}>{t("nav.categories")}</Text>
+          {renderNavItem("cellphone", categoryLabels.Electronics, () => {
             applyFilter({ ...activeFilter, category: "Electronics" });
             navigation.navigate("Main", { screen: "SearchTab" });
           })}
-          {renderNavItem("cog-outline", "Tools", () => {
+          {renderNavItem("cog-outline", categoryLabels.Tools, () => {
             applyFilter({ ...activeFilter, category: "Tools" });
             navigation.navigate("Main", { screen: "SearchTab" });
           })}
-          {renderNavItem("account-outline", "Fashion", () => {
+          {renderNavItem("account-outline", categoryLabels.Fashion, () => {
             applyFilter({ ...activeFilter, category: "Fashion" });
             navigation.navigate("Main", { screen: "SearchTab" });
           })}
-          {renderNavItem("check-decagram-outline", "Sports", () => {
+          {renderNavItem("check-decagram-outline", categoryLabels.Sports, () => {
             applyFilter({ ...activeFilter, category: "Sports" });
             navigation.navigate("Main", { screen: "SearchTab" });
           })}
-          {renderNavItem("swap-horizontal", "Vehicles", () => {
+          {renderNavItem("swap-horizontal", categoryLabels.Vehicles, () => {
             applyFilter({ ...activeFilter, category: "Vehicles" });
             navigation.navigate("Main", { screen: "SearchTab" });
           })}
-          {renderNavItem("home-outline", "Home", () => {
+          {renderNavItem("home-outline", categoryLabels.Home, () => {
             applyFilter({ ...activeFilter, category: "Home" });
             navigation.navigate("Main", { screen: "SearchTab" });
           })}
-          {renderNavItem("book-open-outline", "Books", () => {
+          {renderNavItem("book-open-outline", categoryLabels.Books, () => {
             applyFilter({ ...activeFilter, category: "Books" });
             navigation.navigate("Main", { screen: "SearchTab" });
           })}
-          {renderNavItem("music-note-outline", "Music", () => {
+          {renderNavItem("music-note-outline", categoryLabels.Music, () => {
             applyFilter({ ...activeFilter, category: "Music" });
             navigation.navigate("Main", { screen: "SearchTab" });
           })}
-          {renderNavItem("camera-outline", "Photography", () => {
+          {renderNavItem("camera-outline", categoryLabels.Photography, () => {
             applyFilter({ ...activeFilter, category: "Photography" });
             navigation.navigate("Main", { screen: "SearchTab" });
           })}
-          {renderNavItem("shape-outline", "Other", () => {
+          {renderNavItem("shape-outline", categoryLabels.Other, () => {
             applyFilter({ ...activeFilter, category: "Other" });
             navigation.navigate("Main", { screen: "SearchTab" });
           })}
@@ -399,7 +414,7 @@ export const SidebarMenu = () => {
             }}
           >
             <MaterialCommunityIcons name="logout" size={18} color="#374151" />
-            <Text style={styles.signOutText}>Sign Out</Text>
+            <Text style={styles.signOutText}>{t("nav.logout")}</Text>
           </TouchableOpacity>
         </View>
       </Animated.View>

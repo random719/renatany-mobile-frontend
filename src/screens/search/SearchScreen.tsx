@@ -7,6 +7,7 @@ import { ActivityIndicator, Menu, Text, Checkbox } from 'react-native-paper';
 import { useUser } from '@clerk/expo';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { ListingCard } from '../../components/listing/ListingCard';
+import { useI18n } from '../../i18n';
 import { useListingStore } from '../../store/listingStore';
 import { toast } from '../../store/toastStore';
 import { colors, typography } from '../../theme';
@@ -17,6 +18,7 @@ type Nav = StackNavigationProp<SearchStackParamList, 'Search'>;
 
 export const SearchScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { t } = useI18n();
   const { user } = useUser();
   const userEmail = user?.emailAddresses?.[0]?.emailAddress;
   const {
@@ -47,17 +49,19 @@ export const SearchScreen = () => {
   // Sort state
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const [isAvailabilityMenuVisible, setIsAvailabilityMenuVisible] = useState(false);
+  const sortOptions = getSortOptions(t);
+  const availabilityOptions = [t('search.allItems'), t('search.availableNow'), t('search.unavailable')];
   const [selectedSort, setSelectedSort] = useState<string>(() => {
-    const match = SORT_OPTIONS.find((o) => o.value === activeFilter.sortBy);
-    return match?.label || 'Relevance';
+    const match = sortOptions.find((o) => o.value === activeFilter.sortBy);
+    return match?.label || t('home.sort.relevance');
   });
 
   // Advanced Filter state
   const [minPrice, setMinPrice] = useState(activeFilter.minPrice?.toString() || '');
   const [maxPrice, setMaxPrice] = useState(activeFilter.maxPrice?.toString() || '');
   const [availability, setAvailability] = useState<string>(
-    activeFilter.availability === 'available' ? 'Available Now' :
-    activeFilter.availability === 'unavailable' ? 'Unavailable' : 'All Items'
+    activeFilter.availability === 'available' ? t('search.availableNow') :
+    activeFilter.availability === 'unavailable' ? t('search.unavailable') : t('search.allItems')
   );
   const [hasDateRange, setHasDateRange] = useState(false);
   const [hasDistance, setHasDistance] = useState(false);
@@ -96,12 +100,12 @@ export const SearchScreen = () => {
     setMinPrice(activeFilter.minPrice?.toString() || '');
     setMaxPrice(activeFilter.maxPrice?.toString() || '');
     setHasRating(!!activeFilter.rating);
-    const sortMatch = SORT_OPTIONS.find((o) => o.value === activeFilter.sortBy);
-    setSelectedSort(sortMatch?.label || 'Relevance');
-    if (activeFilter.availability === 'available') setAvailability('Available Now');
-    else if (activeFilter.availability === 'unavailable') setAvailability('Unavailable');
-    else setAvailability('All Items');
-  }, [activeFilter.query, activeFilter.location, activeFilter.category, activeFilter.sortBy, activeFilter.minPrice, activeFilter.maxPrice, activeFilter.rating, activeFilter.availability]);
+    const sortMatch = sortOptions.find((o) => o.value === activeFilter.sortBy);
+    setSelectedSort(sortMatch?.label || t('home.sort.relevance'));
+    if (activeFilter.availability === 'available') setAvailability(t('search.availableNow'));
+    else if (activeFilter.availability === 'unavailable') setAvailability(t('search.unavailable'));
+    else setAvailability(t('search.allItems'));
+  }, [activeFilter.query, activeFilter.location, activeFilter.category, activeFilter.sortBy, activeFilter.minPrice, activeFilter.maxPrice, activeFilter.rating, activeFilter.availability, t]);
 
   const dataSource = hasActiveFilters ? searchResults : listings;
 
@@ -119,11 +123,11 @@ export const SearchScreen = () => {
     setLocation('');
     setMinPrice('');
     setMaxPrice('');
-    setAvailability('All Items');
+    setAvailability(t('search.allItems'));
     setHasDateRange(false);
     setHasDistance(false);
     setHasRating(false);
-    setSelectedSort('Relevance');
+    setSelectedSort(t('home.sort.relevance'));
     setActiveFilter({});
     clearSearch();
     fetchListings();
@@ -141,12 +145,12 @@ export const SearchScreen = () => {
     else delete updatedFilter.rating;
 
     // Availability
-    if (availability === 'Available Now') updatedFilter.availability = 'available';
-    else if (availability === 'Unavailable') updatedFilter.availability = 'unavailable';
+    if (availability === t('search.availableNow')) updatedFilter.availability = 'available';
+    else if (availability === t('search.unavailable')) updatedFilter.availability = 'unavailable';
     else delete updatedFilter.availability;
 
     applyFilter(updatedFilter);
-  }, [activeFilter, minPrice, maxPrice, hasRating, availability, applyFilter]);
+  }, [activeFilter, minPrice, maxPrice, hasRating, availability, applyFilter, t]);
 
   const handleSortSelect = useCallback(
     (label: string, value?: ListingFilter['sortBy']) => {
@@ -172,7 +176,7 @@ export const SearchScreen = () => {
 
   const handleSaveSearch = () => {
     if (!query.trim() && !location.trim() && !activeFilter.category) {
-      toast.warning('Enter a search query, location, or select a category first.');
+      toast.warning(t('search.noSearchWarning'));
       return;
     }
     setSaveSearchName('');
@@ -181,16 +185,16 @@ export const SearchScreen = () => {
 
   const handleConfirmSaveSearch = async () => {
     if (!saveSearchName.trim()) {
-      toast.error('Please enter a name for your saved search.');
+      toast.error(t('search.enterSearchName'));
       return;
     }
     setIsSavingSearch(true);
     try {
       await createSavedSearch(saveSearchName.trim(), activeFilter);
       setSaveSearchModalVisible(false);
-      toast.success("Search saved! You'll receive notifications when new items match your criteria.");
+      toast.success(t('search.saveSearchSuccess'));
     } catch {
-      toast.error('Failed to save search. Please try again.');
+      toast.error(t('search.saveSearchFailed'));
     } finally {
       setIsSavingSearch(false);
     }
@@ -217,12 +221,12 @@ export const SearchScreen = () => {
     <View style={styles.searchHeader}>
       <View style={styles.headerTitleRow}>
         <Text variant="headlineSmall" style={styles.headerTitle}>
-          Search & Filter
+          {t('search.title')}
         </Text>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.saveBtn} onPress={handleSaveSearch}>
             <MaterialCommunityIcons name="bookmark-outline" size={18} color={colors.textPrimary} />
-            <Text style={styles.saveBtnText}>Save Search</Text>
+            <Text style={styles.saveBtnText}>{t('home.saveSearch')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -232,7 +236,7 @@ export const SearchScreen = () => {
         <MaterialCommunityIcons name="magnify" size={20} color="#9CA3AF" />
         <TextInput
           style={styles.input}
-          placeholder="Search items..."
+          placeholder={t('home.searchItemsPlaceholder')}
           placeholderTextColor="#9CA3AF"
           value={query}
           onChangeText={setQuery}
@@ -251,7 +255,7 @@ export const SearchScreen = () => {
         <MaterialCommunityIcons name="map-marker-outline" size={20} color="#9CA3AF" />
         <TextInput
           style={styles.input}
-          placeholder="Location..."
+          placeholder={t('home.locationPlaceholder')}
           placeholderTextColor="#9CA3AF"
           value={location}
           onChangeText={setLocation}
@@ -283,7 +287,7 @@ export const SearchScreen = () => {
             onPress={() => setIsCategoryMenuVisible(true)}
           >
             <Text style={styles.dropdownText}>
-              {activeFilter.category || 'All Categories'}
+              {activeFilter.category || t('home.allCategories')}
             </Text>
             <MaterialCommunityIcons name="chevron-down" size={20} color="#6B7280" />
           </TouchableOpacity>
@@ -291,7 +295,7 @@ export const SearchScreen = () => {
       >
         <ScrollView style={styles.menuScroll}>
           <Menu.Item
-            title="All Categories"
+            title={t('home.allCategories')}
             leadingIcon="view-grid"
             onPress={() => handleSelectCategory(undefined)}
             titleStyle={!activeFilter.category ? styles.menuItemActiveText : undefined}
@@ -315,7 +319,7 @@ export const SearchScreen = () => {
           onPress={() => setIsAdvancedFilterModalVisible(true)}
         >
           <MaterialCommunityIcons name="tune-variant" size={18} color={colors.textPrimary} />
-          <Text style={styles.actionBtnText}>Advanced Filters</Text>
+          <Text style={styles.actionBtnText}>{t('search.advancedFilters')}</Text>
           {activeFiltersCount > 0 && (
             <View style={styles.filterBadge}>
               <Text style={styles.filterBadgeText}>{activeFiltersCount}</Text>
@@ -336,7 +340,7 @@ export const SearchScreen = () => {
             </TouchableOpacity>
           }
         >
-          {SORT_OPTIONS.map((opt) => (
+          {sortOptions.map((opt) => (
             <Menu.Item
               key={opt.label}
               onPress={() => handleSortSelect(opt.label, opt.value)}
@@ -352,7 +356,7 @@ export const SearchScreen = () => {
         <View style={styles.activeFiltersContainer}>
           <TouchableOpacity onPress={handleClear} style={styles.clearAllBtn}>
             <MaterialCommunityIcons name="close" size={16} color="#6B7280" />
-            <Text style={styles.clearAllText}>Clear ({activeFiltersCount})</Text>
+            <Text style={styles.clearAllText}>{t('home.clear', { count: activeFiltersCount })}</Text>
           </TouchableOpacity>
 
           <View style={styles.tagsContainer}>
@@ -412,11 +416,11 @@ export const SearchScreen = () => {
             {activeFilter.availability && activeFilter.availability !== 'all' && (
               <View style={styles.filterTag}>
                 <Text style={styles.filterTagText}>
-                  {activeFilter.availability === 'available' ? 'Available' : 'Unavailable'}
+                  {activeFilter.availability === 'available' ? t('search.available') : t('search.unavailable')}
                 </Text>
                 <TouchableOpacity
                   onPress={() => {
-                    setAvailability('All Items');
+                    setAvailability(t('search.allItems'));
                     const { availability: _, ...rest } = activeFilter;
                     applyFilter(rest);
                   }}
@@ -427,7 +431,7 @@ export const SearchScreen = () => {
             )}
             {activeFilter.rating && (
               <View style={styles.filterTag}>
-                <Text style={styles.filterTagText}>{activeFilter.rating}+ Stars</Text>
+                <Text style={styles.filterTagText}>{activeFilter.rating}+ {t('home.sort.rating')}</Text>
                 <TouchableOpacity
                   onPress={() => {
                     setHasRating(false);
@@ -447,7 +451,9 @@ export const SearchScreen = () => {
       <View style={styles.resultsRow}>
         <MaterialCommunityIcons name="star" size={18} color={colors.primary} />
         <Text style={styles.resultsText}>
-          {hasActiveFilters ? `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''}` : 'All Items'}
+          {hasActiveFilters
+            ? t(searchResults.length === 1 ? 'search.results' : 'search.results_plural', { count: searchResults.length })
+            : t('search.allItems')}
         </Text>
       </View>
     </View>
@@ -480,10 +486,10 @@ export const SearchScreen = () => {
               isLoadingMore ? (
                 <View style={styles.loadingMore}>
                   <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={styles.loadingMoreText}>Loading more items...</Text>
+                  <Text style={styles.loadingMoreText}>{t('search.loadingMore')}</Text>
                 </View>
               ) : !hasMoreListings && dataSource.length > 0 && !hasActiveFilters ? (
-                <Text style={styles.endText}>No more items to load</Text>
+                <Text style={styles.endText}>{t('search.endOfList')}</Text>
               ) : (
                 <View style={{ height: 40 }} />
               )
@@ -494,12 +500,12 @@ export const SearchScreen = () => {
                   <MaterialCommunityIcons name="magnify-close" size={48} color="#D1D5DB" />
                   <Text variant="bodyLarge" style={styles.emptyText}>
                     {hasActiveFilters
-                      ? 'No items found matching your filters.'
-                      : 'No items available yet.'}
+                      ? t('search.noMatches')
+                      : t('search.noItems')}
                   </Text>
                   {hasActiveFilters && (
                     <TouchableOpacity style={styles.clearFiltersBtn} onPress={handleClear}>
-                      <Text style={styles.clearFiltersBtnText}>Clear Filters</Text>
+                      <Text style={styles.clearFiltersBtnText}>{t('search.clearFilters')}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -527,20 +533,20 @@ export const SearchScreen = () => {
       >
         <View style={styles.saveModalOverlay}>
           <View style={styles.saveModalContent}>
-            <Text style={styles.saveModalTitle}>Save This Search</Text>
+            <Text style={styles.saveModalTitle}>{t('search.saveSearchTitle')}</Text>
             <Text style={styles.saveModalSubtitle}>
-              Give your search a name so you can easily find it later.
+              {t('search.saveSearchSubtitle')}
             </Text>
             <TextInput
               style={styles.saveModalInput}
-              placeholder="e.g., Weekend Camera Gear"
+              placeholder={t('search.saveSearchPlaceholder')}
               placeholderTextColor="#9CA3AF"
               value={saveSearchName}
               onChangeText={setSaveSearchName}
               autoFocus
             />
             <Text style={styles.saveModalHint}>
-              You'll receive notifications when new items match your search criteria.
+              {t('search.saveSearchHint')}
             </Text>
             <View style={styles.saveModalActions}>
               <TouchableOpacity
@@ -548,7 +554,7 @@ export const SearchScreen = () => {
                 onPress={() => setSaveSearchModalVisible(false)}
                 disabled={isSavingSearch}
               >
-                <Text style={styles.saveModalCancelText}>Cancel</Text>
+                <Text style={styles.saveModalCancelText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.saveModalSaveBtn, (!saveSearchName.trim() || isSavingSearch) && { opacity: 0.5 }]}
@@ -556,7 +562,7 @@ export const SearchScreen = () => {
                 disabled={!saveSearchName.trim() || isSavingSearch}
               >
                 <Text style={styles.saveModalSaveText}>
-                  {isSavingSearch ? 'Saving...' : 'Save Search'}
+                  {isSavingSearch ? t('search.saving') : t('home.saveSearch')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -575,7 +581,7 @@ export const SearchScreen = () => {
           <View style={[styles.modalContent, styles.advancedFilterModal]}>
             <View style={styles.modalHeader}>
               <Text variant="titleMedium" style={styles.modalTitle}>
-                Advanced Filters
+                {t('search.advancedFilters')}
               </Text>
               <TouchableOpacity onPress={() => setIsAdvancedFilterModalVisible(false)}>
                 <MaterialCommunityIcons name="close" size={24} color="#6B7280" />
@@ -585,14 +591,14 @@ export const SearchScreen = () => {
             <ScrollView style={styles.advancedFilterBody}>
               {/* Price Range */}
               <Text style={styles.advancedFilterLabel}>
-                <MaterialCommunityIcons name="currency-usd" size={16} color="#111827" /> Price Range
-                ($/day)
+                <MaterialCommunityIcons name="currency-usd" size={16} color="#111827" /> {t('search.priceRange')}
+                {` ${t('search.perDay')}`}
               </Text>
               <View style={styles.priceInputsRow}>
                 <View style={styles.priceInputWrapper}>
                   <TextInput
                     style={styles.priceInput}
-                    placeholder="Min price"
+                    placeholder={t('search.minPrice')}
                     placeholderTextColor="#9CA3AF"
                     value={minPrice}
                     onChangeText={setMinPrice}
@@ -602,7 +608,7 @@ export const SearchScreen = () => {
                 <View style={styles.priceInputWrapper}>
                   <TextInput
                     style={styles.priceInput}
-                    placeholder="Max price"
+                    placeholder={t('search.maxPrice')}
                     placeholderTextColor="#9CA3AF"
                     value={maxPrice}
                     onChangeText={setMaxPrice}
@@ -612,7 +618,7 @@ export const SearchScreen = () => {
               </View>
 
               {/* Availability */}
-              <Text style={styles.advancedFilterLabel}>Availability</Text>
+              <Text style={styles.advancedFilterLabel}>{t('search.availability')}</Text>
               <Menu
                 visible={isAvailabilityMenuVisible}
                 onDismiss={() => setIsAvailabilityMenuVisible(false)}
@@ -628,7 +634,7 @@ export const SearchScreen = () => {
                   </TouchableOpacity>
                 }
               >
-                {['All Items', 'Available Now', 'Unavailable'].map((opt) => (
+                {availabilityOptions.map((opt) => (
                   <Menu.Item
                     key={opt}
                     title={opt}
@@ -647,7 +653,7 @@ export const SearchScreen = () => {
               <View style={styles.checkboxRow}>
                 <View style={styles.checkboxLabelRow}>
                   <MaterialCommunityIcons name="calendar-range-outline" size={20} color="#111827" />
-                  <Text style={styles.checkboxLabel}>Date Range</Text>
+                  <Text style={styles.checkboxLabel}>{t('search.dateRange')}</Text>
                 </View>
                 <Checkbox.Android
                   status={hasDateRange ? 'checked' : 'unchecked'}
@@ -663,7 +669,7 @@ export const SearchScreen = () => {
               <View style={styles.checkboxRow}>
                 <View style={styles.checkboxLabelRow}>
                   <MaterialCommunityIcons name="near-me" size={20} color="#111827" />
-                  <Text style={styles.checkboxLabel}>Distance</Text>
+                  <Text style={styles.checkboxLabel}>{t('search.distance')}</Text>
                 </View>
                 <Checkbox.Android
                   status={hasDistance ? 'checked' : 'unchecked'}
@@ -679,7 +685,7 @@ export const SearchScreen = () => {
               <View style={styles.checkboxRow}>
                 <View style={styles.checkboxLabelRow}>
                   <MaterialCommunityIcons name="star-outline" size={20} color="#111827" />
-                  <Text style={styles.checkboxLabel}>Rating (4+ stars)</Text>
+                  <Text style={styles.checkboxLabel}>{t('search.ratingFilter')}</Text>
                 </View>
                 <Checkbox.Android
                   status={hasRating ? 'checked' : 'unchecked'}
@@ -695,14 +701,14 @@ export const SearchScreen = () => {
                   style={styles.applyBtn}
                   onPress={handleApplyAdvancedFilters}
                 >
-                  <Text style={styles.applyBtnText}>Apply Filters</Text>
+                  <Text style={styles.applyBtnText}>{t('search.applyFilters')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.resetBtn}
                   onPress={() => {
                     setMinPrice('');
                     setMaxPrice('');
-                    setAvailability('All Items');
+                    setAvailability(t('search.allItems'));
                     setHasDateRange(false);
                     setHasDistance(false);
                     setHasRating(false);
@@ -712,7 +718,7 @@ export const SearchScreen = () => {
                     applyFilter(rest);
                   }}
                 >
-                  <Text style={styles.resetBtnText}>Reset Filters</Text>
+                  <Text style={styles.resetBtnText}>{t('search.resetFilters')}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -723,16 +729,16 @@ export const SearchScreen = () => {
   );
 };
 
-const SORT_OPTIONS: {
+const getSortOptions = (t: (key: string, params?: Record<string, string | number>) => any): {
   label: string;
   value?: 'newest' | 'price_low' | 'price_high' | 'rating' | 'popular';
-}[] = [
-  { label: 'Relevance', value: undefined },
-  { label: 'Newest', value: 'newest' },
-  { label: 'Price: Low', value: 'price_low' },
-  { label: 'Price: High', value: 'price_high' },
-  { label: 'Rating', value: 'rating' },
-  { label: 'Popular', value: 'popular' },
+}[] => [
+  { label: t('home.sort.relevance'), value: undefined },
+  { label: t('home.sort.newest'), value: 'newest' },
+  { label: t('home.sort.priceLow'), value: 'price_low' },
+  { label: t('home.sort.priceHigh'), value: 'price_high' },
+  { label: t('home.sort.rating'), value: 'rating' },
+  { label: t('home.sort.popular'), value: 'popular' },
 ];
 
 const styles = StyleSheet.create({

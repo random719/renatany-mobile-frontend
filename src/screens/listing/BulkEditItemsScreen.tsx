@@ -7,14 +7,9 @@ import { ActivityIndicator, Button, Checkbox, Menu, Text, TextInput, Surface } f
 import { useUser } from '@clerk/expo';
 import { ScreenLayout } from '../../components/common/ScreenLayout';
 import { colors, typography } from '../../theme';
-import { BulkEditChanges, Listing } from '../../types/listing';
+import { BulkEditChanges } from '../../types/listing';
 import { useListingStore } from '../../store/listingStore';
-
-const TRISTATE_OPTIONS = [
-    { value: null, label: 'No change' },
-    { value: true, label: 'Yes' },
-    { value: false, label: 'No' },
-];
+import { useI18n } from '../../i18n';
 
 const INITIAL_BULK_CHANGES: BulkEditChanges = {
     availability: null,
@@ -28,6 +23,7 @@ const INITIAL_BULK_CHANGES: BulkEditChanges = {
 };
 
 export const BulkEditItemsScreen = () => {
+    const { t } = useI18n();
     const navigation = useNavigation();
     const { user } = useUser();
     const { userItems, isLoading, isSubmitting, fetchUserItems, updateItem, deleteItem } = useListingStore();
@@ -72,16 +68,16 @@ export const BulkEditItemsScreen = () => {
 
     const handleBulkDelete = useCallback(async () => {
         if (selectedItems.length === 0) {
-            toast.warning('Please select at least one item to delete.');
+            toast.warning(t('bulkEdit.selectDeleteWarning'));
             return;
         }
         Alert.alert(
-            `Delete ${selectedItems.length} Item(s)?`,
-            'This will permanently delete the selected items and all associated data:\n\n• Item listings and photos\n• Rental history\n• Reviews and ratings\n• Availability calendars\n\nThis action cannot be undone!',
+            t('bulkEdit.deleteConfirmTitle', { count: selectedItems.length }),
+            t('bulkEdit.deleteConfirmBody'),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                    text: `Yes, Delete ${selectedItems.length} Item(s)`,
+                    text: t('bulkEdit.deleteConfirmAction', { count: selectedItems.length }),
                     style: 'destructive',
                     onPress: async () => {
                         setIsDeleting(true);
@@ -89,12 +85,12 @@ export const BulkEditItemsScreen = () => {
                             for (const itemId of selectedItems) {
                                 await deleteItem(itemId);
                             }
-                            toast.success(`Deleted ${selectedItems.length} item(s).`);
+                            toast.success(t('bulkEdit.deleteSuccess', { count: selectedItems.length }));
                             setSelectedItems([]);
                             if (user?.id) fetchUserItems(user.id);
                         } catch (error) {
                             console.error('Bulk delete error:', error);
-                            toast.error('Failed to delete some items. Please try again.');
+                            toast.error(t('bulkEdit.deleteFailed'));
                         } finally {
                             setIsDeleting(false);
                         }
@@ -102,26 +98,26 @@ export const BulkEditItemsScreen = () => {
                 },
             ]
         );
-    }, [selectedItems, deleteItem, fetchUserItems, user?.id]);
+    }, [selectedItems, deleteItem, fetchUserItems, user?.id, t]);
 
     const handleBulkUpdate = useCallback(async () => {
         if (selectedItems.length === 0) {
-            toast.warning('Please select at least one item to update.');
+            toast.warning(t('bulkEdit.selectUpdateWarning'));
             return;
         }
         const changesCount = Object.values(bulkChanges).filter(v => v !== null && v !== '').length;
         if (changesCount === 0) {
-            toast.warning('Please specify at least one change to apply.');
+            toast.warning(t('bulkEdit.noChangesWarning'));
             return;
         }
 
         Alert.alert(
-            'Confirm Update',
-            `Apply changes to ${selectedItems.length} item(s)?`,
+            t('bulkEdit.updateConfirmTitle'),
+            t('bulkEdit.updateConfirmBody', { count: selectedItems.length }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                    text: 'Apply',
+                    text: t('common.apply'),
                     onPress: async () => {
                         try {
                             const baseUpdates: Record<string, any> = {};
@@ -145,22 +141,28 @@ export const BulkEditItemsScreen = () => {
                                 await updateItem(itemId, itemUpdates);
                             }
 
-                            toast.success(`Updated ${selectedItems.length} item(s).`);
+                            toast.success(t('bulkEdit.updateSuccess', { count: selectedItems.length }));
                             setSelectedItems([]);
                             setBulkChanges(INITIAL_BULK_CHANGES);
                             if (user?.id) fetchUserItems(user.id);
                         } catch (error) {
                             console.error('Bulk update error:', error);
-                            toast.error('Failed to update some items. Please try again.');
+                            toast.error(t('bulkEdit.updateFailed'));
                         }
                     },
                 },
             ]
         );
-    }, [selectedItems, bulkChanges, userItems, updateItem, fetchUserItems, user?.id]);
+    }, [selectedItems, bulkChanges, userItems, updateItem, fetchUserItems, user?.id, t]);
+
+    const triStateOptions = [
+        { value: null, label: t('bulkEdit.noChange') },
+        { value: true, label: t('bulkEdit.yes') },
+        { value: false, label: t('bulkEdit.no') },
+    ];
 
     const getTriStateLabel = (value: boolean | null) =>
-        TRISTATE_OPTIONS.find(o => o.value === value)?.label || 'No change';
+        triStateOptions.find(o => o.value === value)?.label || t('bulkEdit.noChange');
 
     return (
         <ScreenLayout onRefresh={onRefresh} refreshing={refreshing} showBottomNav bottomNavActiveKey="none">
@@ -172,21 +174,21 @@ export const BulkEditItemsScreen = () => {
                         </TouchableOpacity>
 
                         <View style={styles.headerTitleContainer}>
-                            <Text style={styles.pageTitle}>Bulk Edit{"\n"}Items</Text>
+                            <Text style={styles.pageTitle}>{t('bulkEdit.title')}</Text>
                             <Text style={styles.pageSubtitle}>
-                                Select items and{"\n"}apply changes to{"\n"}multiple at once
+                                {t('bulkEdit.subtitle')}
                             </Text>
                         </View>
 
                         <View style={styles.selectedCountBadge}>
-                            <Text style={styles.selectedCountText}>{selectedItems.length} / {userItems.length} selected</Text>
+                            <Text style={styles.selectedCountText}>{t('bulkEdit.selectedCount', { selected: selectedItems.length, total: userItems.length })}</Text>
                         </View>
                     </View>
 
                     {/* Your Items Card */}
                     <Surface style={styles.card} elevation={0}>
                         <View style={styles.cardHeader}>
-                            <Text style={styles.cardTitle}>Your Items</Text>
+                            <Text style={styles.cardTitle}>{t('bulkEdit.yourItems')}</Text>
                             <View style={styles.actionButtonsRow}>
                                 <Button
                                     mode="contained"
@@ -197,7 +199,7 @@ export const BulkEditItemsScreen = () => {
                                     disabled={selectedItems.length === 0 || isSubmitting || isDeleting}
                                     loading={isDeleting}
                                 >
-                                    {isDeleting ? 'Deleting...' : `Delete Selected (${selectedItems.length})`}
+                                    {isDeleting ? t('bulkEdit.deleting') : t('bulkEdit.deleteSelected', { count: selectedItems.length })}
                                 </Button>
                                 <Button
                                     mode="outlined"
@@ -205,7 +207,7 @@ export const BulkEditItemsScreen = () => {
                                     labelStyle={styles.selectAllBtnLabel}
                                     onPress={toggleSelectAll}
                                 >
-                                    {selectedItems.length === userItems.length ? 'Deselect All' : 'Select All'}
+                                    {selectedItems.length === userItems.length ? t('bulkEdit.deselectAll') : t('bulkEdit.selectAll')}
                                 </Button>
                             </View>
                         </View>
@@ -217,8 +219,8 @@ export const BulkEditItemsScreen = () => {
                             ) : userItems.length === 0 ? (
                                 <View style={styles.emptyState}>
                                     <MaterialCommunityIcons name="calendar-blank-outline" size={56} color="#CBD5E1" />
-                                    <Text style={styles.emptyStateTitle}>No items yet</Text>
-                                    <Text style={styles.emptyStateSubtitle}>Create some items to use bulk editing</Text>
+                                    <Text style={styles.emptyStateTitle}>{t('bulkEdit.noItemsTitle')}</Text>
+                                    <Text style={styles.emptyStateSubtitle}>{t('bulkEdit.noItemsSubtitle')}</Text>
                                 </View>
                             ) : (
                                 userItems.map(item => {
@@ -251,7 +253,7 @@ export const BulkEditItemsScreen = () => {
                                                 </View>
                                                 <View style={[styles.statusTag, !isAvailable && styles.statusTagUnavailable]}>
                                                     <Text style={[styles.statusText, !isAvailable && styles.statusTextUnavailable]}>
-                                                        {isAvailable ? 'Available' : 'Unavailable'}
+                                                        {isAvailable ? t('bulkEdit.available') : t('bulkEdit.unavailable')}
                                                     </Text>
                                                 </View>
                                                 {item.category ? (
@@ -274,13 +276,13 @@ export const BulkEditItemsScreen = () => {
                     {/* Bulk Changes Form */}
                     <Surface style={styles.card} elevation={0}>
                         <View style={styles.bulkChangesHeader}>
-                            <Text style={styles.cardTitle}>Bulk Changes</Text>
+                            <Text style={styles.cardTitle}>{t('bulkEdit.bulkChanges')}</Text>
                         </View>
 
                         <View style={styles.bulkFormContainer}>
 
                             <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Availability Status</Text>
+                                <Text style={styles.label}>{t('bulkEdit.availabilityStatus')}</Text>
                                 <Menu
                                     visible={availabilityMenuVisible}
                                     onDismiss={() => setAvailabilityMenuVisible(false)}
@@ -294,7 +296,7 @@ export const BulkEditItemsScreen = () => {
                                         </TouchableOpacity>
                                     }
                                 >
-                                    {TRISTATE_OPTIONS.map((opt, idx) => (
+                                    {triStateOptions.map((opt, idx) => (
                                         <Menu.Item 
                                             key={idx} 
                                             title={opt.label} 
@@ -310,11 +312,11 @@ export const BulkEditItemsScreen = () => {
 
                             <View style={styles.rowInputs}>
                                 <View style={[styles.inputGroup, styles.flex1, { marginRight: 12 }]}>
-                                    <Text style={styles.label}>Min Days</Text>
+                                    <Text style={styles.label}>{t('bulkEdit.minDays')}</Text>
                                     <View style={styles.numberInputContainer}>
                                         <TextInput
                                             mode="outlined"
-                                            placeholder="No change"
+                                            placeholder={t('bulkEdit.noChange')}
                                             value={bulkChanges.min_rental_days}
                                             onChangeText={(text) => setBulkChanges(prev => ({ ...prev, min_rental_days: text }))}
                                             outlineColor={colors.border}
@@ -330,11 +332,11 @@ export const BulkEditItemsScreen = () => {
                                 </View>
 
                                 <View style={[styles.inputGroup, styles.flex1]}>
-                                    <Text style={styles.label}>Max Days</Text>
+                                    <Text style={styles.label}>{t('bulkEdit.maxDays')}</Text>
                                     <View style={styles.numberInputContainer}>
                                         <TextInput
                                             mode="outlined"
-                                            placeholder="No change"
+                                            placeholder={t('bulkEdit.noChange')}
                                             value={bulkChanges.max_rental_days}
                                             onChangeText={(text) => setBulkChanges(prev => ({ ...prev, max_rental_days: text }))}
                                             outlineColor={colors.border}
@@ -351,11 +353,11 @@ export const BulkEditItemsScreen = () => {
                             </View>
 
                             <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Notice Period (hours)</Text>
+                                <Text style={styles.label}>{t('bulkEdit.noticePeriod')}</Text>
                                 <View style={styles.numberInputContainer}>
                                     <TextInput
                                         mode="outlined"
-                                        placeholder="No change"
+                                        placeholder={t('bulkEdit.noChange')}
                                         value={bulkChanges.notice_period_hours}
                                         onChangeText={(text) => setBulkChanges(prev => ({ ...prev, notice_period_hours: text }))}
                                         outlineColor={colors.border}
@@ -371,11 +373,11 @@ export const BulkEditItemsScreen = () => {
                             </View>
 
                             <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Price Multiplier</Text>
+                                <Text style={styles.label}>{t('bulkEdit.priceMultiplier')}</Text>
                                 <View style={styles.numberInputContainer}>
                                     <TextInput
                                         mode="outlined"
-                                        placeholder="e.g., 1.2 for 20% increase"
+                                        placeholder={t('bulkEdit.priceMultiplierPlaceholder')}
                                         value={bulkChanges.daily_rate_multiplier}
                                         onChangeText={(text) => setBulkChanges(prev => ({ ...prev, daily_rate_multiplier: text }))}
                                         outlineColor={colors.border}
@@ -388,15 +390,15 @@ export const BulkEditItemsScreen = () => {
                                         <MaterialCommunityIcons name="unfold-more-horizontal" size={20} color="#94A3B8" style={{ transform: [{ rotate: '90deg' }] }} />
                                     </View>
                                 </View>
-                                <Text style={styles.helperText}>1.0 = no change, 1.2 = +20%</Text>
+                                <Text style={styles.helperText}>{t('bulkEdit.priceMultiplierHint')}</Text>
                             </View>
 
                             <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Security Deposit ($)</Text>
+                                <Text style={styles.label}>{t('bulkEdit.securityDeposit')}</Text>
                                 <View style={styles.numberInputContainer}>
                                     <TextInput
                                         mode="outlined"
-                                        placeholder="No change"
+                                        placeholder={t('bulkEdit.noChange')}
                                         value={bulkChanges.deposit}
                                         onChangeText={(text) => setBulkChanges(prev => ({ ...prev, deposit: text }))}
                                         outlineColor={colors.border}
@@ -413,7 +415,7 @@ export const BulkEditItemsScreen = () => {
 
                             <View style={styles.preferencesContainer}>
                                 <View style={styles.preferenceRow}>
-                                    <Text style={styles.preferenceLabel}>Instant Booking</Text>
+                                    <Text style={styles.preferenceLabel}>{t('bulkEdit.instantBooking')}</Text>
                                     <Menu
                                         visible={instantBookingMenuVisible}
                                         onDismiss={() => setInstantBookingMenuVisible(false)}
@@ -427,7 +429,7 @@ export const BulkEditItemsScreen = () => {
                                             </TouchableOpacity>
                                         }
                                     >
-                                        {TRISTATE_OPTIONS.map((opt, idx) => (
+                                        {triStateOptions.map((opt, idx) => (
                                             <Menu.Item 
                                                 key={idx} 
                                                 title={opt.label} 
@@ -442,7 +444,7 @@ export const BulkEditItemsScreen = () => {
                                 </View>
 
                                 <View style={styles.preferenceRow}>
-                                    <Text style={styles.preferenceLabel}>Same-Day Pickup</Text>
+                                    <Text style={styles.preferenceLabel}>{t('bulkEdit.sameDayPickup')}</Text>
                                     <Menu
                                         visible={sameDayPickupMenuVisible}
                                         onDismiss={() => setSameDayPickupMenuVisible(false)}
@@ -453,7 +455,7 @@ export const BulkEditItemsScreen = () => {
                                             </TouchableOpacity>
                                         }
                                     >
-                                        {TRISTATE_OPTIONS.map((opt, idx) => (
+                                        {triStateOptions.map((opt, idx) => (
                                             <Menu.Item key={idx} title={opt.label} onPress={() => {
                                                 setBulkChanges(prev => ({ ...prev, same_day_pickup: opt.value }));
                                                 setSameDayPickupMenuVisible(false);
@@ -472,7 +474,7 @@ export const BulkEditItemsScreen = () => {
                                 disabled={selectedItems.length === 0 || isSubmitting}
                                 loading={isSubmitting}
                             >
-                                Apply to {selectedItems.length} Item(s)
+                                {t('bulkEdit.applyToItems', { count: selectedItems.length })}
                             </Button>
 
                         </View>

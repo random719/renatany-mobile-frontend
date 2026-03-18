@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
+import { useI18n } from '../../i18n';
 import { colors } from '../../theme';
 import { Listing } from '../../types/listing';
 
@@ -36,8 +37,9 @@ const generateAnswer = (
   question: string,
   item: Listing | null | undefined,
   reviews: { rating: number; comment?: string }[],
+  t: (key: string, params?: Record<string, string | number>) => string,
 ): string => {
-  if (!item) return 'Sorry, item details are not available right now.';
+  if (!item) return t('aiAssistant.unavailable');
 
   const q = question.toLowerCase().trim();
   const title = item.title || '';
@@ -62,101 +64,102 @@ const generateAnswer = (
 
   // Price
   if (q.includes('price') || q.includes('cost') || q.includes('rate') || q.includes('how much') || q.includes('expensive') || q.includes('cheap') || q.includes('afford')) {
-    let ans = `This item rents for $${dailyRate}/day.`;
+    let ans = t('aiAssistant.answers.priceBase', { price: dailyRate });
     if (pricingTiers.length > 0) {
       const info = pricingTiers.map(t => `${t.days}+ days: $${t.price}/day`).join(', ');
-      ans += ` Bulk pricing: ${info}.`;
+      ans += t('aiAssistant.answers.bulkPricing', { info });
     }
-    if (deposit > 0) ans += ` Security deposit: $${deposit}.`;
+    if (deposit > 0) ans += t('aiAssistant.answers.securityDeposit', { deposit });
     return ans;
   }
 
   // Condition
   if (q.includes('condition') || q.includes('quality') || q.includes('wear') || q.includes('damage') || q.includes('scratch')) {
-    let ans = condition ? `The owner describes this item as in "${condition}" condition.` : 'The condition is not explicitly specified.';
-    if (description) ans += ` Description: "${description.substring(0, 150)}${description.length > 150 ? '...' : ''}"`;
-    ans += '\n\nFor more details, consider contacting the owner directly.';
+    let ans = condition ? t('aiAssistant.answers.conditionKnown', { condition }) : t('aiAssistant.answers.conditionUnknown');
+    if (description) ans += t('aiAssistant.answers.descriptionPrefix', { value: `${description.substring(0, 150)}${description.length > 150 ? '...' : ''}` });
+    ans += t('aiAssistant.answers.contactOwner');
     return ans;
   }
 
   // Availability / booking
   if (q.includes('available') || q.includes('book') || q.includes('reserve') || q.includes('when can')) {
-    let ans = `Rental period: minimum ${minDays} day(s), maximum ${maxDays} days.`;
-    if (instantBooking) ans += ' Instant booking is available — no owner approval needed.';
-    if (sameDayPickup) ans += ' Same-day pickup is available.';
-    if (noticePeriod > 0) ans += ` The owner requires ${noticePeriod} hours advance notice.`;
+    let ans = t('aiAssistant.answers.rentalPeriod', { min: minDays, max: maxDays });
+    if (instantBooking) ans += t('aiAssistant.answers.instantBooking');
+    if (sameDayPickup) ans += t('aiAssistant.answers.sameDayPickup');
+    if (noticePeriod > 0) ans += t('aiAssistant.answers.noticePeriod', { hours: noticePeriod });
     return ans;
   }
 
   // Delivery / pickup
   if (q.includes('deliver') || q.includes('pickup') || q.includes('pick up') || q.includes('shipping') || q.includes('collect')) {
     if (deliveryOptions.length > 0) {
-      let ans = `Delivery options: ${deliveryOptions.join(', ')}.`;
-      if (deliveryFee > 0) ans += ` Delivery fee: $${deliveryFee}.`;
+      let ans = t('aiAssistant.answers.deliveryOptions', { value: deliveryOptions.join(', ') });
+      if (deliveryFee > 0) ans += t('aiAssistant.answers.deliveryFee', { fee: deliveryFee });
       return ans;
     }
-    return 'Pickup is the default option. The owner has not listed specific delivery options. Contact them for arrangements.';
+    return t('aiAssistant.answers.pickupDefault');
   }
 
   // Location
   if (q.includes('location') || q.includes('where') || q.includes('address') || q.includes('area') || q.includes('near')) {
     return location
-      ? `This item is located at: ${typeof location === 'string' ? location : JSON.stringify(location)}.`
-      : 'The exact location is not publicly listed. Contact the owner for pickup details.';
+      ? t('aiAssistant.answers.locationKnown', { value: typeof location === 'string' ? location : JSON.stringify(location) })
+      : t('aiAssistant.answers.locationUnknown');
   }
 
   // Reviews / rating
   if (q.includes('review') || q.includes('rating') || q.includes('recommend') || q.includes('experience') || q.includes('worth')) {
     if (reviews.length > 0) {
-      let ans = `This item has ${reviews.length} review(s) with an average rating of ${avgRating}/5.`;
+      let ans = t('aiAssistant.answers.reviewsKnown', { count: reviews.length, rating: avgRating || 0 });
       const withComment = reviews.find(r => r.comment);
       if (withComment?.comment) {
-        ans += ` Recent review: "${withComment.comment.substring(0, 120)}${withComment.comment.length > 120 ? '...' : ''}"`;
+        ans += t('aiAssistant.answers.recentReview', { value: `${withComment.comment.substring(0, 120)}${withComment.comment.length > 120 ? '...' : ''}` });
       }
       return ans;
     }
-    return 'This item has no reviews yet. It may be a new listing.';
+    return t('aiAssistant.answers.reviewsUnknown');
   }
 
   // Beginner / suitable
   if (q.includes('beginner') || q.includes('suitable') || q.includes('easy') || q.includes('first time') || q.includes('new to')) {
-    let ans = `This is a ${category} item: "${title}".`;
+    let ans = t('aiAssistant.answers.beginner', { category, title });
     if (description) ans += ` ${description.substring(0, 200)}${description.length > 200 ? '...' : ''}`;
-    ans += '\n\nFor specific suitability questions, I recommend contacting the owner.';
+    ans += t('aiAssistant.answers.suitability');
     return ans;
   }
 
   // What's included
   if (q.includes('include') || q.includes('comes with') || q.includes('accessories') || q.includes('what do i get')) {
     return description
-      ? `Based on the listing: "${description.substring(0, 250)}${description.length > 250 ? '...' : ''}"\n\nFor a full list of what's included, ask the owner.`
-      : 'The listing does not specify what is included. Please contact the owner.';
+      ? t('aiAssistant.answers.includedKnown', { value: `${description.substring(0, 250)}${description.length > 250 ? '...' : ''}` })
+      : t('aiAssistant.answers.includedUnknown');
   }
 
   // Deposit / insurance
   if (q.includes('deposit') || q.includes('insurance') || q.includes('protect') || q.includes('secure')) {
     return deposit > 0
-      ? `A security deposit of $${deposit} is required. It is refunded after the item is returned in good condition.`
-      : 'No security deposit is required for this item.';
+      ? t('aiAssistant.answers.depositRequired', { deposit })
+      : t('aiAssistant.answers.depositNotRequired');
   }
 
   // Category
   if (q.includes('category') || q.includes('type') || q.includes('kind')) {
-    return `This item is in the "${category}" category: "${title}".`;
+    return t('aiAssistant.answers.category', { category, title });
   }
 
   // Fallback — general info
-  let ans = `Here's what I know about "${title}":`;
+  let ans = t('aiAssistant.answers.fallbackIntro', { title });
   if (description) ans += ` ${description.substring(0, 250)}${description.length > 250 ? '...' : ''}`;
-  ans += `\n\nPrice: $${dailyRate}/day`;
-  if (condition) ans += ` | Condition: ${condition}`;
-  if (deposit > 0) ans += ` | Deposit: $${deposit}`;
-  if (reviews.length > 0) ans += `\nRated ${avgRating}/5 from ${reviews.length} review(s).`;
-  ans += '\n\nAsk me about pricing, availability, condition, delivery, or reviews!';
+  ans += t('aiAssistant.answers.priceLine', { price: dailyRate });
+  if (condition) ans += t('aiAssistant.answers.conditionLine', { value: condition });
+  if (deposit > 0) ans += t('aiAssistant.answers.depositLine', { value: deposit });
+  if (reviews.length > 0) ans += t('aiAssistant.answers.ratingLine', { rating: avgRating || 0, count: reviews.length });
+  ans += t('aiAssistant.answers.fallbackHint');
   return ans;
 };
 
 export const AIChatAssistant = ({ visible, onClose, itemId, itemTitle, item, reviews = [] }: AIChatAssistantProps) => {
+  const { t } = useI18n();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -173,7 +176,7 @@ export const AIChatAssistant = ({ visible, onClose, itemId, itemTitle, item, rev
 
     // Simulate a brief "thinking" delay for natural UX
     setTimeout(() => {
-      const answer = generateAnswer(question, item, reviews);
+      const answer = generateAnswer(question, item, reviews, t);
       setMessages((prev) => [...prev, { role: 'assistant', content: answer }]);
       setIsLoading(false);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -201,9 +204,9 @@ export const AIChatAssistant = ({ visible, onClose, itemId, itemTitle, item, rev
                 <MaterialCommunityIcons name="robot" size={20} color="#FFFFFF" />
               </View>
               <View>
-                <Text style={styles.headerTitle}>AI Assistant</Text>
+                <Text style={styles.headerTitle}>{t('aiAssistant.headerTitle')}</Text>
                 <Text style={styles.headerSubtitle} numberOfLines={1}>
-                  Ask about "{itemTitle}"
+                  {t('aiAssistant.headerSubtitle', { title: itemTitle })}
                 </Text>
               </View>
             </View>
@@ -217,16 +220,16 @@ export const AIChatAssistant = ({ visible, onClose, itemId, itemTitle, item, rev
             {messages.length === 0 && (
               <View style={styles.welcomeContainer}>
                 <MaterialCommunityIcons name="robot-happy" size={48} color="#D1D5DB" />
-                <Text style={styles.welcomeTitle}>Ask me anything</Text>
+                <Text style={styles.welcomeTitle}>{t('aiAssistant.welcomeTitle')}</Text>
                 <Text style={styles.welcomeText}>
-                  I can answer questions about this item based on its details, pricing, reviews, and more.
+                  {t('aiAssistant.welcomeText')}
                 </Text>
                 <View style={styles.suggestions}>
                   {[
-                    'How much does it cost?',
-                    'What condition is it in?',
-                    'What are the delivery options?',
-                    'Does it have good reviews?',
+                    t('aiAssistant.suggestions.cost'),
+                    t('aiAssistant.suggestions.condition'),
+                    t('aiAssistant.suggestions.delivery'),
+                    t('aiAssistant.suggestions.reviews'),
                   ].map((suggestion, i) => (
                     <TouchableOpacity
                       key={i}
@@ -261,7 +264,7 @@ export const AIChatAssistant = ({ visible, onClose, itemId, itemTitle, item, rev
               <View style={[styles.messageBubble, styles.assistantBubble]}>
                 <View style={styles.typingIndicator}>
                   <ActivityIndicator size="small" color="#6B7280" />
-                  <Text style={styles.typingText}>Thinking...</Text>
+                  <Text style={styles.typingText}>{t('aiAssistant.thinking')}</Text>
                 </View>
               </View>
             )}
@@ -271,7 +274,7 @@ export const AIChatAssistant = ({ visible, onClose, itemId, itemTitle, item, rev
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder="Ask a question..."
+              placeholder={t('aiAssistant.inputPlaceholder')}
               placeholderTextColor="#9CA3AF"
               value={input}
               onChangeText={setInput}

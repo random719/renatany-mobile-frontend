@@ -4,6 +4,7 @@ import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { FAB, Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useI18n } from '../../i18n';
 import { useIsAdmin } from '../../hooks/useIsAdmin';
 import { colors, typography } from '../../theme';
 
@@ -17,6 +18,7 @@ export const AppBottomNavBar = ({ activeKey = 'none' }: AppBottomNavBarProps) =>
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { isAdmin } = useIsAdmin();
+  const { t } = useI18n();
 
   const navigateToMainTab = (screen: string) => {
     navigation.navigate('Main', { screen });
@@ -52,11 +54,11 @@ export const AppBottomNavBar = ({ activeKey = 'none' }: AppBottomNavBarProps) =>
   return (
     <View style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       <View style={styles.inner}>
-        {renderItem('home', 'Home', 'home', () => navigateToMainTab('HomeTab'))}
-        {renderItem('search', 'Search', 'magnify', () => navigateToMainTab('SearchTab'))}
+        {renderItem('home', t('nav.home'), 'home', () => navigateToMainTab('HomeTab'))}
+        {renderItem('search', t('nav.search'), 'magnify', () => navigateToMainTab('SearchTab'))}
 
         {isAdmin ? (
-          renderItem('profile', 'Profile', 'account-outline', () => navigateToMainTab('ProfileTab'))
+          renderItem('profile', t('nav.profile'), 'account-outline', () => navigateToMainTab('ProfileTab'))
         ) : (
           <>
             <View style={styles.fabSlot}>
@@ -64,8 +66,8 @@ export const AppBottomNavBar = ({ activeKey = 'none' }: AppBottomNavBarProps) =>
                 <FAB icon="plus" size="small" style={styles.fab} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
-            {renderItem('favorites', 'Favorites', 'heart-outline', () => navigateToMainTab('FavoritesTab'))}
-            {renderItem('profile', 'Profile', 'account-outline', () => navigateToMainTab('ProfileTab'))}
+            {renderItem('favorites', t('nav.favorites'), 'heart-outline', () => navigateToMainTab('FavoritesTab'))}
+            {renderItem('profile', t('nav.profile'), 'account-outline', () => navigateToMainTab('ProfileTab'))}
           </>
         )}
       </View>

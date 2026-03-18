@@ -35,25 +35,27 @@ import { colors, typography } from '../../theme';
 import { Listing } from '../../types/listing';
 import { HomeStackParamList } from '../../types/navigation';
 import { AIChatAssistant } from './AIChatAssistant';
+import { useI18n } from '../../i18n';
 
 type Route = RouteProp<HomeStackParamList, 'ListingDetail'>;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IMAGE_HEIGHT = 300;
 const THUMB_SIZE = 64;
-const REPORT_REASONS = [
-  { value: 'fraud', label: 'Fraudulent Listing' },
-  { value: 'stolen_item', label: 'Suspected Stolen Item' },
-  { value: 'prohibited_item', label: 'Prohibited Item' },
-  { value: 'misleading', label: 'Misleading Description/Photos' },
-  { value: 'price_gouging', label: 'Price Gouging' },
-  { value: 'spam', label: 'Spam or Duplicate' },
-  { value: 'other', label: 'Other' },
+const REPORT_REASON_VALUES = [
+  'fraud',
+  'stolen_item',
+  'prohibited_item',
+  'misleading',
+  'price_gouging',
+  'spam',
+  'other',
 ] as const;
 
 const isVideoUrl = (url: string): boolean => /\.(mp4|mov|webm)$/i.test(url);
 
 export const ListingDetailScreen = () => {
+  const { t } = useI18n();
   const route = useRoute<Route>();
   const navigation = useNavigation();
   const { listingId } = route.params;
@@ -109,6 +111,10 @@ export const ListingDetailScreen = () => {
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showAIChat, setShowAIChat] = useState(false);
+  const reportReasons = REPORT_REASON_VALUES.map((value) => ({
+    value,
+    label: t(`listingDetail.reportReasons.${value}`),
+  }));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -178,7 +184,7 @@ export const ListingDetailScreen = () => {
     if (!listing) return;
     try {
       await Share.share({
-        message: `Check out "${listing.title}" on Rentany - $${listing.pricePerDay}/day`,
+        message: t('listingDetail.shareMessage', { title: listing.title, price: listing.pricePerDay }),
         title: listing.title,
       });
     } catch {
@@ -188,7 +194,7 @@ export const ListingDetailScreen = () => {
 
   const handleReport = () => {
     if (hasOpenListingReport) {
-      toast.info('You have already reported this listing. Our team is still reviewing your existing report.');
+      toast.info(t('listingDetail.alreadyReported'));
       return;
     }
     setShowReportReasons(false);
@@ -212,7 +218,7 @@ export const ListingDetailScreen = () => {
       );
       setReportEvidence((prev) => [...prev, ...uploaded]);
     } catch (error: any) {
-      toast.error('Could not add evidence. Please try again.');
+      toast.error(t('listingDetail.addEvidenceFailed'));
     } finally {
       setIsUploadingReportEvidence(false);
     }
@@ -230,15 +236,15 @@ export const ListingDetailScreen = () => {
 
   const handleSubmitReport = async () => {
     if (!listing || !userEmail) {
-      toast.warning('You must be signed in to submit a report.');
+      toast.warning(t('listingDetail.signInToReport'));
       return;
     }
     if (!reportReason) {
-      toast.warning('Please select a reason for your report.');
+      toast.warning(t('listingDetail.selectReportReason'));
       return;
     }
     if (!reportDetails.trim()) {
-      toast.warning('Please provide detailed information about the issue.');
+      toast.warning(t('listingDetail.reportDetailsRequired'));
       return;
     }
 
@@ -253,11 +259,11 @@ export const ListingDetailScreen = () => {
         status: 'pending',
       });
       setHasOpenListingReport(true);
-      toast.success('Thank you. Our team will review this listing report.');
+      toast.success(t('listingDetail.reportSubmitted'));
       resetReportForm();
     } catch (error: any) {
       const statusCode = error?.response?.status;
-      const errorMessage = error?.response?.data?.error || 'Could not submit your report. Please try again.';
+      const errorMessage = error?.response?.data?.error || t('listingDetail.reportFailed');
       if (statusCode === 409) {
         setHasOpenListingReport(true);
         toast.info(errorMessage);
@@ -367,7 +373,7 @@ export const ListingDetailScreen = () => {
       }
       // Check if any blocked dates are in the range
       if (dates.some(d => blockedDates.includes(d))) {
-        toast.warning('Some dates in this range are blocked by the owner. Please choose a different range.');
+        toast.warning(t('listingDetail.blockedRangeWarning'));
         return;
       }
       setSelectedDates(dates);
@@ -498,14 +504,14 @@ export const ListingDetailScreen = () => {
 
       if (kycCheck?.kyc_required) {
         if (kycCheck.user_kyc_status === 'pending') {
-          toast.info('Your ID verification is still processing. Please wait a moment and try again.');
+          toast.info(t('listingDetail.kycProcessing'));
           return;
         }
         const riskLabel = kycCheck.risk_trigger === 'amount'
-          ? 'High rental value'
+          ? t('listingDetail.riskHighValue')
           : kycCheck.risk_trigger === 'category'
-            ? 'High-risk category'
-            : 'Item requires verification';
+            ? t('listingDetail.riskHighCategory')
+            : t('listingDetail.riskVerificationRequired');
         setIdentityVerificationReason(riskLabel);
         setShowIdentityVerificationCard(true);
         return;
@@ -518,7 +524,7 @@ export const ListingDetailScreen = () => {
         owner_email: ownerEmail,
         start_date: startDate,
         end_date: endDate,
-        message: rentalMessage || "Hi! I'm interested in renting your item.",
+        message: rentalMessage || t('listingDetail.inquiryDefault'),
         status: (listing as any).instant_booking ? 'approved' : 'pending',
       });
       const requestId = res.data?.data?.id || res.data?.id || res.data?.data?._id || res.data?._id;
@@ -526,7 +532,7 @@ export const ListingDetailScreen = () => {
         await api.post('/messages', {
           rental_request_id: requestId,
           sender_email: userEmail,
-          content: rentalMessage || "Hi! I'm interested in renting your item.",
+          content: rentalMessage || t('listingDetail.inquiryDefault'),
           message_type: 'text',
         }).catch(() => {});
       }
@@ -544,14 +550,14 @@ export const ListingDetailScreen = () => {
       const data = err?.response?.data;
       if (data?.kyc_required) {
         if (backendUser?.kyc_status === 'pending') {
-          toast.info('Your ID verification is still processing. Please wait a moment and try again.');
+          toast.info(t('listingDetail.kycProcessing'));
         } else {
-          const riskLabel = data.risk_trigger === 'amount' ? 'High rental value' : data.risk_trigger === 'category' ? 'High-risk category' : 'Item requires verification';
+          const riskLabel = data.risk_trigger === 'amount' ? t('listingDetail.riskHighValue') : data.risk_trigger === 'category' ? t('listingDetail.riskHighCategory') : t('listingDetail.riskVerificationRequired');
           setIdentityVerificationReason(riskLabel);
           setShowIdentityVerificationCard(true);
         }
       } else {
-        toast.error(data?.error || 'Failed to submit request. Please try again.');
+        toast.error(data?.error || t('listingDetail.submitRequestFailed'));
       }
     } finally {
       setIsSubmittingRental(false);
@@ -611,7 +617,7 @@ export const ListingDetailScreen = () => {
       });
       const url = res.data?.data?.url || res.data?.url;
       if (!url) {
-        toast.error('Could not start identity verification. Please try again.');
+        toast.error(t('listingDetail.verificationStartFailed'));
         setIsStartingKyc(false);
         return;
       }
@@ -622,20 +628,20 @@ export const ListingDetailScreen = () => {
         if (latestKycStatus === 'verified') {
           setShowIdentityVerificationCard(false);
           setIdentityVerificationReason(null);
-          toast.success('Your ID verification is complete. You can now send your rental request.');
+          toast.success(t('listingDetail.verificationComplete'));
         } else if (latestKycStatus === 'failed') {
           setShowIdentityVerificationCard(true);
-          toast.error('ID verification needs more information. Please try again.');
+          toast.error(t('listingDetail.verificationRetry'));
         } else {
           setShowIdentityVerificationCard(false);
           setIdentityVerificationReason(null);
-          toast.info('Your verification was submitted and is still processing. Please wait a moment, then try again.');
+          toast.info(t('listingDetail.verificationSubmitted'));
         }
 
         setIsStartingKyc(false);
       });
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Failed to start ID verification.');
+      toast.error(err?.response?.data?.error || t('listingDetail.startVerificationFailed'));
       setIsStartingKyc(false);
     }
   };
@@ -654,7 +660,7 @@ export const ListingDetailScreen = () => {
         setIsConnectingCard(false);
       });
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Failed to start card setup. Please try again.');
+      toast.error(err?.response?.data?.error || t('listingDetail.cardSetupFailed'));
       setIsConnectingCard(false);
     }
   };
@@ -678,17 +684,17 @@ export const ListingDetailScreen = () => {
         const updatedUser = userRes?.data?.data || userRes?.data;
         if (updatedUser && !updatedUser.stripe_payment_method_id) {
           Alert.alert(
-            'Bank Connected!',
-            'Would you like to also connect a card for making rental payments?',
+            t('listingDetail.bankConnectedTitle'),
+            t('listingDetail.bankConnectedPrompt'),
             [
-              { text: 'Later', style: 'cancel' },
-              { text: 'Connect Card', onPress: () => handleConnectCard() },
+              { text: t('listingDetail.later'), style: 'cancel' },
+              { text: t('listingDetail.connectCard'), onPress: () => handleConnectCard() },
             ],
           );
         }
       });
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Failed to start bank setup. Please try again.');
+      toast.error(err?.response?.data?.error || t('listingDetail.bankSetupFailed'));
       setIsConnectingBank(false);
     }
   };
@@ -723,7 +729,7 @@ export const ListingDetailScreen = () => {
       setInquiryMessage('');
       (navigation as any).navigate('MyConversations');
     } catch (err: any) {
-      const msg = err?.response?.data?.error || 'Failed to send message. Please try again.';
+      const msg = err?.response?.data?.error || t('listingDetail.sendMessageFailed');
       toast.error(msg);
     } finally {
       setIsSendingInquiry(false);
@@ -733,12 +739,12 @@ export const ListingDetailScreen = () => {
   const handleToggleAvailability = () => {
     if (!listing) return;
     Alert.alert(
-      listing.isActive ? 'Hide Listing' : 'Make Available',
-      `Are you sure you want to ${listing.isActive ? 'hide' : 'make available'} this listing?`,
+      listing.isActive ? t('listingDetail.hideConfirmTitle') : t('listingDetail.availableConfirmTitle'),
+      listing.isActive ? t('listingDetail.hideConfirmBody') : t('listingDetail.availableConfirmBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Confirm',
+          text: t('common.apply'),
           onPress: async () => {
             try {
               await listingService.updateItem(listing.id, {
@@ -746,7 +752,7 @@ export const ListingDetailScreen = () => {
               });
               fetchListingById(listingId);
             } catch {
-              toast.error('Failed to update availability.');
+              toast.error(t('listingDetail.availabilityUpdateFailed'));
             }
           },
         },
@@ -757,19 +763,19 @@ export const ListingDetailScreen = () => {
   const handleDeleteItem = () => {
     if (!listing) return;
     Alert.alert(
-      'Delete Item',
-      'This action cannot be undone. Are you sure you want to delete this item?',
+      t('listingDetail.deleteConfirmTitle'),
+      t('listingDetail.deleteConfirmBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               await deleteItem(listing.id);
               navigation.goBack();
             } catch {
-              toast.error('Failed to delete item.');
+              toast.error(t('listingDetail.deleteFailed'));
             }
           },
         },
@@ -841,7 +847,7 @@ export const ListingDetailScreen = () => {
                 size={20}
                 color={colors.textPrimary}
               />
-              <Text style={styles.headerIconText}>Share</Text>
+              <Text style={styles.headerIconText}>{t('listingDetail.share')}</Text>
             </TouchableOpacity>
             {!isOwner && (
               <TouchableOpacity
@@ -861,7 +867,7 @@ export const ListingDetailScreen = () => {
             {isVideoUrl(displayMedia[selectedMediaIndex]) ? (
               <View style={styles.videoPlaceholder}>
                 <MaterialCommunityIcons name="play-circle-outline" size={64} color="#FFFFFF" />
-                <Text style={styles.videoText}>Video</Text>
+                <Text style={styles.videoText}>{t('listingDetail.video')}</Text>
               </View>
             ) : (
               <TouchableOpacity
@@ -879,7 +885,7 @@ export const ListingDetailScreen = () => {
             {listing.availability === false && (
               <View style={styles.unavailableOverlay}>
                 <View style={styles.unavailableBadge}>
-                  <Text style={styles.unavailableText}>Not Available</Text>
+                  <Text style={styles.unavailableText}>{t('listingDetail.notAvailable')}</Text>
                 </View>
               </View>
             )}
@@ -887,7 +893,7 @@ export const ListingDetailScreen = () => {
             {listing.instant_booking && (
               <View style={styles.instantBadge}>
                 <MaterialCommunityIcons name="lightning-bolt" size={14} color="#FFFFFF" />
-                <Text style={styles.instantBadgeText}>Instant Booking</Text>
+                <Text style={styles.instantBadgeText}>{t('listingDetail.instantBooking')}</Text>
               </View>
             )}
           </View>
@@ -929,7 +935,7 @@ export const ListingDetailScreen = () => {
               <Text variant="displaySmall" style={styles.priceAmount}>
                 ${listing.pricePerDay}
               </Text>
-              <Text style={styles.priceUnit}>/day</Text>
+              <Text style={styles.priceUnit}>{t('listingDetail.perDay')}</Text>
             </View>
             <View style={styles.tagsContainer}>
               <View style={[styles.tag, { backgroundColor: '#FDF2F8' }]}>
@@ -948,14 +954,14 @@ export const ListingDetailScreen = () => {
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <TouchableOpacity style={[styles.askQuestionBtn, { flex: 1 }]} onPress={() => setShowInquiryModal(true)}>
                 <MaterialCommunityIcons name="chat-outline" size={20} color={colors.textPrimary} />
-                <Text style={styles.askQuestionText}>Ask Owner</Text>
+                <Text style={styles.askQuestionText}>{t('listingDetail.askOwner')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.askQuestionBtn, { flex: 1, borderColor: '#8B5CF6' }]}
                 onPress={() => setShowAIChat(true)}
               >
                 <MaterialCommunityIcons name="robot" size={20} color="#8B5CF6" />
-                <Text style={[styles.askQuestionText, { color: '#8B5CF6' }]}>AI Assistant</Text>
+                <Text style={[styles.askQuestionText, { color: '#8B5CF6' }]}>{t('listingDetail.aiAssistant')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -965,27 +971,27 @@ export const ListingDetailScreen = () => {
             <View style={styles.infoRow}>
               <View style={styles.infoLabelContainer}>
                 <MaterialCommunityIcons name="shield-outline" size={18} color={colors.textSecondary} />
-                <Text style={styles.infoLabel}>Security Deposit</Text>
+                <Text style={styles.infoLabel}>{t('listingDetail.securityDeposit')}</Text>
               </View>
               <Text style={styles.infoValue}>${listing.deposit ?? 0}</Text>
             </View>
             <View style={styles.infoRow}>
               <View style={styles.infoLabelContainer}>
                 <MaterialCommunityIcons name="clock-outline" size={18} color={colors.textSecondary} />
-                <Text style={styles.infoLabel}>Min/Max Days</Text>
+                <Text style={styles.infoLabel}>{t('listingDetail.minMaxDays')}</Text>
               </View>
               <Text style={styles.infoValue}>
-                {listing.min_rental_days ?? 1} - {listing.max_rental_days ?? 30} days
+                {listing.min_rental_days ?? 1} - {listing.max_rental_days ?? 30} {t('listingDetail.days')}
               </Text>
             </View>
             {listing.rating > 0 && (
               <View style={styles.infoRow}>
                 <View style={styles.infoLabelContainer}>
                   <MaterialCommunityIcons name="star" size={18} color="#F59E0B" />
-                  <Text style={styles.infoLabel}>Rating</Text>
+                  <Text style={styles.infoLabel}>{t('listingDetail.rating')}</Text>
                 </View>
                 <Text style={styles.infoValue}>
-                  {listing.rating.toFixed(1)} ({listing.totalReviews} reviews)
+                  {listing.rating.toFixed(1)} ({t('listingDetail.reviews', { count: listing.totalReviews })})
                 </Text>
               </View>
             )}
@@ -994,15 +1000,15 @@ export const ListingDetailScreen = () => {
           {/* Pricing Tiers */}
           {listing.pricing_tiers && listing.pricing_tiers.length > 0 && (
             <View style={styles.pricingTiersBox}>
-              <Text style={styles.pricingTiersTitle}>Special Pricing:</Text>
+              <Text style={styles.pricingTiersTitle}>{t('listingDetail.specialPricing')}</Text>
               {listing.pricing_tiers
                 .sort((a, b) => a.days - b.days)
                 .map((tier, idx) => (
                   <View key={idx} style={styles.tierRow}>
-                    <Text style={styles.tierLabel}>Rent for {tier.days} {tier.days === 1 ? 'day' : 'days'}:</Text>
+                    <Text style={styles.tierLabel}>{t('listingDetail.rentFor', { days: tier.days, unit: tier.days === 1 ? t('listingDetail.day') : t('listingDetail.days') })}</Text>
                     <Text style={styles.tierValue}>
                       ${(tier.price || 0).toFixed(2)}{' '}
-                      <Text style={styles.tierPerDay}>(${(tier.price / tier.days || 0).toFixed(2)}/day)</Text>
+                      <Text style={styles.tierPerDay}>{t('listingDetail.perDayPrice', { price: (tier.price / tier.days || 0).toFixed(2) })}</Text>
                     </Text>
                   </View>
                 ))}
@@ -1011,7 +1017,7 @@ export const ListingDetailScreen = () => {
 
           {/* Delivery Options */}
           <View style={styles.deliverySection}>
-            <Text style={styles.deliveryTitle}>Delivery Options:</Text>
+            <Text style={styles.deliveryTitle}>{t('listingDetail.deliveryOptions')}</Text>
             {(listing.delivery_options && listing.delivery_options.length > 0) ? (
               listing.delivery_options.map((opt, idx) => (
                 <View key={idx} style={[styles.deliveryBadge, { marginBottom: 6 }]}>
@@ -1022,23 +1028,25 @@ export const ListingDetailScreen = () => {
                   />
                   <Text style={styles.deliveryText}>
                     {opt === 'pickup'
-                      ? 'Pickup at location'
-                      : `Delivery ($${listing.delivery_fee ?? 0})`}
+                      ? t('listingDetail.pickupAtLocation')
+                      : t('listingDetail.deliveryWithFee', { fee: listing.delivery_fee ?? 0 })}
                   </Text>
                 </View>
               ))
             ) : (
               <View style={styles.deliveryBadge}>
                 <MaterialCommunityIcons name="map-marker" size={14} color="#EF4444" />
-                <Text style={styles.deliveryText}>Pickup at location</Text>
+                <Text style={styles.deliveryText}>{t('listingDetail.pickupAtLocation')}</Text>
               </View>
             )}
             {listing.delivery_options?.includes('delivery') &&
               listing.delivery_fee != null &&
               listing.delivery_fee > 0 && (
                 <Text style={styles.deliveryFeeNote}>
-                  Delivery fee: ${listing.delivery_fee}
-                  {listing.delivery_radius ? ` (within ${listing.delivery_radius} miles)` : ''}
+                  {t('listingDetail.deliveryFeeNote', {
+                    fee: listing.delivery_fee,
+                    radius: listing.delivery_radius ? t('listingDetail.deliveryRadius', { value: listing.delivery_radius }) : '',
+                  })}
                 </Text>
               )}
           </View>
@@ -1047,7 +1055,7 @@ export const ListingDetailScreen = () => {
         {/* About Section */}
         <View style={styles.sectionCard}>
           <Text variant="titleLarge" style={styles.sectionTitle}>
-            About this item
+            {t('listingDetail.aboutItem')}
           </Text>
           <Text style={styles.descriptionText}>{listing.description}</Text>
         </View>
@@ -1061,11 +1069,11 @@ export const ListingDetailScreen = () => {
               <Avatar.Icon size={48} icon="account" style={{ backgroundColor: '#E2E8F0' }} />
             )}
             <View style={styles.ownerInfo}>
-              <Text variant="titleMedium" style={styles.ownerName}>Owner</Text>
+              <Text variant="titleMedium" style={styles.ownerName}>{t('listingDetail.owner')}</Text>
               <Text style={styles.ownerHandle}>
                 {owner?.username
                   ? `@${owner.username}`
-                  : owner?.full_name || 'A user'}
+                  : owner?.full_name || t('listingDetail.fallbackUser')}
               </Text>
             </View>
             {!isOwner && owner?.email && (
@@ -1073,7 +1081,7 @@ export const ListingDetailScreen = () => {
                 style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#F3F4F6', borderRadius: 8 }}
                 onPress={() => (navigation as any).navigate('PublicProfile', { userEmail: owner.email })}
               >
-                <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>View Profile</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>{t('listingDetail.viewProfile')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -1084,7 +1092,7 @@ export const ListingDetailScreen = () => {
           <View style={styles.ownerManageCard}>
             <View style={styles.ownerManageHeader}>
               <MaterialCommunityIcons name="cog" size={20} color="#FFFFFF" />
-              <Text style={styles.ownerManageTitle}>Manage This Listing</Text>
+              <Text style={styles.ownerManageTitle}>{t('listingDetail.manageListing')}</Text>
             </View>
             <View style={styles.ownerManageBody}>
               {backendUser && !backendUser.payouts_enabled && (
@@ -1094,9 +1102,9 @@ export const ListingDetailScreen = () => {
                       <MaterialCommunityIcons name="bank-outline" size={18} color="#15803D" />
                     </View>
                     <View style={styles.connectBankPromptCopy}>
-                      <Text style={styles.connectBankPromptTitle}>Connect bank account</Text>
+                      <Text style={styles.connectBankPromptTitle}>{t('listingDetail.connectBankTitle')}</Text>
                       <Text style={styles.connectBankPromptDesc}>
-                        Stripe Connect onboarding is required to receive payouts for this listing.
+                        {t('listingDetail.connectBankDescription')}
                       </Text>
                     </View>
                   </View>
@@ -1111,7 +1119,7 @@ export const ListingDetailScreen = () => {
                     ) : (
                       <>
                         <MaterialCommunityIcons name="bank-outline" size={18} color="#FFFFFF" />
-                        <Text style={styles.connectBankPromptBtnText}>Connect bank account</Text>
+                        <Text style={styles.connectBankPromptBtnText}>{t('listingDetail.connectBankAction')}</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -1124,7 +1132,7 @@ export const ListingDetailScreen = () => {
                 onPress={() => (navigation as any).navigate('EditItem', { itemId: listing.id })}
               >
                 <MaterialCommunityIcons name="pencil-outline" size={20} color="#475569" />
-                <Text style={styles.manageBtnText}>Edit Item Details</Text>
+                <Text style={styles.manageBtnText}>{t('listingDetail.editItemDetails')}</Text>
                 <MaterialCommunityIcons name="chevron-right" size={18} color="#CBD5E1" />
               </TouchableOpacity>
 
@@ -1134,17 +1142,17 @@ export const ListingDetailScreen = () => {
                 onPress={() => (navigation as any).navigate('ManageAvailability', { itemId: listing.id, itemTitle: listing.title })}
               >
                 <MaterialCommunityIcons name="calendar-month-outline" size={20} color="#475569" />
-                <Text style={styles.manageBtnText}>Manage Availability</Text>
+                <Text style={styles.manageBtnText}>{t('listingDetail.manageAvailability')}</Text>
                 <MaterialCommunityIcons name="chevron-right" size={18} color="#CBD5E1" />
               </TouchableOpacity>
 
               {/* View Analytics */}
               <TouchableOpacity
                 style={styles.manageBtn}
-                onPress={() => toast.info('View analytics coming soon.')}
+                onPress={() => toast.info(t('listingDetail.analyticsSoon'))}
               >
                 <MaterialCommunityIcons name="trending-up" size={20} color="#475569" />
-                <Text style={styles.manageBtnText}>View Analytics</Text>
+                <Text style={styles.manageBtnText}>{t('listingDetail.viewAnalytics')}</Text>
                 <MaterialCommunityIcons name="chevron-right" size={18} color="#CBD5E1" />
               </TouchableOpacity>
 
@@ -1159,7 +1167,7 @@ export const ListingDetailScreen = () => {
                   color="#F1F5F9"
                 />
                 <Text style={styles.manageBtnDarkText}>
-                  {listing.isActive ? 'Hide Listing' : 'Make Available'}
+                  {listing.isActive ? t('listingDetail.hideListing') : t('listingDetail.makeAvailable')}
                 </Text>
               </TouchableOpacity>
 
@@ -1169,7 +1177,7 @@ export const ListingDetailScreen = () => {
                 onPress={handleDeleteItem}
               >
                 <MaterialCommunityIcons name="trash-can-outline" size={20} color="#FFFFFF" />
-                <Text style={styles.manageBtnDeleteText}>Delete Item</Text>
+                <Text style={styles.manageBtnDeleteText}>{t('listingDetail.deleteItem')}</Text>
                 {isSubmitting && <ActivityIndicator size="small" color="#FFFFFF" />}
               </TouchableOpacity>
             </View>
@@ -1182,17 +1190,19 @@ export const ListingDetailScreen = () => {
             <MaterialCommunityIcons name="information-outline" size={16} color="#1D4ED8" />
             <View style={{ flex: 1 }}>
               <Text style={styles.noticeText}>
-                <Text style={styles.noticeBold}>Earliest pickup date: </Text>
+                <Text style={styles.noticeBold}>{t('listingDetail.earliestPickup')}</Text>
                 {earliestAvailableDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
               </Text>
               {noticePeriodHours > 0 && (
                 <Text style={styles.noticeSubtext}>
-                  The owner requires {noticePeriodHours} hour{noticePeriodHours !== 1 ? 's' : ''} notice before pickup.
+                  {noticePeriodHours === 1
+                    ? t('listingDetail.ownerNoticeHours', { count: noticePeriodHours })
+                    : t('listingDetail.ownerNoticeHours_plural', { count: noticePeriodHours })}
                 </Text>
               )}
               {!sameDayPickup && noticePeriodHours === 0 && (
                 <Text style={styles.noticeSubtext}>
-                  The owner does not allow same-day pickup.
+                  {t('listingDetail.noSameDayPickup')}
                 </Text>
               )}
             </View>
@@ -1204,8 +1214,8 @@ export const ListingDetailScreen = () => {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <MaterialCommunityIcons name="shield-account" size={24} color="#D97706" />
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: '#92400E' }}>Admin Account</Text>
-                <Text style={{ fontSize: 13, color: '#A16207', marginTop: 2 }}>Admins manage the platform and cannot rent or list items.</Text>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#92400E' }}>{t('listingDetail.adminAccount')}</Text>
+                <Text style={{ fontSize: 13, color: '#A16207', marginTop: 2 }}>{t('listingDetail.adminAccountNote')}</Text>
               </View>
             </View>
           </View>
@@ -1219,22 +1229,22 @@ export const ListingDetailScreen = () => {
                 <View style={styles.connectCardIconBg}>
                   <MaterialCommunityIcons name="alert-circle-outline" size={26} color="#2563EB" />
                 </View>
-                <Text variant="titleMedium" style={styles.connectCardTitle}>Connect card to rent</Text>
+                <Text variant="titleMedium" style={styles.connectCardTitle}>{t('listingDetail.connectCardTitle')}</Text>
                 <Text style={styles.connectCardDesc}>
-                  Connect your payment card to make rental payments.
+                  {t('listingDetail.connectCardDescription')}
                 </Text>
 
                 <View style={styles.connectStatusRow}>
                   <View style={styles.statusBadge}>
                     <MaterialCommunityIcons name="shield-outline" size={12} color="#475569" />
-                    <Text style={styles.statusBadgeText}>Card not connected</Text>
+                    <Text style={styles.statusBadgeText}>{t('listingDetail.cardNotConnected')}</Text>
                   </View>
                 </View>
 
                 <View style={styles.connectInfoBox}>
                   <MaterialCommunityIcons name="information-outline" size={18} color="#2563EB" />
                   <Text style={styles.connectInfoText}>
-                    Connect your card to make rental payments.
+                    {t('listingDetail.connectCardInfo')}
                   </Text>
                 </View>
               </View>
@@ -1250,7 +1260,7 @@ export const ListingDetailScreen = () => {
                   ) : (
                     <>
                       <MaterialCommunityIcons name="shield-outline" size={18} color="#2563EB" />
-                      <Text style={styles.connectCardBtnText}>Connect Card (to Rent)</Text>
+                      <Text style={styles.connectCardBtnText}>{t('listingDetail.connectCardAction')}</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -1266,7 +1276,7 @@ export const ListingDetailScreen = () => {
                     ) : (
                       <>
                         <MaterialCommunityIcons name="shield-outline" size={18} color="#2563EB" />
-                        <Text style={styles.connectBankBtnText}>Connect Bank Account (to Lend)</Text>
+                        <Text style={styles.connectBankBtnText}>{t('listingDetail.connectBankLendAction')}</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -1274,7 +1284,7 @@ export const ListingDetailScreen = () => {
               </View>
 
               <Text style={styles.stripeDisclaimer}>
-                We use Stripe to securely process payments. Your payment information is encrypted and securely handled by Stripe.
+                {t('listingDetail.stripeDisclaimer')}
               </Text>
             </View>
           ) : (
@@ -1297,14 +1307,14 @@ export const ListingDetailScreen = () => {
 
                     <Text variant="titleLarge" style={styles.successTitle}>
                       {(submittedRequestSummary?.instantBooking ?? (listing as any).instant_booking)
-                        ? 'Booking Confirmed!'
-                        : 'Request Sent!'}
+                        ? t('listingDetail.bookingConfirmed')
+                        : t('listingDetail.requestSent')}
                     </Text>
 
                     <Text style={styles.successDesc}>
                       {(submittedRequestSummary?.instantBooking ?? (listing as any).instant_booking)
-                        ? `Your booking for ${submittedRequestSummary?.listingTitle || listing?.title || 'this item'} is confirmed.`
-                        : `Your rental request for ${submittedRequestSummary?.listingTitle || listing?.title || 'this item'} has been sent to the owner.`}
+                        ? t('listingDetail.bookingConfirmedBody', { title: submittedRequestSummary?.listingTitle || listing?.title || '' })
+                        : t('listingDetail.requestSentBody', { title: submittedRequestSummary?.listingTitle || listing?.title || '' })}
                     </Text>
 
                     <View style={styles.successSummaryCard}>
@@ -1317,24 +1327,24 @@ export const ListingDetailScreen = () => {
                       <View style={styles.successSummaryRow}>
                         <MaterialCommunityIcons name="credit-card-outline" size={20} color="#64748B" />
                         <Text style={styles.successSummaryTotal}>
-                          Total: ${Number(submittedRequestSummary?.totalCost ?? rentalCosts.totalCost).toFixed(2)}
+                          {t('listingDetail.total', { value: Number(submittedRequestSummary?.totalCost ?? rentalCosts.totalCost).toFixed(2) })}
                         </Text>
                       </View>
                     </View>
 
                     <View style={styles.successInfoCard}>
-                      <Text style={styles.successInfoTitle}>What happens next?</Text>
+                      <Text style={styles.successInfoTitle}>{t('listingDetail.whatNext')}</Text>
                       {(submittedRequestSummary?.instantBooking ?? (listing as any).instant_booking) ? (
                         <>
-                          <Text style={styles.successInfoItem}>• Your booking is now confirmed</Text>
-                          <Text style={styles.successInfoItem}>• You can message the owner for pickup details</Text>
-                          <Text style={styles.successInfoItem}>• You&apos;ll receive updates in Conversations</Text>
+                          <Text style={styles.successInfoItem}>{t('listingDetail.nextConfirmed1')}</Text>
+                          <Text style={styles.successInfoItem}>{t('listingDetail.nextConfirmed2')}</Text>
+                          <Text style={styles.successInfoItem}>{t('listingDetail.nextConfirmed3')}</Text>
                         </>
                       ) : (
                         <>
-                          <Text style={styles.successInfoItem}>• The owner will review your request</Text>
-                          <Text style={styles.successInfoItem}>• You&apos;ll receive a notification when they respond</Text>
-                          <Text style={styles.successInfoItem}>• If approved, you can proceed with payment</Text>
+                          <Text style={styles.successInfoItem}>{t('listingDetail.nextPending1')}</Text>
+                          <Text style={styles.successInfoItem}>{t('listingDetail.nextPending2')}</Text>
+                          <Text style={styles.successInfoItem}>{t('listingDetail.nextPending3')}</Text>
                         </>
                       )}
                     </View>
@@ -1344,14 +1354,14 @@ export const ListingDetailScreen = () => {
                       onPress={() => (navigation as any).navigate('MyConversations')}
                     >
                       <MaterialCommunityIcons name="chat-outline" size={20} color="#FFFFFF" />
-                      <Text style={styles.successConvBtnText}>View Conversation</Text>
+                      <Text style={styles.successConvBtnText}>{t('listingDetail.viewConversation')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                       style={styles.successSecondaryBtn}
                       onPress={() => setRequestSentSuccessfully(false)}
                     >
-                      <Text style={styles.successSecondaryBtnText}>Continue Browsing</Text>
+                      <Text style={styles.successSecondaryBtnText}>{t('listingDetail.continueBrowsing')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1359,34 +1369,34 @@ export const ListingDetailScreen = () => {
               <>
               {/* Calendar */}
               <View style={[styles.sectionCard, styles.calendarCard]}>
-                <Text variant="titleMedium" style={styles.calendarTitle}>Select Rental Dates</Text>
+                <Text variant="titleMedium" style={styles.calendarTitle}>{t('listingDetail.selectRentalDates')}</Text>
 
                 {/* Legend */}
                 <View style={styles.legendRow}>
                   <View style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: '#F67B86' }]} />
-                    <Text style={styles.legendText}>Past dates</Text>
+                    <Text style={styles.legendText}>{t('listingDetail.pastDates')}</Text>
                   </View>
                   <View style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: '#FFBE55' }]} />
-                    <Text style={styles.legendText}>Notice period</Text>
+                    <Text style={styles.legendText}>{t('listingDetail.noticePeriodLegend')}</Text>
                   </View>
                   <View style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: '#FFB347' }]} />
-                    <Text style={styles.legendText}>Same-day unavailable</Text>
+                    <Text style={styles.legendText}>{t('listingDetail.sameDayUnavailable')}</Text>
                   </View>
                   <View style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: '#FB7185' }]} />
-                    <Text style={styles.legendText}>Blocked by owner</Text>
+                    <Text style={styles.legendText}>{t('listingDetail.blockedByOwner')}</Text>
                   </View>
                 </View>
 
                 <Text style={styles.calendarHint}>
                   {selectedDates.length === 0
-                    ? 'Tap a start date'
+                    ? t('listingDetail.tapStartDate')
                     : selectedDates.length === 1
-                    ? 'Tap an end date'
-                    : `${selectedDates.length} days selected`}
+                    ? t('listingDetail.tapEndDate')
+                    : t('listingDetail.daysSelected', { count: selectedDates.length })}
                 </Text>
                 <View style={styles.calNavRow}>
                   <TouchableOpacity
@@ -1463,21 +1473,21 @@ export const ListingDetailScreen = () => {
                     onPress={() => { setSelectedDates([]); setRangeStart(null); }}
                     style={styles.clearDatesBtn}
                   >
-                    <Text style={styles.clearDatesText}>Clear dates</Text>
+                    <Text style={styles.clearDatesText}>{t('listingDetail.clearDates')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
               {/* Rental request card — always visible, shows prompt or form */}
               <View style={[styles.sectionCard, styles.rentalRequestCard]}>
-                <Text variant="titleMedium" style={styles.rentalCardTitle}>Request to Rent</Text>
+                <Text variant="titleMedium" style={styles.rentalCardTitle}>{t('listingDetail.requestToRent')}</Text>
 
 
                 {selectedDates.length === 0 ? (
                   /* No dates selected yet — prompt */
                   <View style={styles.selectDatesPrompt}>
                     <Text style={styles.selectDatesText}>
-                      Select your desired rental dates on the calendar above to see the final price and send your request.
+                      {t('listingDetail.selectDatesPrompt')}
                     </Text>
                   </View>
                 ) : (
@@ -1486,35 +1496,35 @@ export const ListingDetailScreen = () => {
                     <View style={styles.costBox}>
                       {/* Rental period: "5 dates: Jan 15, Jan 16, ..." */}
                       <View style={styles.costRow}>
-                        <Text style={styles.costLabel}>Rental period:</Text>
+                        <Text style={styles.costLabel}>{t('listingDetail.rentalPeriod')}</Text>
                         <Text style={[styles.costValue, { flex: 1, textAlign: 'right' }]}>
                           {selectedDatesLabel}
                         </Text>
                       </View>
                       {/* Rental cost */}
                       <View style={styles.costRow}>
-                        <Text style={styles.costLabel}>Rental cost ({selectedDates.length} days):</Text>
+                        <Text style={styles.costLabel}>{t('listingDetail.rentalCost', { count: selectedDates.length })}</Text>
                         <Text style={styles.costValue}>${rentalCosts.rentalCost.toFixed(2)}</Text>
                       </View>
                       {/* Platform fee */}
                       <View style={styles.costRow}>
-                        <Text style={styles.costLabel}>Platform fee (15%):</Text>
+                        <Text style={styles.costLabel}>{t('listingDetail.platformFee')}</Text>
                         <Text style={styles.costValue}>${rentalCosts.platformFee.toFixed(2)}</Text>
                       </View>
                       {/* Total — includes deposit silently, same as frontend-v1 */}
                       <View style={[styles.costRow, styles.costTotalRow]}>
-                        <Text style={styles.costTotalLabel}>Total price:</Text>
+                        <Text style={styles.costTotalLabel}>{t('listingDetail.totalPrice')}</Text>
                         <Text style={styles.costTotalValue}>${rentalCosts.totalCost.toFixed(2)}</Text>
                       </View>
                     </View>
 
                     {/* Message to owner */}
-                    <Text style={styles.messageLabel}>Message to Owner (Optional)</Text>
+                    <Text style={styles.messageLabel}>{t('listingDetail.messageToOwner')}</Text>
                     <TextInput
                       style={styles.messageInput}
                       value={rentalMessage}
                       onChangeText={setRentalMessage}
-                      placeholder="Tell the owner why you need this item..."
+                      placeholder={t('listingDetail.messagePlaceholder')}
                       placeholderTextColor="#94A3B8"
                       multiline
                       numberOfLines={3}
@@ -1524,20 +1534,20 @@ export const ListingDetailScreen = () => {
                     {backendUser?.kyc_status === 'pending' && (
                       <View style={styles.kycBanner}>
                         <MaterialCommunityIcons name="clock-outline" size={16} color="#92400E" />
-                        <Text style={styles.kycBannerText}>ID verification pending — you can still send your request once approved.</Text>
+                        <Text style={styles.kycBannerText}>{t('listingDetail.kycPending')}</Text>
                       </View>
                     )}
                     {backendUser?.kyc_status === 'failed' && (
                       <View style={[styles.kycBanner, styles.kycBannerError]}>
                         <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#B91C1C" />
                         <Text style={[styles.kycBannerText, styles.kycBannerErrorText]}>
-                          ID verification failed. Please verify again before sending your request.
+                          {t('listingDetail.kycFailed')}
                         </Text>
                         <TouchableOpacity
                           onPress={() => setShowIdentityVerificationCard(true)}
                           disabled={isStartingKyc}
                         >
-                          <Text style={styles.kycRetryText}>{isStartingKyc ? 'Starting...' : 'Verify'}</Text>
+                          <Text style={styles.kycRetryText}>{isStartingKyc ? t('listingDetail.starting') : t('listingDetail.verify')}</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -1551,7 +1561,7 @@ export const ListingDetailScreen = () => {
                       {isSubmittingRental ? (
                         <ActivityIndicator size="small" color="#FFFFFF" />
                       ) : (
-                        <Text style={styles.submitRentalBtnText}>Confirm and Send Request</Text>
+                        <Text style={styles.submitRentalBtnText}>{t('listingDetail.confirmAndSend')}</Text>
                       )}
                     </TouchableOpacity>
                   </>
@@ -1566,12 +1576,12 @@ export const ListingDetailScreen = () => {
         {/* Sign in prompt for unauthenticated users */}
         {!user && listing.availability !== false && !isOwner && (
           <View style={styles.sectionCard}>
-            <Text style={styles.signInPrompt}>Sign in to rent this item</Text>
+            <Text style={styles.signInPrompt}>{t('listingDetail.signInPrompt')}</Text>
             <TouchableOpacity
               style={styles.signInBtn}
               onPress={() => (navigation as any).navigate('Auth')}
             >
-              <Text style={styles.signInBtnText}>Sign In</Text>
+              <Text style={styles.signInBtnText}>{t('listingDetail.signIn')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1580,7 +1590,7 @@ export const ListingDetailScreen = () => {
         {similarItems.length > 0 && (
           <View style={styles.similarSection}>
             <Text variant="titleLarge" style={styles.sectionTitle}>
-              Similar Items
+              {t('listingDetail.similarItems')}
             </Text>
             <FlatList
               data={similarItems}
@@ -1627,16 +1637,16 @@ export const ListingDetailScreen = () => {
           <View style={styles.identityModalCard}>
             <View style={styles.identityHeader}>
               <MaterialCommunityIcons name="shield-outline" size={38} color="#111827" />
-              <Text style={styles.identityTitle}>ID verification</Text>
+              <Text style={styles.identityTitle}>{t('listingDetail.idVerification')}</Text>
             </View>
             <Text style={styles.identityDescription}>
-              This booking requires identity verification before you can send the request.
+              {t('listingDetail.idVerificationRequired')}
             </Text>
             <Text style={styles.identityDescription}>
-              We use Stripe Identity to verify your ID and a live selfie. You only need to verify once.
+              {t('listingDetail.idVerificationStripe')}
             </Text>
             {identityVerificationReason ? (
-              <Text style={styles.identityReason}>Reason: {identityVerificationReason}</Text>
+              <Text style={styles.identityReason}>{t('listingDetail.reason', { value: identityVerificationReason })}</Text>
             ) : null}
             <TouchableOpacity
               style={[styles.identityPrimaryBtn, isStartingKyc && styles.identityPrimaryBtnDisabled]}
@@ -1646,7 +1656,7 @@ export const ListingDetailScreen = () => {
               {isStartingKyc ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Text style={styles.identityPrimaryBtnText}>Start verification (ID + selfie)</Text>
+                <Text style={styles.identityPrimaryBtnText}>{t('listingDetail.startVerification')}</Text>
               )}
             </TouchableOpacity>
             <TouchableOpacity
@@ -1657,9 +1667,9 @@ export const ListingDetailScreen = () => {
               }}
             >
               <MaterialCommunityIcons name="arrow-left" size={20} color="#111827" />
-              <Text style={styles.identitySecondaryBtnText}>Back</Text>
+              <Text style={styles.identitySecondaryBtnText}>{t('common.back')}</Text>
             </TouchableOpacity>
-            <Text style={styles.identityFooterText}>Profile</Text>
+            <Text style={styles.identityFooterText}>{t('listingDetail.profile')}</Text>
           </View>
         </View>
       </Modal>
@@ -1689,7 +1699,7 @@ export const ListingDetailScreen = () => {
               <View style={styles.reportModalHeader}>
                 <View style={styles.reportModalTitleWrap}>
                   <MaterialCommunityIcons name="alert-outline" size={28} color="#8B1E1E" />
-                  <Text style={styles.reportModalTitle}>Report Listing</Text>
+                  <Text style={styles.reportModalTitle}>{t('listingDetail.reportListing')}</Text>
                 </View>
                 <TouchableOpacity onPress={resetReportForm} style={styles.reportModalCloseBtn}>
                   <MaterialCommunityIcons name="close" size={24} color="#4B5563" />
@@ -1698,17 +1708,17 @@ export const ListingDetailScreen = () => {
 
               <View style={styles.reportingBox}>
                 <Text style={styles.reportingLabel}>
-                  <Text style={styles.reportingLabelStrong}>Reporting:</Text> {listing?.title}
+                  <Text style={styles.reportingLabelStrong}>{t('listingDetail.reporting')}</Text> {listing?.title}
                 </Text>
               </View>
 
-              <Text style={styles.reportFieldTitle}>Reason for Report</Text>
+              <Text style={styles.reportFieldTitle}>{t('listingDetail.reasonForReport')}</Text>
               <TouchableOpacity
                 style={styles.reportSelect}
                 onPress={() => setShowReportReasons((prev) => !prev)}
               >
                 <Text style={[styles.reportSelectText, !reportReason && styles.reportPlaceholderText]}>
-                  {REPORT_REASONS.find((reason) => reason.value === reportReason)?.label || 'Select a reason'}
+                  {reportReasons.find((reason) => reason.value === reportReason)?.label || t('listingDetail.selectReason')}
                 </Text>
                 <MaterialCommunityIcons
                   name={showReportReasons ? 'chevron-up' : 'chevron-down'}
@@ -1719,7 +1729,7 @@ export const ListingDetailScreen = () => {
 
               {showReportReasons && (
                 <View style={styles.reportReasonList}>
-                  {REPORT_REASONS.map((reason) => (
+                  {reportReasons.map((reason) => (
                     <TouchableOpacity
                       key={reason.value}
                       style={[
@@ -1744,24 +1754,24 @@ export const ListingDetailScreen = () => {
                 </View>
               )}
 
-              <Text style={styles.reportFieldTitle}>Detailed Description</Text>
+              <Text style={styles.reportFieldTitle}>{t('listingDetail.detailedDescription')}</Text>
               <TextInput
                 style={styles.reportDetailsInput}
                 value={reportDetails}
                 onChangeText={setReportDetails}
-                placeholder="Please provide detailed information about the issue. Include dates, specific incidents, or any relevant details..."
+                placeholder={t('listingDetail.reportDescriptionPlaceholder')}
                 placeholderTextColor="#9CA3AF"
                 multiline
                 numberOfLines={5}
                 textAlignVertical="top"
               />
               <Text style={styles.reportHelperText}>
-                Be as specific as possible. This helps our team investigate the report.
+                {t('listingDetail.reportDescriptionHint')}
               </Text>
 
-              <Text style={styles.reportFieldTitle}>Evidence (Screenshots/Photos)</Text>
+              <Text style={styles.reportFieldTitle}>{t('listingDetail.evidence')}</Text>
               <Text style={styles.reportSubtext}>
-                Upload any evidence that supports your report (optional but recommended)
+                {t('listingDetail.evidenceHint')}
               </Text>
               <TouchableOpacity
                 style={styles.reportEvidenceBtn}
@@ -1774,7 +1784,7 @@ export const ListingDetailScreen = () => {
                   <MaterialCommunityIcons name="upload-outline" size={20} color="#111827" />
                 )}
                 <Text style={styles.reportEvidenceBtnText}>
-                  {isUploadingReportEvidence ? 'Uploading...' : 'Add Evidence'}
+                  {isUploadingReportEvidence ? t('listingDetail.uploading') : t('listingDetail.addEvidence')}
                 </Text>
               </TouchableOpacity>
               {reportEvidence.length > 0 && (
@@ -1796,8 +1806,7 @@ export const ListingDetailScreen = () => {
 
               <View style={styles.reportWarningBox}>
                 <Text style={styles.reportWarningText}>
-                  <Text style={styles.reportWarningStrong}>Important:</Text> False reports may result in account
-                  suspension. Only submit reports for genuine concerns about safety, fraud, or policy violations.
+                  {t('listingDetail.reportWarning')}
                 </Text>
               </View>
 
@@ -1809,11 +1818,11 @@ export const ListingDetailScreen = () => {
                 {isSubmittingReport ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.reportSubmitBtnText}>Submit Report</Text>
+                  <Text style={styles.reportSubmitBtnText}>{t('listingDetail.submitReport')}</Text>
                 )}
               </TouchableOpacity>
               <TouchableOpacity style={styles.reportCancelBtn} onPress={resetReportForm}>
-                <Text style={styles.reportCancelBtnText}>Cancel</Text>
+                <Text style={styles.reportCancelBtnText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -1862,13 +1871,13 @@ export const ListingDetailScreen = () => {
           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowInquiryModal(false)} />
           <View style={styles.modalContainer}>
             <View style={styles.modalHandle} />
-            <Text variant="titleLarge" style={styles.modalTitle}>Ask Owner a Question</Text>
+            <Text variant="titleLarge" style={styles.modalTitle}>{t('listingDetail.askQuestion')}</Text>
             <Text style={styles.modalSubtitle}>
-              Your message will start a conversation about "{listing?.title}".
+              {t('listingDetail.askQuestionBody', { title: listing?.title || '' })}
             </Text>
             <TextInput
               style={styles.modalTextInput}
-              placeholder="Type your question here..."
+              placeholder={t('listingDetail.askQuestionPlaceholder')}
               placeholderTextColor="#9CA3AF"
               value={inquiryMessage}
               onChangeText={setInquiryMessage}
@@ -1883,7 +1892,7 @@ export const ListingDetailScreen = () => {
                 onPress={() => { setShowInquiryModal(false); setInquiryMessage(''); }}
                 disabled={isSendingInquiry}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalSendBtn, (!inquiryMessage.trim() || isSendingInquiry) && styles.modalSendBtnDisabled]}
@@ -1895,7 +1904,7 @@ export const ListingDetailScreen = () => {
                 ) : (
                   <>
                     <MaterialCommunityIcons name="send" size={16} color="#FFFFFF" />
-                    <Text style={styles.modalSendText}>Send Message</Text>
+                    <Text style={styles.modalSendText}>{t('listingDetail.sendMessage')}</Text>
                   </>
                 )}
               </TouchableOpacity>

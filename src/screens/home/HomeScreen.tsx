@@ -26,6 +26,7 @@ import { HowItWorks } from "../../components/home/HowItWorks";
 import { Testimonials } from "../../components/home/Testimonials";
 import { ListingCard } from "../../components/listing/ListingCard";
 import { useUser } from "@clerk/expo";
+import { useI18n } from "../../i18n";
 import { useListingStore } from "../../store/listingStore";
 import { useUIStore } from "../../store/uiStore";
 import { colors, typography } from "../../theme";
@@ -36,10 +37,12 @@ import { toast } from "../../store/toastStore";
 // Extend the local type for this specific navigation call
 type ExtendedHomeStackParamList = HomeStackParamList & { SearchTab: undefined };
 type Nav = StackNavigationProp<ExtendedHomeStackParamList, "Home">;
+type SortKey = "relevance" | "newest" | "priceLow" | "priceHigh" | "rating" | "popular";
 
 export const HomeScreen = () => {
   const navigation = useNavigation<Nav>();
   const { user } = useUser();
+  const { t } = useI18n();
   const openSidebar = useUIStore((s) => s.openSidebar);
   const {
     listings,
@@ -66,7 +69,7 @@ export const HomeScreen = () => {
   const [categoryMenuVisible, setCategoryMenuVisible] = useState(false);
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
-  const [selectedSort, setSelectedSort] = useState<string>("Relevance");
+  const [selectedSortKey, setSelectedSortKey] = useState<SortKey>("relevance");
   const [saveSearchModalVisible, setSaveSearchModalVisible] = useState(false);
   const [saveSearchName, setSaveSearchName] = useState("");
   const [isSavingSearch, setIsSavingSearch] = useState(false);
@@ -75,12 +78,12 @@ export const HomeScreen = () => {
   const allItemsRef = React.useRef<View>(null);
 
   const SORT_OPTIONS = [
-    { label: "Relevance", value: undefined },
-    { label: "Newest", value: "newest" as const },
-    { label: "Price: Low", value: "price_low" as const },
-    { label: "Price: High", value: "price_high" as const },
-    { label: "Rating", value: "rating" as const },
-    { label: "Popular", value: "popular" as const },
+    { key: "relevance" as const, label: t("home.sort.relevance"), value: undefined },
+    { key: "newest" as const, label: t("home.sort.newest"), value: "newest" as const },
+    { key: "priceLow" as const, label: t("home.sort.priceLow"), value: "price_low" as const },
+    { key: "priceHigh" as const, label: t("home.sort.priceHigh"), value: "price_high" as const },
+    { key: "rating" as const, label: t("home.sort.rating"), value: "rating" as const },
+    { key: "popular" as const, label: t("home.sort.popular"), value: "popular" as const },
   ];
 
   const userEmail = user?.emailAddresses?.[0]?.emailAddress;
@@ -116,7 +119,7 @@ export const HomeScreen = () => {
     const q = overrides?.query ?? query.trim();
     const loc = overrides?.location ?? location.trim();
     const cat = overrides?.category !== undefined ? overrides.category : selectedCategory;
-    const sort = overrides?.sortBy !== undefined ? overrides.sortBy : SORT_OPTIONS.find((o) => o.label === selectedSort)?.value;
+    const sort = overrides?.sortBy !== undefined ? overrides.sortBy : SORT_OPTIONS.find((o) => o.key === selectedSortKey)?.value;
 
     if (q) filter.query = q;
     if (loc) filter.location = loc;
@@ -128,7 +131,7 @@ export const HomeScreen = () => {
     // so we set it directly and then call fetch
     useListingStore.setState({ activeFilter: filter });
     fetchListings();
-  }, [query, location, selectedCategory, selectedSort, setActiveFilter, fetchListings]);
+  }, [query, location, selectedCategory, selectedSortKey, setActiveFilter, fetchListings]);
 
   const handleSearchSubmit = () => {
     applyCurrentFilters();
@@ -140,16 +143,16 @@ export const HomeScreen = () => {
     applyCurrentFilters({ category: categoryName });
   };
 
-  const handleSortSelect = (label: string) => {
+  const handleSortSelect = (key: SortKey) => {
     setSortMenuVisible(false);
-    setSelectedSort(label);
-    const sortValue = SORT_OPTIONS.find((o) => o.label === label)?.value;
+    setSelectedSortKey(key);
+    const sortValue = SORT_OPTIONS.find((o) => o.key === key)?.value;
     applyCurrentFilters({ sortBy: sortValue });
   };
 
   const handleSaveSearch = () => {
     if (!query.trim() && !location.trim() && !selectedCategory) {
-      toast.warning("No Search: Enter a search query, location, or select a category first.");
+      toast.warning(t("home.toasts.emptySearch"));
       return;
     }
     setSaveSearchName("");
@@ -158,7 +161,7 @@ export const HomeScreen = () => {
 
   const handleConfirmSaveSearch = async () => {
     if (!saveSearchName.trim()) {
-      toast.error("Please enter a name for your saved search.");
+      toast.error(t("home.toasts.enterSearchName"));
       return;
     }
     setIsSavingSearch(true);
@@ -169,9 +172,9 @@ export const HomeScreen = () => {
       if (selectedCategory) filter.category = selectedCategory;
       await createSavedSearch(saveSearchName.trim(), filter);
       setSaveSearchModalVisible(false);
-      toast.success("Search Saved: You'll receive notifications when new items match your criteria.");
+      toast.success(t("home.toasts.searchSaved"));
     } catch {
-      toast.error("Failed to save search. Please try again.");
+      toast.error(t("home.toasts.saveSearchFailed"));
     } finally {
       setIsSavingSearch(false);
     }
@@ -196,7 +199,7 @@ export const HomeScreen = () => {
   };
  
   const handleGrowingCommunityPress = () => {
-    toast.info("Growing Community: Join thousands of users sharing items in your neighborhood!");
+    toast.info(t("home.toasts.growingCommunity"));
   };
 
   const getActiveFiltersCount = () => {
@@ -219,7 +222,7 @@ export const HomeScreen = () => {
     setQuery('');
     setLocation('');
     setSelectedCategory(undefined);
-    setSelectedSort('Relevance');
+    setSelectedSortKey("relevance");
     useListingStore.setState({ activeFilter: {} });
     fetchListings();
   };
@@ -234,7 +237,7 @@ export const HomeScreen = () => {
 
     // We expect the "Recommended" section to have the unique UI with the side icon
     const isSpecial =
-      title.includes("Recommended") || title.includes("Recently Viewed");
+      title.includes(t("home.recommendedForYou")) || title.includes(t("home.recentlyViewed"));
 
     return (
       <View style={styles.section}>
@@ -243,7 +246,7 @@ export const HomeScreen = () => {
             <View
               style={[
                 styles.sectionIconBg,
-                title.includes("Recently Viewed") && {
+                title.includes(t("home.recentlyViewed")) && {
                   backgroundColor: colors.accentBlue,
                 },
               ]}
@@ -259,9 +262,9 @@ export const HomeScreen = () => {
             <Text variant="headlineSmall" style={styles.sectionTitle}>
               {title}
             </Text>
-            {title.includes("Recommended") && (
+            {title.includes(t("home.recommendedForYou")) && (
               <Text variant="bodyMedium" style={styles.sectionSubtitleText}>
-                Based on your activity and preferences
+                {t("home.recommendedSubtitle")}
               </Text>
             )}
           </View>
@@ -317,28 +320,28 @@ export const HomeScreen = () => {
             <View style={styles.trustRow}>
               <TrustBadge
                 icon="shield-outline"
-                title="Verified Users"
-                subtitle="ID checked"
+                title={t("home.trust.verifiedUsers")}
+                subtitle={t("home.trust.idChecked")}
                 iconColor={colors.accentEmerald}
               />
               <TrustBadge
                 icon="credit-card-outline"
-                title="Secure Payments"
-                subtitle="Stripe protected"
+                title={t("home.trust.securePayments")}
+                subtitle={t("home.trust.stripeProtected")}
                 iconColor={colors.accentEmerald}
               />
             </View>
             <View style={styles.trustRow}>
               <TrustBadge
                 icon="account-group-outline"
-                title="Deposit Protection"
-                subtitle="Fully refundable"
+                title={t("home.trust.depositProtection")}
+                subtitle={t("home.trust.fullyRefundable")}
                 iconColor={colors.accentEmerald}
               />
               <TrustBadge
                 icon="clock-outline"
-                title="24/7 Support"
-                subtitle="Always here to help"
+                title={t("home.trust.support247")}
+                subtitle={t("home.trust.alwaysHere")}
                 iconColor={colors.accentEmerald}
               />
             </View>
@@ -350,14 +353,14 @@ export const HomeScreen = () => {
         ) : (
           <>
             {viewMode === "grid" && renderSection(
-              "Recently Viewed",
+              t("home.recentlyViewed"),
               recentlyViewed,
               undefined,
               "history",
             )}
 
             {viewMode === "grid" && renderSection(
-              "Recommended for You",
+              t("home.recommendedForYou"),
               recommended,
               "AI Powered",
               "creation",
@@ -367,7 +370,7 @@ export const HomeScreen = () => {
             <View style={styles.searchHeader}>
               <View style={styles.headerTitleRow}>
                 <Text variant="headlineSmall" style={styles.headerTitle}>
-                  Search & Filter
+                  {t("home.searchAndFilter")}
                 </Text>
                 <View style={styles.headerActions}>
                   <TouchableOpacity style={styles.saveBtn} onPress={handleSaveSearch}>
@@ -376,7 +379,7 @@ export const HomeScreen = () => {
                       size={18}
                       color={colors.textPrimary}
                     />
-                    <Text style={styles.saveBtnText}>Save Search</Text>
+                    <Text style={styles.saveBtnText}>{t("home.saveSearch")}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -389,7 +392,7 @@ export const HomeScreen = () => {
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="Search items..."
+                  placeholder={t("home.searchItemsPlaceholder")}
                   placeholderTextColor="#9CA3AF"
                   value={query}
                   onChangeText={setQuery}
@@ -405,7 +408,7 @@ export const HomeScreen = () => {
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="Location..."
+                  placeholder={t("home.locationPlaceholder")}
                   placeholderTextColor="#9CA3AF"
                   value={location}
                   onChangeText={setLocation}
@@ -420,7 +423,7 @@ export const HomeScreen = () => {
                 contentStyle={styles.menuContent}
                 anchor={
                   <TouchableOpacity style={styles.dropdownBtn} onPress={() => setCategoryMenuVisible(true)}>
-                    <Text style={styles.dropdownText}>{selectedCategory || "All Categories"}</Text>
+                    <Text style={styles.dropdownText}>{selectedCategory || t("home.allCategories")}</Text>
                     <MaterialCommunityIcons
                       name="chevron-down"
                       size={20}
@@ -432,7 +435,7 @@ export const HomeScreen = () => {
                 <RNScrollView style={styles.menuScroll}>
                   <Menu.Item 
                     onPress={() => handleCategorySelect(undefined)} 
-                    title="All Categories" 
+                    title={t("home.allCategories")}
                     leadingIcon="view-grid"
                     titleStyle={!selectedCategory ? styles.menuItemActiveText : undefined}
                   />
@@ -455,7 +458,7 @@ export const HomeScreen = () => {
                     size={18}
                     color={colors.textPrimary}
                   />
-                  <Text style={styles.actionBtnText}>Advanced Filters</Text>
+                  <Text style={styles.actionBtnText}>{t("home.advancedFilters")}</Text>
                   {activeFiltersCount > 0 && (
                     <View style={styles.filterBadge}>
                       <Text style={styles.filterBadgeText}>{activeFiltersCount}</Text>
@@ -475,7 +478,9 @@ export const HomeScreen = () => {
                         size={18}
                         color={colors.textPrimary}
                       />
-                      <Text style={styles.actionBtnText}>{selectedSort}</Text>
+                      <Text style={styles.actionBtnText}>
+                        {SORT_OPTIONS.find((opt) => opt.key === selectedSortKey)?.label ?? t("home.sort.relevance")}
+                      </Text>
                       <MaterialCommunityIcons
                         name="chevron-down"
                         size={18}
@@ -486,7 +491,7 @@ export const HomeScreen = () => {
                   }
                 >
                   {SORT_OPTIONS.map((opt) => (
-                    <Menu.Item key={opt.label} onPress={() => handleSortSelect(opt.label)} title={opt.label} />
+                    <Menu.Item key={opt.key} onPress={() => handleSortSelect(opt.key)} title={opt.label} />
                   ))}
                 </Menu>
               </View>
@@ -533,7 +538,7 @@ export const HomeScreen = () => {
                 <View style={styles.activeFiltersContainer}>
                   <TouchableOpacity onPress={handleClear} style={styles.clearAllBtn}>
                     <MaterialCommunityIcons name="close" size={16} color="#6B7280" />
-                    <Text style={styles.clearAllText}>Clear ({activeFiltersCount})</Text>
+                    <Text style={styles.clearAllText}>{t("home.clear", { count: activeFiltersCount })}</Text>
                   </TouchableOpacity>
  
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagsContainer}>
@@ -627,13 +632,13 @@ export const HomeScreen = () => {
                   <View style={styles.allItemsHeader}>
                     <MaterialCommunityIcons name="star" size={24} color="#8B5CF6" />
                     <Text variant="headlineSmall" style={styles.allItemsTitle}>
-                      All Items
+                      {t("home.allItems")}
                     </Text>
                     <TouchableOpacity
                       style={styles.viewAllBtn}
                       onPress={() => navigation.navigate('SearchTab' as any)}
                     >
-                      <Text style={styles.viewAllText}>View All</Text>
+                      <Text style={styles.viewAllText}>{t("home.viewAll")}</Text>
                       <MaterialCommunityIcons name="chevron-right" size={16} color={colors.primary} />
                     </TouchableOpacity>
                   </View>
@@ -677,20 +682,20 @@ export const HomeScreen = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Save This Search</Text>
+            <Text style={styles.modalTitle}>{t("home.saveSearchTitle")}</Text>
             <Text style={styles.modalSubtitle}>
-              Give your search a name so you can easily find it later.
+              {t("home.saveSearchSubtitle")}
             </Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="e.g., Weekend Camera Gear"
+              placeholder={t("home.saveSearchPlaceholder")}
               placeholderTextColor="#9CA3AF"
               value={saveSearchName}
               onChangeText={setSaveSearchName}
               autoFocus
             />
             <Text style={styles.modalHint}>
-              You'll receive notifications when new items match your search criteria.
+              {t("home.saveSearchHint")}
             </Text>
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -698,7 +703,7 @@ export const HomeScreen = () => {
                 onPress={() => setSaveSearchModalVisible(false)}
                 disabled={isSavingSearch}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{t("home.cancel")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalSaveBtn, (!saveSearchName.trim() || isSavingSearch) && { opacity: 0.5 }]}
@@ -706,7 +711,7 @@ export const HomeScreen = () => {
                 disabled={!saveSearchName.trim() || isSavingSearch}
               >
                 <Text style={styles.modalSaveText}>
-                  {isSavingSearch ? "Saving..." : "Save Search"}
+                  {isSavingSearch ? t("home.saving") : t("home.saveSearch")}
                 </Text>
               </TouchableOpacity>
             </View>

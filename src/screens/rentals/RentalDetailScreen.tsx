@@ -8,6 +8,7 @@ import { useAuth, useUser } from '@clerk/expo';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
+import { useI18n } from '../../i18n';
 import { getConditionReports } from '../../services/conditionReportService';
 import { getRentalRequestById } from '../../services/rentalService';
 import { getListingById } from '../../services/listingService';
@@ -53,6 +54,7 @@ const InfoRow = ({ label, value }: { label: string; value: string }) => (
 
 export const RentalDetailScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { t } = useI18n();
   const route = useRoute<Route>();
   const { rentalId } = route.params;
   const { user: clerkUser } = useUser();
@@ -97,7 +99,7 @@ export const RentalDetailScreen = () => {
           }
         }
       } catch {
-        toast.error('Failed to load rental details.', () => navigation.goBack());
+        toast.error(t('rentalDetail.notFound'), () => navigation.goBack());
       } finally {
         setIsLoading(false);
       }
@@ -111,7 +113,7 @@ export const RentalDetailScreen = () => {
       const baseUrl = api.defaults.baseURL || '';
       const token = await getToken();
       if (!token) {
-        toast.error('Session expired. Please log in again.');
+        toast.error(t('rentalDetail.sessionExpired'));
         setDownloadingReceipt(false);
         return;
       }
@@ -132,16 +134,16 @@ export const RentalDetailScreen = () => {
           dialogTitle: `Receipt - ${rental.id}`,
         });
       } else {
-        toast.success('Receipt downloaded successfully.');
+        toast.success(t('rentalDetail.receiptDownloaded'));
       }
     } catch (err: any) {
       const msg = err?.message || '';
       if (msg.includes('401') || msg.includes('Unauthorized')) {
-        toast.error('Session expired. Please log in again to download receipts.');
+        toast.error(t('rentalDetail.sessionExpiredReceipt'));
       } else if (msg.includes('400') || msg.includes('only available')) {
-        toast.warning('Receipts are only available for paid or completed rentals.');
+        toast.warning(t('rentalDetail.receiptUnavailable'));
       } else {
-        toast.error('Unable to download receipt. Please try again.');
+        toast.error(t('rentalDetail.receiptFailed'));
       }
     } finally {
       setDownloadingReceipt(false);
@@ -158,8 +160,8 @@ export const RentalDetailScreen = () => {
 
   if (!rental) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.notFoundText}>Rental not found.</Text>
+        <View style={styles.centered}>
+        <Text style={styles.notFoundText}>{t('rentalDetail.notFound')}</Text>
       </View>
     );
   }
@@ -202,7 +204,7 @@ export const RentalDetailScreen = () => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text variant="titleLarge" style={styles.headerTitle}>Rental Details</Text>
+          <Text variant="titleLarge" style={styles.headerTitle}>{t('rentalDetail.title')}</Text>
         </View>
 
         {/* Item Image */}
@@ -220,15 +222,15 @@ export const RentalDetailScreen = () => {
                 {rental.status.replace('_', ' ').toUpperCase()}
               </Text>
             </View>
-            <Text style={styles.dateText}>Filed {createdDate}</Text>
+            <Text style={styles.dateText}>{t('rentalDetail.filed', { date: createdDate })}</Text>
           </View>
-          <Text style={styles.roleTag}>{isRenter ? 'You are the renter' : 'You are the owner'}</Text>
+          <Text style={styles.roleTag}>{isRenter ? t('rentalDetail.renterRole') : t('rentalDetail.ownerRole')}</Text>
         </View>
 
         {/* Item Details */}
         {itemInfo && (
           <View style={styles.card}>
-            <Text style={styles.sectionLabel}>Item Details</Text>
+            <Text style={styles.sectionLabel}>{t('rentalDetail.itemDetails')}</Text>
             <InfoRow label="Title" value={itemInfo.title} />
             {itemInfo.category && <InfoRow label="Category" value={itemInfo.category} />}
             {itemInfo.condition && <InfoRow label="Condition" value={itemInfo.condition} />}
@@ -241,7 +243,7 @@ export const RentalDetailScreen = () => {
 
         {/* Dates */}
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Rental Period</Text>
+          <Text style={styles.sectionLabel}>{t('rentalDetail.rentalPeriod')}</Text>
           <View style={styles.datesRow}>
             <View style={styles.dateBlock}>
               <Text style={styles.dateBlockLabel}>Start</Text>
@@ -253,35 +255,35 @@ export const RentalDetailScreen = () => {
               <Text style={styles.dateBlockValue}>{endDate}</Text>
             </View>
           </View>
-          <Text style={styles.durationText}>{totalDays} day{totalDays !== 1 ? 's' : ''}</Text>
+          <Text style={styles.durationText}>{t(totalDays !== 1 ? 'rentalDetail.days_plural' : 'rentalDetail.days', { count: totalDays })}</Text>
         </View>
 
         {/* People */}
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Parties</Text>
+          <Text style={styles.sectionLabel}>{t('rentalDetail.parties')}</Text>
           <InfoRow label="Renter" value={rental.renter_email} />
           <InfoRow label="Owner" value={rental.owner_email} />
         </View>
 
         {/* Financials */}
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Pricing Breakdown</Text>
+          <Text style={styles.sectionLabel}>{t('rentalDetail.pricing')}</Text>
           {itemInfo?.daily_rate !== undefined && (
-            <InfoRow label="Daily rate" value={`$${itemInfo.daily_rate.toFixed(2)}`} />
+            <InfoRow label={t('rentalDetail.dailyRate')} value={`$${itemInfo.daily_rate.toFixed(2)}`} />
           )}
           {itemInfo?.daily_rate !== undefined && (
-            <InfoRow label="Duration" value={`${totalDays} day${totalDays !== 1 ? 's' : ''}`} />
+            <InfoRow label={t('rentalDetail.duration')} value={t(totalDays !== 1 ? 'rentalDetail.days_plural' : 'rentalDetail.days', { count: totalDays })} />
           )}
-          <InfoRow label="Rental cost" value={`$${rentalCost.toFixed(2)}`} />
-          <InfoRow label="Platform fee" value={`$${platformFee.toFixed(2)}`} />
-          <InfoRow label="Security deposit" value={`$${securityDeposit.toFixed(2)}`} />
+          <InfoRow label={t('rentalDetail.rentalCost')} value={`$${rentalCost.toFixed(2)}`} />
+          <InfoRow label={t('rentalDetail.platformFee')} value={`$${platformFee.toFixed(2)}`} />
+          <InfoRow label={t('rentalDetail.securityDeposit')} value={`$${securityDeposit.toFixed(2)}`} />
           <View style={[styles.infoRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Total Paid</Text>
+            <Text style={styles.totalLabel}>{t('rentalDetail.totalPaid')}</Text>
             <Text style={styles.totalValue}>${totalPaid.toFixed(2)}</Text>
           </View>
           {!isRenter && (
             <View style={[styles.infoRow, { borderBottomWidth: 0, marginTop: 4 }]}>
-              <Text style={[styles.infoLabel, { color: '#059669' }]}>Owner payout</Text>
+              <Text style={[styles.infoLabel, { color: '#059669' }]}>{t('rentalDetail.ownerPayout')}</Text>
               <Text style={[styles.infoValue, { color: '#059669', fontWeight: '700' }]}>${ownerPayout.toFixed(2)}</Text>
             </View>
           )}
@@ -290,7 +292,7 @@ export const RentalDetailScreen = () => {
         {/* Message */}
         {rental.message ? (
           <View style={styles.card}>
-            <Text style={styles.sectionLabel}>Message</Text>
+            <Text style={styles.sectionLabel}>{t('rentalDetail.message')}</Text>
             <Text style={styles.messageText}>"{rental.message}"</Text>
           </View>
         ) : null}
@@ -310,7 +312,7 @@ export const RentalDetailScreen = () => {
             contentStyle={styles.btnContent}
             icon="message-outline"
           >
-            Open Chat
+            {t('rentalDetail.openChat')}
           </Button>
           <Button
             mode="outlined"
@@ -321,19 +323,19 @@ export const RentalDetailScreen = () => {
             contentStyle={styles.btnContent}
             icon="download"
           >
-            Download Receipt
+            {t('rentalDetail.downloadReceipt')}
           </Button>
 
           {/* Condition Reports */}
           {rental && (
             <>
               <View style={styles.conditionSummaryCard}>
-                <Text style={styles.sectionLabel}>Condition Reports</Text>
+                <Text style={styles.sectionLabel}>{t('rentalDetail.conditionReports')}</Text>
                 <Text style={styles.conditionSummaryText}>
-                  Pickup reports: {reportRules.pickupReports.length}/2
+                  {t('rentalDetail.pickupReports', { count: reportRules.pickupReports.length })}
                 </Text>
                 <Text style={styles.conditionSummaryText}>
-                  Return reports: {reportRules.returnReports.length}/2
+                  {t('rentalDetail.returnReports', { count: reportRules.returnReports.length })}
                 </Text>
               </View>
               <Button
@@ -349,7 +351,7 @@ export const RentalDetailScreen = () => {
                 icon="clipboard-check-outline"
                 disabled={!reportRules.canCreatePickupReport && !reportRules.userPickupReport}
               >
-                {reportRules.userPickupReport ? 'View Pickup Report' : 'Pickup Report'}
+                {reportRules.userPickupReport ? t('rentalDetail.viewPickupReport') : t('rentalDetail.pickupReport')}
               </Button>
               {!reportRules.canCreatePickupReport && !reportRules.userPickupReport && reportRules.pickupStatusMessage ? (
                 <Text style={styles.conditionHint}>{reportRules.pickupStatusMessage}</Text>
@@ -367,7 +369,7 @@ export const RentalDetailScreen = () => {
                 icon="clipboard-arrow-left-outline"
                 disabled={!reportRules.canCreateReturnReport && !reportRules.userReturnReport}
               >
-                {reportRules.userReturnReport ? 'View Return Report' : 'Return Report'}
+                {reportRules.userReturnReport ? t('rentalDetail.viewReturnReport') : t('rentalDetail.returnReport')}
               </Button>
               {!reportRules.canCreateReturnReport && !reportRules.userReturnReport && reportRules.returnStatusMessage ? (
                 <Text style={styles.conditionHint}>{reportRules.returnStatusMessage}</Text>
@@ -392,7 +394,7 @@ export const RentalDetailScreen = () => {
               contentStyle={styles.btnContent}
               icon="calendar-plus"
             >
-              {isRenter ? 'Request Extension' : 'View Extensions'}
+              {isRenter ? t('rentalDetail.requestExtension') : t('rentalDetail.viewExtensions')}
             </Button>
           )}
 
@@ -402,7 +404,7 @@ export const RentalDetailScreen = () => {
             style={styles.backBtnAction}
             contentStyle={styles.btnContent}
           >
-            Back
+            {t('common.back')}
           </Button>
         </View>
       </ScrollView>

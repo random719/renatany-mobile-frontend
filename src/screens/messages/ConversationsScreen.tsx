@@ -6,6 +6,7 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { ScreenLayout } from '../../components/common/ScreenLayout';
+import { useI18n } from '../../i18n';
 import { api } from '../../services/api';
 import { getRentalRequests } from '../../services/rentalService';
 import { colors, typography } from '../../theme';
@@ -13,20 +14,11 @@ import { Listing } from '../../types/listing';
 import { RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
 
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-    pending:   { label: 'PENDING',   bg: '#FEF9C3', text: '#854D0E' },
-    approved:  { label: 'APPROVED',  bg: '#DCFCE7', text: '#166534' },
-    paid:      { label: 'PAID',      bg: '#F3E8FF', text: '#6B21A8' },
-    inquiry:   { label: 'INQUIRY',   bg: '#E0F2FE', text: '#075985' },
-    completed: { label: 'COMPLETED', bg: '#F1F5F9', text: '#334155' },
-    declined:  { label: 'DECLINED',  bg: '#FEE2E2', text: '#991B1B' },
-    cancelled: { label: 'CANCELLED', bg: '#F1F5F9', text: '#64748B' },
-};
-
 const fmt = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 export const ConversationsScreen = () => {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+    const { t } = useI18n();
     const { user } = useUser();
     const userEmail = user?.emailAddresses?.[0]?.emailAddress;
     const [conversations, setConversations] = useState<RentalRequest[]>([]);
@@ -87,6 +79,15 @@ export const ConversationsScreen = () => {
     const totalActive = conversations.length;
 
     const renderCard = (conv: RentalRequest) => {
+        const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
+            pending:   { label: t('conversations.status.pending'),   bg: '#FEF9C3', text: '#854D0E' },
+            approved:  { label: t('conversations.status.approved'),  bg: '#DCFCE7', text: '#166534' },
+            paid:      { label: t('conversations.status.paid'),      bg: '#F3E8FF', text: '#6B21A8' },
+            inquiry:   { label: t('conversations.status.inquiry'),   bg: '#E0F2FE', text: '#075985' },
+            completed: { label: t('conversations.status.completed'), bg: '#F1F5F9', text: '#334155' },
+            declined:  { label: t('conversations.status.declined'),  bg: '#FEE2E2', text: '#991B1B' },
+            cancelled: { label: t('conversations.status.cancelled'), bg: '#F1F5F9', text: '#64748B' },
+        };
         const item = itemsMap[conv.item_id];
         const status = STATUS_CONFIG[conv.status] ?? { label: conv.status.toUpperCase(), bg: '#F1F5F9', text: '#334155' };
         const otherEmail = activeTab === 'sent' ? conv.owner_email : conv.renter_email;
@@ -116,7 +117,7 @@ export const ConversationsScreen = () => {
                     <View style={styles.cardMeta}>
                         <View style={styles.cardTitleRow}>
                             <Text style={styles.cardTitle} numberOfLines={2}>
-                                {item ? (item.title || 'Untitled Item') : 'Loading...'}
+                                {item ? (item.title || t('conversations.untitledItem')) : t('common.loading')}
                             </Text>
                             <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
                                 <Text style={[styles.statusText, { color: status.text }]}>{status.label}</Text>
@@ -126,7 +127,7 @@ export const ConversationsScreen = () => {
                         <View style={styles.cardInfoRow}>
                             <MaterialCommunityIcons name="account-outline" size={13} color="#64748B" />
                             <Text style={styles.cardInfoText} numberOfLines={1}>
-                                {activeTab === 'sent' ? 'To: ' : 'From: '}
+                                {activeTab === 'sent' ? t('conversations.to') : t('conversations.from')}
                                 <Text style={styles.cardInfoBold}>{otherEmail}</Text>
                             </Text>
                         </View>
@@ -146,7 +147,7 @@ export const ConversationsScreen = () => {
                                             ${totalPaid.toFixed(2)}
                                         </Text>
                                         <Text style={styles.cardAmountBreakdown}>
-                                            Rental ${rentalCost.toFixed(2)} · Fee ${platformFee.toFixed(2)} · Deposit ${securityDeposit.toFixed(2)}
+                                            {t('conversations.rental')} ${rentalCost.toFixed(2)} · {t('conversations.fee')} ${platformFee.toFixed(2)} · {t('conversations.deposit')} ${securityDeposit.toFixed(2)}
                                         </Text>
                                     </View>
                                 </View>
@@ -174,13 +175,13 @@ export const ConversationsScreen = () => {
                         activeOpacity={0.7}
                     >
                         <MaterialCommunityIcons name="message-outline" size={15} color="#475569" />
-                        <Text style={styles.btnOutlineText}>Open Chat</Text>
+                        <Text style={styles.btnOutlineText}>{t('conversations.openChat')}</Text>
                     </TouchableOpacity>
                 </View>
 
                 {/* Submitted date */}
                 <Text style={styles.submittedDate}>
-                    Submitted {new Date(conv.created_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {t('conversations.submitted', { date: new Date(conv.created_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) })}
                 </Text>
             </View>
         );
@@ -191,19 +192,19 @@ export const ConversationsScreen = () => {
                 <View style={styles.contentWrapper}>
                     <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
                         <MaterialCommunityIcons name="arrow-left" size={20} color="#475569" />
-                        <Text style={styles.backBtnText}>Back</Text>
+                        <Text style={styles.backBtnText}>{t('common.back')}</Text>
                     </TouchableOpacity>
 
                     <View style={styles.titleRow}>
                         <MaterialCommunityIcons name="message-text-outline" size={32} color="#2563EB" />
-                        <Text style={styles.title}>My Conversations</Text>
+                        <Text style={styles.title}>{t('conversations.title')}</Text>
                     </View>
                     <View style={styles.subtitleRow}>
-                        <Text style={styles.subtitle}>Active conversations only (last 7 days)</Text>
+                        <Text style={styles.subtitle}>{t('conversations.subtitle')}</Text>
                         {totalActive > 0 && (
                             <View style={styles.activeBadge}>
                                 <MaterialCommunityIcons name="clock-outline" size={12} color="#475569" />
-                                <Text style={styles.activeBadgeText}>{totalActive} active</Text>
+                                <Text style={styles.activeBadgeText}>{t('conversations.activeCount', { count: totalActive })}</Text>
                             </View>
                         )}
                     </View>
@@ -216,7 +217,7 @@ export const ConversationsScreen = () => {
                         >
                             <MaterialCommunityIcons name="message-outline" size={16} color={activeTab === 'sent' ? '#1E293B' : '#64748B'} />
                             <Text style={activeTab === 'sent' ? styles.activeTabText : styles.tabText}>
-                                My Requests ({sentByMe.length})
+                                {t('conversations.myRequests', { count: sentByMe.length })}
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -225,7 +226,7 @@ export const ConversationsScreen = () => {
                         >
                             <MaterialCommunityIcons name="package-variant" size={16} color={activeTab === 'inbox' ? '#1E293B' : '#64748B'} />
                             <Text style={activeTab === 'inbox' ? styles.activeTabText : styles.tabText}>
-                                Received ({inInbox.length})
+                                {t('conversations.received', { count: inInbox.length })}
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -242,11 +243,11 @@ export const ConversationsScreen = () => {
                                 color="#94A3B8"
                                 style={styles.emptyIcon}
                             />
-                            <Text variant="titleLarge" style={styles.emptyTitle}>No active requests</Text>
+                            <Text variant="titleLarge" style={styles.emptyTitle}>{t('conversations.noActiveRequests')}</Text>
                             <Text variant="bodyMedium" style={styles.emptySubtitle}>
                                 {activeTab === 'sent'
-                                    ? "You haven't sent any rental requests recently"
-                                    : "You haven't received any rental requests recently"}
+                                    ? t('conversations.noSentRequests')
+                                    : t('conversations.noReceivedRequests')}
                             </Text>
                         </View>
                     ) : (

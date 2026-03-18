@@ -20,6 +20,8 @@ import { ActivityIndicator, Button, Surface, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { ListingCard } from '../../components/listing/ListingCard';
+import { isSupportedLanguage, useI18n } from '../../i18n';
+import { LANGUAGE_OPTIONS } from '../../i18n/translations';
 import { api } from '../../services/api';
 import * as disputeService from '../../services/disputeService';
 import * as listingService from '../../services/listingService';
@@ -65,15 +67,6 @@ type TabKey = 'items' | 'wallet' | 'reviews' | 'rentals' | 'disputes' | 'documen
 type RentalSubTab = 'all' | 'renter' | 'owner' | 'upcoming';
 type WalletSubTab = 'completed' | 'held' | 'payouts';
 
-const LANGUAGES = [
-  { value: 'en', label: 'English' },
-  { value: 'es', label: 'Español' },
-  { value: 'fr', label: 'Français' },
-  { value: 'de', label: 'Deutsch' },
-  { value: 'it', label: 'Italiano' },
-  { value: 'pl', label: 'Polski' },
-];
-
 const NOTIFICATION_OPTIONS = [
   { key: 'rental_requests', label: 'Rental Requests', desc: 'New rental requests and approvals' },
   { key: 'messages', label: 'Messages', desc: 'New messages in conversations' },
@@ -89,6 +82,7 @@ export const ProfileScreen = () => {
   const { signOut } = useClerk();
   const { logout } = useAuthStore();
   const navigation = useNavigation<any>();
+  const { language, setLanguage, t } = useI18n();
   const { userItems, fetchUserItems, isLoading: itemsLoading, toggleLike } = useListingStore();
 
   const [backendUser, setBackendUser] = useState<BackendUser | null>(null);
@@ -243,7 +237,9 @@ export const ProfileScreen = () => {
       setSettingsForm({
         full_name: backendUser.full_name || '',
         bio: backendUser.bio || '',
-        preferred_language: backendUser.preferred_language || 'en',
+        preferred_language: isSupportedLanguage(backendUser.preferred_language)
+          ? backendUser.preferred_language
+          : language,
         notification_preferences: {
           email_notifications: true,
           push_notifications: true,
@@ -259,6 +255,12 @@ export const ProfileScreen = () => {
       });
     }
   }, [activeTab, loadReviews, loadRentals, loadDisputes, loadWallet, backendUser]);
+
+  useEffect(() => {
+    if (isSupportedLanguage(backendUser?.preferred_language) && backendUser.preferred_language !== language) {
+      setLanguage(backendUser.preferred_language);
+    }
+  }, [backendUser?.preferred_language, language, setLanguage]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -351,10 +353,13 @@ export const ProfileScreen = () => {
       });
       const updatedUser = res.data?.data || res.data;
       setBackendUser(updatedUser);
-      setSaveMessage({ type: 'success', text: 'Settings saved successfully!' });
+      if (isSupportedLanguage(settingsForm.preferred_language)) {
+        setLanguage(settingsForm.preferred_language);
+      }
+      setSaveMessage({ type: 'success', text: t('profile.settingsSaved') });
       setTimeout(() => setSaveMessage(null), 3000);
     } catch {
-      setSaveMessage({ type: 'error', text: 'Failed to save settings.' });
+      setSaveMessage({ type: 'error', text: t('profile.settingsSaveFailed') });
     } finally {
       setIsSaving(false);
     }
@@ -452,7 +457,7 @@ export const ProfileScreen = () => {
   };
 
   const TABS: { key: TabKey; label: string; icon: string }[] = [
-    { key: 'items', label: 'Items', icon: 'package-variant-closed' },
+    { key: 'items', label: t('profile.items'), icon: 'package-variant-closed' },
     { key: 'wallet', label: 'Wallet', icon: 'wallet-outline' },
     { key: 'reviews', label: 'Reviews', icon: 'star-outline' },
     { key: 'rentals', label: 'Rentals', icon: 'calendar-outline' },
@@ -563,18 +568,18 @@ export const ProfileScreen = () => {
               <View style={styles.statsRow}>
                 <View style={styles.statBox}>
                   <Text style={styles.statNumber}>{stats.totalItems}</Text>
-                  <Text style={styles.statLabel}>Items</Text>
+                  <Text style={styles.statLabel}>{t('profile.items')}</Text>
                 </View>
                 <View style={styles.statBox}>
                   <Text style={[styles.statNumber, { color: '#16A34A' }]}>{stats.availableItems}</Text>
-                  <Text style={styles.statLabel}>Available</Text>
+                  <Text style={styles.statLabel}>{t('profile.available')}</Text>
                 </View>
                 <View style={styles.statBox}>
                   <View style={styles.ratingRow}>
                     <Text style={[styles.statNumber, { color: '#F59E0B' }]}>{stats.avgRating.toFixed(1)}</Text>
                     <MaterialCommunityIcons name="star" size={16} color="#F59E0B" style={styles.starIcon} />
                   </View>
-                  <Text style={styles.statLabel}>({stats.totalReviews} reviews)</Text>
+                  <Text style={styles.statLabel}>{t('profile.reviewsCount', { count: stats.totalReviews })}</Text>
                 </View>
               </View>
 
@@ -584,7 +589,7 @@ export const ProfileScreen = () => {
                 labelStyle={styles.listNewBtnLabel}
                 onPress={() => navigation.navigate('Main', { screen: 'ListItemTab' })}
               >
-                List New Item
+                {t('profile.listNewItem')}
               </Button>
 
               <Button
@@ -594,26 +599,26 @@ export const ProfileScreen = () => {
                 labelStyle={styles.signOutBtnLabel}
                 onPress={handleSignOut}
               >
-                Sign Out
+                {t('profile.signOut')}
               </Button>
             </View>
           </Surface>
 
           {/* Payment Setup Card */}
           <Surface style={styles.card} elevation={0}>
-            <Text style={styles.cardTitle}>Payment setup</Text>
+            <Text style={styles.cardTitle}>{t('profile.paymentSetup')}</Text>
 
             {/* Card status */}
             <View style={styles.badgeRow}>
               {backendUser?.stripe_payment_method_id ? (
                 <View style={styles.badgeSuccess}>
                   <MaterialCommunityIcons name="check-circle-outline" size={16} color="#16A34A" />
-                  <Text style={styles.badgeSuccessText}>Card connected</Text>
+                  <Text style={styles.badgeSuccessText}>{t('profile.cardConnected')}</Text>
                 </View>
               ) : (
                 <View style={styles.badgeError}>
                   <MaterialCommunityIcons name="close-circle-outline" size={16} color="#DC2626" />
-                  <Text style={styles.badgeErrorText}>Card not connected</Text>
+                  <Text style={styles.badgeErrorText}>{t('profile.cardNotConnected')}</Text>
                 </View>
               )}
             </View>
@@ -623,12 +628,12 @@ export const ProfileScreen = () => {
               {backendUser?.stripe_account_id ? (
                 <View style={styles.badgeSuccess}>
                   <MaterialCommunityIcons name="check-circle-outline" size={16} color="#16A34A" />
-                  <Text style={styles.badgeSuccessText}>Bank connected</Text>
+                  <Text style={styles.badgeSuccessText}>{t('profile.bankConnected')}</Text>
                 </View>
               ) : (
                 <View style={styles.badgeError}>
                   <MaterialCommunityIcons name="close-circle-outline" size={16} color="#DC2626" />
-                  <Text style={styles.badgeErrorText}>Bank not connected</Text>
+                  <Text style={styles.badgeErrorText}>{t('profile.bankNotConnected')}</Text>
                 </View>
               )}
             </View>
@@ -1293,9 +1298,9 @@ export const ProfileScreen = () => {
                 </View>
                 <Text style={styles.settingsHint}>{settingsForm.bio.length}/160 characters</Text>
 
-                <Text style={[styles.settingsLabel, { marginTop: 16 }]}>Preferred Language</Text>
+                <Text style={[styles.settingsLabel, { marginTop: 16 }]}>{t('profile.preferredLanguage')}</Text>
                 <View style={styles.languageRow}>
-                  {LANGUAGES.map((lang) => (
+                  {LANGUAGE_OPTIONS.map((lang) => (
                     <TouchableOpacity
                       key={lang.value}
                       style={[
@@ -1310,7 +1315,7 @@ export const ProfileScreen = () => {
                           settingsForm.preferred_language === lang.value && styles.languageChipTextActive,
                         ]}
                       >
-                        {lang.label}
+                        {`${lang.code} ${lang.label}`}
                       </Text>
                     </TouchableOpacity>
                   ))}

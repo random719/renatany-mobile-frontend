@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
+import { useI18n } from '../../i18n';
 import { colors, typography } from '../../theme';
 import { GlobalHeader } from '../common/GlobalHeader';
 
@@ -19,7 +20,10 @@ export const HeroBanner = ({
   onNotificationPress,
   onItemsAvailablePress,
   onGrowingCommunityPress
-}: HeroBannerProps) => (
+}: HeroBannerProps) => {
+  const { t } = useI18n();
+
+  return (
   <View style={styles.container}>
     <GlobalHeader onMenuPress={onMenuPress} onNotificationPress={onNotificationPress} />
 
@@ -27,17 +31,16 @@ export const HeroBanner = ({
     <View style={styles.heroSection}>
       <View style={styles.heroContent}>
         <Text variant="displaySmall" style={styles.headline}>
-          Don't use it?
+          {t('hero.line1')}
         </Text>
         <Text variant="displaySmall" style={styles.coralText}>
-          Don't waste it.
+          {t('hero.line2')}
         </Text>
         <Text variant="displaySmall" style={styles.pinkishText}>
-          Rent it.
+          {t('hero.line3')}
         </Text>
         <Text variant="bodyLarge" style={styles.subtitle}>
-          Discover thousands of items from your neighbors. From power tools to designer clothes, find
-          what you need without buying it.
+          {t('hero.subtitle')}
         </Text>
 
         {/* Stat Badges */}
@@ -45,13 +48,13 @@ export const HeroBanner = ({
           <TouchableOpacity style={styles.statBadge} onPress={onItemsAvailablePress}>
             <MaterialCommunityIcons name="creation" size={20} color="#FFFFFF" />
             <Text variant="labelLarge" style={styles.statText}>
-              {availableCount !== null ? `${availableCount} items available` : 'Loading...'}
+              {availableCount !== null ? t('hero.itemsAvailable', { count: availableCount }) : t('header.loading')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.statBadge} onPress={onGrowingCommunityPress}>
             <MaterialCommunityIcons name="trending-up" size={20} color="#FFFFFF" />
             <Text variant="labelLarge" style={styles.statText}>
-              Growing community
+              {t('hero.growingCommunity')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -61,7 +64,7 @@ export const HeroBanner = ({
       <View style={styles.linksRow}>
         <TouchableOpacity>
           <Text variant="bodySmall" style={styles.link}>
-            Privacy Policy
+            {t('footer.privacyPolicy')}
           </Text>
         </TouchableOpacity>
         <Text variant="bodySmall" style={styles.linkDot}>
@@ -69,13 +72,14 @@ export const HeroBanner = ({
         </Text>
         <TouchableOpacity>
           <Text variant="bodySmall" style={styles.link}>
-            Contact Us
+            {t('footer.contactUs')}
           </Text>
         </TouchableOpacity>
       </View>
     </View>
   </View>
 );
+};
 
 const styles = StyleSheet.create({
   container: {

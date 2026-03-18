@@ -6,11 +6,13 @@ import { ActivityIndicator, Text } from 'react-native-paper';
 import { toast } from '../../../store/toastStore';
 import { GlobalHeader } from '../../../components/common/GlobalHeader';
 import { Footer } from '../../../components/home/Footer';
+import { useI18n } from '../../../i18n';
 import { useListingStore } from '../../../store/listingStore';
 import { SavedSearch } from '../../../types/listing';
 
 export const SavedSearchesScreen = () => {
     const navigation = useNavigation();
+    const { t } = useI18n();
     const {
         savedSearches,
         isSavedSearchesLoading,
@@ -57,7 +59,7 @@ export const SavedSearchesScreen = () => {
                 notify_new_items: !search.notify_new_items,
             });
         } catch {
-            toast.error('Failed to update notifications.');
+            toast.error(t('savedSearches.updateNotificationsFailed'));
         } finally {
             setUpdatingId(null);
         }
@@ -65,19 +67,19 @@ export const SavedSearchesScreen = () => {
 
     const handleDelete = (search: SavedSearch) => {
         Alert.alert(
-            'Delete Saved Search',
-            `Are you sure you want to delete "${search.name}"?`,
+            t('savedSearches.deleteTitle'),
+            t('savedSearches.deletePrompt', { name: search.name }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                    text: 'Delete',
+                    text: t('common.delete'),
                     style: 'destructive',
                     onPress: async () => {
                         setDeletingId(search.id);
                         try {
                             await deleteSavedSearch(search.id);
                         } catch {
-                            toast.error('Failed to delete saved search.');
+                            toast.error(t('savedSearches.deleteFailed'));
                         } finally {
                             setDeletingId(null);
                         }
@@ -106,46 +108,46 @@ export const SavedSearchesScreen = () => {
                         </View>
                         <View style={styles.cardTitleBlock}>
                             <Text style={styles.cardTitle} numberOfLines={1}>{search.name}</Text>
-                            <Text style={styles.cardMeta}>Saved {formatDate(search.created_at)}</Text>
+                            <Text style={styles.cardMeta}>{t('savedSearches.savedOn', { date: formatDate(search.created_at) })}</Text>
                         </View>
                     </View>
                     {search.notify_new_items ? (
                         <View style={styles.notifBadgeOn}>
                             <MaterialCommunityIcons name="bell" size={12} color="#166534" />
-                            <Text style={styles.notifBadgeOnText}>On</Text>
+                            <Text style={styles.notifBadgeOnText}>{t('common.on')}</Text>
                         </View>
                     ) : (
                         <View style={styles.notifBadgeOff}>
                             <MaterialCommunityIcons name="bell-off" size={12} color="#6B7280" />
-                            <Text style={styles.notifBadgeOffText}>Off</Text>
+                            <Text style={styles.notifBadgeOffText}>{t('common.off')}</Text>
                         </View>
                     )}
                 </View>
 
                 <View style={styles.criteriaHeader}>
                     <MaterialCommunityIcons name="tune-variant" size={14} color="#64748B" />
-                    <Text style={styles.criteriaHeaderText}>Search criteria</Text>
+                    <Text style={styles.criteriaHeaderText}>{t('savedSearches.searchCriteria')}</Text>
                 </View>
                 <View style={styles.filterBadges}>
                     {filters?.search_query ? (
                         <View style={styles.badge}>
-                            <Text style={styles.badgeText}>Search: {filters.search_query}</Text>
+                            <Text style={styles.badgeText}>{t('savedSearches.search', { value: filters.search_query })}</Text>
                         </View>
                     ) : null}
                     {filters?.location ? (
                         <View style={styles.badge}>
-                            <Text style={styles.badgeText}>Location: {filters.location}</Text>
+                            <Text style={styles.badgeText}>{t('savedSearches.location', { value: filters.location })}</Text>
                         </View>
                     ) : null}
                     {filters?.category && filters.category !== 'all' ? (
                         <View style={styles.badge}>
-                            <Text style={styles.badgeText}>Category: {filters.category}</Text>
+                            <Text style={styles.badgeText}>{t('savedSearches.category', { value: filters.category })}</Text>
                         </View>
                     ) : null}
                     {(filters?.min_price || filters?.max_price) ? (
                         <View style={styles.badge}>
                             <Text style={styles.badgeText}>
-                                Price: ${filters.min_price || '0'} - ${filters.max_price || '∞'}
+                                {t('savedSearches.price', { min: filters.min_price || '0', max: filters.max_price || '∞' })}
                             </Text>
                         </View>
                     ) : null}
@@ -156,7 +158,7 @@ export const SavedSearchesScreen = () => {
                 <View style={styles.cardActions}>
                     <TouchableOpacity style={styles.applyBtn} onPress={() => handleApplySearch(search)}>
                         <MaterialCommunityIcons name="magnify" size={16} color="#FFFFFF" />
-                        <Text style={styles.applyBtnText}>Apply</Text>
+                        <Text style={styles.applyBtnText}>{t('common.apply')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -208,7 +210,7 @@ export const SavedSearchesScreen = () => {
                         onPress={() => navigation.goBack()}
                     >
                         <MaterialCommunityIcons name="arrow-left" size={20} color="#475569" />
-                        <Text style={styles.backBtnText}>Back to Browse</Text>
+                        <Text style={styles.backBtnText}>{t('common.backToBrowse')}</Text>
                     </TouchableOpacity>
 
                     <View style={styles.headerCard}>
@@ -217,9 +219,9 @@ export const SavedSearchesScreen = () => {
                                 <MaterialCommunityIcons name="bookmark" size={24} color="#2563EB" />
                             </View>
                             <View style={styles.headerTextBlock}>
-                                <Text style={styles.title}>Saved Searches</Text>
+                                <Text style={styles.title}>{t('savedSearches.title')}</Text>
                                 <Text style={styles.countText}>
-                                    {isSavedSearchesLoading ? 'Loading...' : `${savedSearches.length} saved search${savedSearches.length !== 1 ? 'es' : ''}`}
+                                    {isSavedSearchesLoading ? t('common.loading') : t(savedSearches.length === 1 ? 'savedSearches.count' : 'savedSearches.count_plural', { count: savedSearches.length })}
                                 </Text>
                             </View>
                         </View>
@@ -227,7 +229,7 @@ export const SavedSearchesScreen = () => {
                         <View style={styles.headerHintBox}>
                             <MaterialCommunityIcons name="bell-ring-outline" size={16} color="#1D4ED8" />
                             <Text style={styles.headerHintText}>
-                                Reuse your favorite filters and get alerts when matching items are added.
+                                {t('savedSearches.hint')}
                             </Text>
                         </View>
                     </View>
@@ -236,20 +238,20 @@ export const SavedSearchesScreen = () => {
                 {isSavedSearchesLoading && savedSearches.length === 0 ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" />
-                        <Text style={styles.loadingText}>Loading saved searches...</Text>
+                        <Text style={styles.loadingText}>{t('savedSearches.loading')}</Text>
                     </View>
                 ) : savedSearches.length === 0 ? (
                     <View style={styles.emptyCard}>
                         <MaterialCommunityIcons name="bookmark-outline" size={72} color="#CBD5E1" style={styles.emptyIcon} />
-                        <Text style={styles.emptyTitle}>No saved searches yet.</Text>
+                        <Text style={styles.emptyTitle}>{t('savedSearches.emptyTitle')}</Text>
                         <Text style={styles.emptySubtitle}>
-                            Save your search criteria to get notified{"\n"}when new items match!
+                            {t('savedSearches.emptySubtitle')}
                         </Text>
                         <TouchableOpacity
                             style={styles.startSearchBtn}
                             onPress={() => navigation.getParent()?.navigate('HomeTab')}
                         >
-                            <Text style={styles.startSearchBtnText}>Start Searching</Text>
+                            <Text style={styles.startSearchBtnText}>{t('savedSearches.startSearching')}</Text>
                         </TouchableOpacity>
                     </View>
                 ) : (

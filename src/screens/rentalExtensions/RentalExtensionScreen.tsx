@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 import { ScreenLayout } from '../../components/common/ScreenLayout';
+import { useI18n } from '../../i18n';
 import {
   getRentalExtensions,
   createRentalExtension,
@@ -34,6 +35,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 
 export const RentalExtensionScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { t } = useI18n();
   const route = useRoute<Route>();
   const { rentalRequestId, currentEndDate, dailyRate, ownerEmail, isOwner } = route.params;
   const { user: clerkUser } = useUser();
@@ -76,7 +78,7 @@ export const RentalExtensionScreen = () => {
     if (!userEmail) return;
     const days = parseInt(extraDays);
     if (!days || days < 1) {
-      toast.warning('Please enter at least 1 extra day.');
+      toast.warning(t('rentalExtension.enterOneDay'));
       return;
     }
 
@@ -90,9 +92,9 @@ export const RentalExtensionScreen = () => {
         message: message.trim() || undefined,
       });
 
-      toast.success('Your extension request has been sent to the owner.', () => { setExtraDays(''); setMessage(''); loadExtensions(); });
+      toast.success(t('rentalExtension.requestSent'), () => { setExtraDays(''); setMessage(''); loadExtensions(); });
     } catch (error: any) {
-      const msg = error?.response?.data?.error || 'Failed to request extension.';
+      const msg = error?.response?.data?.error || t('rentalExtension.requestFailed');
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -103,10 +105,10 @@ export const RentalExtensionScreen = () => {
     setIsSubmitting(true);
     try {
       await updateRentalExtension(extensionId, { status });
-      toast.success(`Extension ${status}.`);
+      toast.success(status === 'approved' ? t('rentalExtension.approved') : t('rentalExtension.declined'));
       loadExtensions();
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || `Failed to ${status} extension.`);
+      toast.error(error?.response?.data?.error || (status === 'approved' ? t('rentalExtension.approveFailed') : t('rentalExtension.declineFailed')));
     } finally {
       setIsSubmitting(false);
     }
@@ -130,38 +132,38 @@ export const RentalExtensionScreen = () => {
         <View style={styles.contentWrapper}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <MaterialCommunityIcons name="arrow-left" size={24} color="#0F172A" />
-            <Text style={styles.backText}>Back</Text>
+            <Text style={styles.backText}>{t('common.back')}</Text>
           </TouchableOpacity>
 
-          <Text style={styles.title}>Rental Extension</Text>
+          <Text style={styles.title}>{t('rentalExtension.title')}</Text>
           <Text style={styles.subtitle}>
-            Current end date: {new Date(currentEndDate).toLocaleDateString()}
+            {t('rentalExtension.currentEndDate', { date: new Date(currentEndDate).toLocaleDateString() })}
           </Text>
 
           {/* Existing Extensions */}
           {extensions.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Extension History</Text>
+              <Text style={styles.sectionTitle}>{t('rentalExtension.history')}</Text>
               {extensions.map((ext) => {
                 const sc = STATUS_COLORS[ext.status] || STATUS_COLORS.pending;
                 return (
                   <View key={ext.id} style={styles.extensionCard}>
                     <View style={styles.extensionCardHeader}>
                       <Text style={styles.extensionDate}>
-                        New end: {new Date(ext.new_end_date).toLocaleDateString()}
+                        {t('rentalExtension.newEnd', { date: new Date(ext.new_end_date).toLocaleDateString() })}
                       </Text>
                       <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
                         <Text style={[styles.statusText, { color: sc.text }]}>
-                          {ext.status.charAt(0).toUpperCase() + ext.status.slice(1)}
+                          {t(`rentalExtension.status.${ext.status}`)}
                         </Text>
                       </View>
                     </View>
                     <Text style={styles.extensionCost}>
-                      Additional: ${ext.additional_cost.toFixed(2)}
+                      {t('rentalExtension.additional', { amount: ext.additional_cost.toFixed(2) })}
                     </Text>
                     {ext.message && <Text style={styles.extensionMessage}>{ext.message}</Text>}
                     <Text style={styles.extensionMeta}>
-                      Requested by: {ext.requested_by_email} on {new Date(ext.created_at).toLocaleDateString()}
+                      {t('rentalExtension.requestedBy', { email: ext.requested_by_email, date: new Date(ext.created_at).toLocaleDateString() })}
                     </Text>
 
                     {/* Owner can approve/decline pending extensions */}
@@ -173,7 +175,7 @@ export const RentalExtensionScreen = () => {
                           disabled={isSubmitting}
                         >
                           <MaterialCommunityIcons name="check" size={16} color="#FFFFFF" />
-                          <Text style={styles.approveBtnText}>Approve</Text>
+                          <Text style={styles.approveBtnText}>{t('rentalExtension.approve')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.declineBtn}
@@ -181,7 +183,7 @@ export const RentalExtensionScreen = () => {
                           disabled={isSubmitting}
                         >
                           <MaterialCommunityIcons name="close" size={16} color="#EF4444" />
-                          <Text style={styles.declineBtnText}>Decline</Text>
+                          <Text style={styles.declineBtnText}>{t('rentalExtension.decline')}</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -194,12 +196,12 @@ export const RentalExtensionScreen = () => {
           {/* Request Extension Form (only for renter, no pending extension) */}
           {!isOwner && !pendingExtension && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Request Extension</Text>
+              <Text style={styles.sectionTitle}>{t('rentalExtension.request')}</Text>
 
-              <Text style={styles.inputLabel}>Extra Days</Text>
+              <Text style={styles.inputLabel}>{t('rentalExtension.extraDays')}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g. 3"
+                placeholder={t('rentalExtension.extraDaysPlaceholder')}
                 placeholderTextColor="#9CA3AF"
                 value={extraDays}
                 onChangeText={setExtraDays}
@@ -209,20 +211,20 @@ export const RentalExtensionScreen = () => {
               {parseInt(extraDays) > 0 && (
                 <View style={styles.costPreview}>
                   <View style={styles.costRow}>
-                    <Text style={styles.costLabel}>New end date</Text>
+                    <Text style={styles.costLabel}>{t('rentalExtension.newEndDate')}</Text>
                     <Text style={styles.costValue}>{new Date(calculateNewEndDate()).toLocaleDateString()}</Text>
                   </View>
                   <View style={styles.costRow}>
-                    <Text style={styles.costLabel}>Additional cost ({extraDays} days x ${dailyRate})</Text>
+                    <Text style={styles.costLabel}>{t('rentalExtension.additionalCost', { days: extraDays, rate: dailyRate })}</Text>
                     <Text style={styles.costValueBold}>${additionalCost.toFixed(2)}</Text>
                   </View>
                 </View>
               )}
 
-              <Text style={styles.inputLabel}>Message (optional)</Text>
+              <Text style={styles.inputLabel}>{t('rentalExtension.messageOptional')}</Text>
               <TextInput
                 style={[styles.input, { minHeight: 80 }]}
-                placeholder="Reason for extension..."
+                placeholder={t('rentalExtension.messagePlaceholder')}
                 placeholderTextColor="#9CA3AF"
                 value={message}
                 onChangeText={setMessage}
@@ -240,7 +242,7 @@ export const RentalExtensionScreen = () => {
                 ) : (
                   <>
                     <MaterialCommunityIcons name="calendar-plus" size={20} color="#FFFFFF" />
-                    <Text style={styles.submitBtnText}>Request Extension</Text>
+                    <Text style={styles.submitBtnText}>{t('rentalExtension.request')}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -251,7 +253,7 @@ export const RentalExtensionScreen = () => {
             <View style={styles.pendingNote}>
               <MaterialCommunityIcons name="clock-outline" size={20} color="#D97706" />
               <Text style={styles.pendingNoteText}>
-                You have a pending extension request. Please wait for the owner to respond.
+                {t('rentalExtension.pendingNote')}
               </Text>
             </View>
           )}

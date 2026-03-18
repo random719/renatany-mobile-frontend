@@ -2,9 +2,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
+import { useI18n } from '../../i18n';
 import { typography } from '../../theme';
 
 export const Footer = () => {
+    const { t } = useI18n();
+
     return (
         <View style={styles.container}>
             {/* Brand Section */}
@@ -13,29 +16,29 @@ export const Footer = () => {
                     Rentany
                 </Text>
                 <Text variant="bodyMedium" style={styles.description}>
-                    Rent anything, from anyone. Your trusted peer-to-peer rental marketplace.
+                    {t('footer.description')}
                 </Text>
             </View>
 
             {/* Legal Section */}
             <View style={styles.section}>
                 <Text variant="titleMedium" style={styles.sectionTitle}>
-                    Legal
+                    {t('footer.legal')}
                 </Text>
                 <TouchableOpacity style={styles.linkRow}>
                     <MaterialCommunityIcons name="shield-check-outline" size={18} color="#9CA3AF" />
-                    <Text style={styles.linkText}>Privacy Policy</Text>
+                    <Text style={styles.linkText}>{t('footer.privacyPolicy')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.linkRow}>
                     <MaterialCommunityIcons name="file-document-outline" size={18} color="#9CA3AF" />
-                    <Text style={styles.linkText}>Terms and Conditions</Text>
+                    <Text style={styles.linkText}>{t('footer.termsAndConditions')}</Text>
                 </TouchableOpacity>
             </View>
 
             {/* Contact Us Section */}
             <View style={styles.section}>
                 <Text variant="titleMedium" style={styles.sectionTitle}>
-                    Contact Us
+                    {t('footer.contactUs')}
                 </Text>
                 <TouchableOpacity style={styles.linkRow}>
                     <MaterialCommunityIcons name="email-outline" size={18} color="#9CA3AF" />
@@ -52,7 +55,7 @@ export const Footer = () => {
 
             {/* Copyright */}
             <Text style={styles.copyrightText}>
-                © 2026 Rentany. All rights reserved.
+                {t('footer.copyright', { year: 2026 })}
             </Text>
         </View>
     );

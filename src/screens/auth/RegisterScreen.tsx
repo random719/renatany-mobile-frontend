@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSignUp } from '@clerk/expo/legacy';
 import { getEmailError, getPasswordError, getConfirmPasswordError } from '../../utils/validators';
 import { colors, typography } from '../../theme';
+import { useI18n } from '../../i18n';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { AuthStackParamList } from '../../types/navigation';
 
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export const RegisterScreen = ({ navigation }: Props) => {
+  const { t } = useI18n();
   const { isLoaded, signUp, setActive } = useSignUp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -52,7 +54,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
       
       setPendingVerification(true);
     } catch (err: any) {
-      setClerkError(err.errors?.[0]?.message || 'Registration failed');
+      setClerkError(err.errors?.[0]?.message || t('auth.registrationFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +77,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
         console.log(JSON.stringify(completeSignUp, null, 2));
       }
     } catch (err: any) {
-      setClerkError(err.errors?.[0]?.message || 'Verification failed');
+      setClerkError(err.errors?.[0]?.message || t('auth.verificationFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -85,15 +87,15 @@ export const RegisterScreen = ({ navigation }: Props) => {
     return (
       <View style={[styles.container, { justifyContent: 'center', padding: 24 }]}>
         <View style={styles.card}>
-          <Text style={styles.title}>Verify your email</Text>
+          <Text style={styles.title}>{t('auth.verifyEmail')}</Text>
           <Text style={{ marginBottom: 20, textAlign: 'center', color: colors.textSecondary }}>
-            We've sent a code to {email}.
+            {t('auth.verificationCodeSentTo', { email })}
           </Text>
           <TextInput
             mode="outlined"
             value={code}
             onChangeText={(t) => { setCode(t); setClerkError(null); }}
-            placeholder="Verification code"
+            placeholder={t('auth.verificationCode')}
             style={styles.input}
             disabled={isLoading}
           />
@@ -106,7 +108,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
             style={styles.submitButton}
             buttonColor={colors.primary}
           >
-            Verify
+            {t('auth.verify')}
           </Button>
         </View>
       </View>
@@ -126,21 +128,21 @@ export const RegisterScreen = ({ navigation }: Props) => {
             onPress={() => navigation.navigate('Login')}
           >
             <MaterialCommunityIcons name="chevron-left" size={20} color={colors.textSecondary} />
-            <Text style={styles.backText}>Back to sign in</Text>
+            <Text style={styles.backText}>{t('auth.backToSignIn')}</Text>
           </TouchableOpacity>
 
           {/* Title */}
-          <Text style={styles.title}>Create your account</Text>
+          <Text style={styles.title}>{t('auth.createAccount')}</Text>
 
           {/* Email */}
-          <Text style={styles.inputLabel}>Email</Text>
+          <Text style={styles.inputLabel}>{t('auth.email')}</Text>
           <TextInput
             mode="outlined"
             dense
             value={email}
             onChangeText={(t) => { setEmail(t); setClerkError(null); }}
             onBlur={() => setTouched((s) => ({ ...s, email: true }))}
-            placeholder="you@example.com"
+            placeholder={t('auth.emailPlaceholder')}
             keyboardType="email-address"
             autoCapitalize="none"
             left={<TextInput.Icon icon="email-outline" size={20} />}
@@ -153,14 +155,14 @@ export const RegisterScreen = ({ navigation }: Props) => {
           {emailError && <HelperText type="error">{emailError}</HelperText>}
 
           {/* Password */}
-          <Text style={styles.inputLabel}>Password</Text>
+          <Text style={styles.inputLabel}>{t('auth.password')}</Text>
           <TextInput
             mode="outlined"
             dense
             value={password}
             onChangeText={(t) => { setPassword(t); setClerkError(null); }}
             onBlur={() => setTouched((s) => ({ ...s, password: true }))}
-            placeholder="Min. 8 characters"
+            placeholder={t('auth.passwordMinPlaceholder')}
             secureTextEntry={!showPassword}
             left={<TextInput.Icon icon="lock-outline" size={20} />}
             right={
@@ -179,14 +181,14 @@ export const RegisterScreen = ({ navigation }: Props) => {
           {passwordError && <HelperText type="error">{passwordError}</HelperText>}
 
           {/* Confirm Password */}
-          <Text style={styles.inputLabel}>Confirm Password</Text>
+          <Text style={styles.inputLabel}>{t('auth.confirmPassword')}</Text>
           <TextInput
             mode="outlined"
             dense
             value={confirmPassword}
             onChangeText={(t) => { setConfirmPassword(t); setClerkError(null); }}
             onBlur={() => setTouched((s) => ({ ...s, confirm: true }))}
-            placeholder="Re-enter password"
+            placeholder={t('auth.passwordConfirmPlaceholder')}
             secureTextEntry={!showPassword}
             left={<TextInput.Icon icon="lock-outline" size={20} />}
             error={!!confirmError}
@@ -209,7 +211,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
             labelStyle={styles.submitButtonLabel}
             buttonColor={colors.primary}
           >
-            Continue
+            {t('auth.continue')}
           </Button>
         </View>
       </ScrollView>

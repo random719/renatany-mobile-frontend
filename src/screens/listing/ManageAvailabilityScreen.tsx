@@ -13,9 +13,10 @@ import { ActivityIndicator, Button, Text } from 'react-native-paper';
 import { Calendar } from 'react-native-calendars';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { api } from '../../services/api';
-import { colors, typography } from '../../theme';
+import { colors } from '../../theme';
 import { RootStackParamList } from '../../types/navigation';
 import { toast } from '../../store/toastStore';
+import { useI18n } from '../../i18n';
 
 type Route = RouteProp<RootStackParamList, 'ManageAvailability'>;
 
@@ -26,13 +27,8 @@ interface BlockedRange {
   reason: string;
 }
 
-const REASONS = [
-  { value: 'personal_use', label: 'Personal Use' },
-  { value: 'maintenance', label: 'Maintenance' },
-  { value: 'other', label: 'Other' },
-];
-
 export const ManageAvailabilityScreen = () => {
+  const { t } = useI18n();
   const route = useRoute<Route>();
   const navigation = useNavigation();
   const { itemId, itemTitle } = route.params;
@@ -153,14 +149,18 @@ export const ManageAvailabilityScreen = () => {
 
       const failures = results.filter((r) => r.status === 'rejected');
       if (failures.length > 0) {
-        toast.error(`Failed to block ${failures.length} date(s).`);
+        toast.error(t('manageAvailability.blockFailedCount', { count: failures.length }));
       } else {
-        toast.success(`Blocked ${selectedDates.length} date${selectedDates.length !== 1 ? 's' : ''}.`);
+        toast.success(
+          selectedDates.length === 1
+            ? t('manageAvailability.blockedSuccess', { count: selectedDates.length })
+            : t('manageAvailability.blockedSuccess_plural', { count: selectedDates.length })
+        );
       }
       setSelectedDates([]);
       await loadAvailability();
     } catch {
-      toast.error('Failed to block dates.');
+      toast.error(t('manageAvailability.blockFailed'));
     } finally {
       setIsBlocking(false);
     }
@@ -172,7 +172,7 @@ export const ManageAvailabilityScreen = () => {
         await api.delete(`/item-availability/${id}`);
         await loadAvailability();
       } catch {
-        toast.error('Failed to unblock date.');
+        toast.error(t('manageAvailability.unblockFailed'));
       }
     },
     [loadAvailability]
@@ -182,6 +182,12 @@ export const ManageAvailabilityScreen = () => {
     const d = new Date(dateStr);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
+
+  const reasons = [
+    { value: 'personal_use', label: t('manageAvailability.personalUse') },
+    { value: 'maintenance', label: t('manageAvailability.maintenance') },
+    { value: 'other', label: t('manageAvailability.other') },
+  ];
 
   if (isLoading) {
     return (
@@ -210,7 +216,7 @@ export const ManageAvailabilityScreen = () => {
             <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <View style={styles.headerTextContainer}>
-            <Text style={styles.headerTitle}>Manage Availability</Text>
+            <Text style={styles.headerTitle}>{t('manageAvailability.title')}</Text>
             <Text style={styles.headerSubtitle} numberOfLines={1}>{itemTitle}</Text>
           </View>
         </View>
@@ -219,7 +225,7 @@ export const ManageAvailabilityScreen = () => {
         <View style={styles.infoCard}>
           <MaterialCommunityIcons name="information-outline" size={18} color="#3B82F6" />
           <Text style={styles.infoText}>
-            Tap dates on the calendar to select them, then block them for personal use or maintenance. Red dates are already blocked.
+            {t('manageAvailability.info')}
           </Text>
         </View>
 
@@ -242,9 +248,6 @@ export const ManageAvailabilityScreen = () => {
             theme={{
               todayTextColor: colors.primary,
               arrowColor: colors.primary,
-              textDayFontFamily: typography.fontFamily,
-              textMonthFontFamily: typography.fontFamily,
-              textDayHeaderFontFamily: typography.fontFamily,
               textDayFontSize: 14,
               textMonthFontSize: 16,
               textDayHeaderFontSize: 12,
@@ -254,9 +257,9 @@ export const ManageAvailabilityScreen = () => {
 
         {/* Block Reason Selector */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Block Reason</Text>
+          <Text style={styles.sectionTitle}>{t('manageAvailability.blockReason')}</Text>
           <View style={styles.reasonRow}>
-            {REASONS.map((r) => (
+            {reasons.map((r) => (
               <TouchableOpacity
                 key={r.value}
                 style={[styles.reasonChip, blockReason === r.value && styles.reasonChipActive]}
@@ -281,16 +284,18 @@ export const ManageAvailabilityScreen = () => {
             labelStyle={styles.blockButtonLabel}
           >
             {isBlocking
-              ? 'Blocking...'
-              : `Block ${selectedDates.length} Date${selectedDates.length !== 1 ? 's' : ''}`}
+              ? t('manageAvailability.blocking')
+              : selectedDates.length === 1
+                ? t('manageAvailability.blockDates', { count: selectedDates.length })
+                : t('manageAvailability.blockDates_plural', { count: selectedDates.length })}
           </Button>
         </View>
 
         {/* Blocked Periods List */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Blocked Periods</Text>
+          <Text style={styles.sectionTitle}>{t('manageAvailability.blockedPeriods')}</Text>
           {blockedRanges.filter((r) => r.reason !== 'rented').length === 0 ? (
-            <Text style={styles.emptyText}>No manually blocked dates.</Text>
+            <Text style={styles.emptyText}>{t('manageAvailability.noBlockedDates')}</Text>
           ) : (
             blockedRanges
               .filter((r) => r.reason !== 'rented')
@@ -301,15 +306,15 @@ export const ManageAvailabilityScreen = () => {
                       {formatDate(range.blocked_start_date)} – {formatDate(range.blocked_end_date)}
                     </Text>
                     <Text style={styles.blockedItemReason}>
-                      {range.reason.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                      {t(`manageAvailability.${range.reason === 'personal_use' ? 'personalUse' : range.reason}`)}
                     </Text>
                   </View>
                   <TouchableOpacity
                     style={styles.unblockButton}
                     onPress={() =>
-                      Alert.alert('Unblock Date', 'Remove this blocked period?', [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Unblock', style: 'destructive', onPress: () => handleUnblock(range.id) },
+                      Alert.alert(t('manageAvailability.unblockTitle'), t('manageAvailability.unblockPrompt'), [
+                        { text: t('common.cancel'), style: 'cancel' },
+                        { text: t('manageAvailability.unblockAction'), style: 'destructive', onPress: () => handleUnblock(range.id) },
                       ])
                     }
                   >
@@ -323,7 +328,7 @@ export const ManageAvailabilityScreen = () => {
         {/* Rented Periods (read-only) */}
         {blockedRanges.filter((r) => r.reason === 'rented').length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Rented Periods</Text>
+            <Text style={styles.sectionTitle}>{t('manageAvailability.rentedPeriods')}</Text>
             {blockedRanges
               .filter((r) => r.reason === 'rented')
               .map((range) => (
@@ -381,12 +386,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#0F172A',
-    fontFamily: typography.fontFamily,
   },
   headerSubtitle: {
     fontSize: 13,
     color: '#64748B',
-    fontFamily: typography.fontFamily,
     marginTop: 2,
   },
   infoCard: {
@@ -404,7 +407,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#1E40AF',
     lineHeight: 18,
-    fontFamily: typography.fontFamily,
   },
   calendarContainer: {
     marginHorizontal: 16,
@@ -426,7 +428,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0F172A',
-    fontFamily: typography.fontFamily,
     marginBottom: 10,
   },
   reasonRow: {
@@ -448,7 +449,6 @@ const styles = StyleSheet.create({
   reasonChipText: {
     fontSize: 13,
     color: '#475569',
-    fontFamily: typography.fontFamily,
   },
   reasonChipTextActive: {
     color: '#FFFFFF',
@@ -461,12 +461,10 @@ const styles = StyleSheet.create({
   blockButtonLabel: {
     fontSize: 15,
     fontWeight: '600',
-    fontFamily: typography.fontFamily,
   },
   emptyText: {
     fontSize: 13,
     color: '#94A3B8',
-    fontFamily: typography.fontFamily,
   },
   blockedItem: {
     flexDirection: 'row',
@@ -488,12 +486,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#0F172A',
-    fontFamily: typography.fontFamily,
   },
   blockedItemReason: {
     fontSize: 12,
     color: '#64748B',
-    fontFamily: typography.fontFamily,
     marginTop: 2,
   },
   unblockButton: {
@@ -511,6 +507,5 @@ const styles = StyleSheet.create({
   rentedItemDate: {
     fontSize: 14,
     color: '#065F46',
-    fontFamily: typography.fontFamily,
   },
 });

@@ -4,6 +4,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
+import { useI18n } from '../../i18n';
 import { colors, typography } from '../../theme';
 import { RootStackParamList } from '../../types/navigation';
 
@@ -12,6 +13,7 @@ type Route = RouteProp<RootStackParamList, 'BookingSuccess'>;
 
 export const BookingSuccessScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { t } = useI18n();
   const route = useRoute<Route>();
   const { rentalRequestId, listingTitle } = route.params;
 
@@ -21,16 +23,14 @@ export const BookingSuccessScreen = () => {
         <MaterialCommunityIcons name="check-circle" size={80} color="#10B981" />
       </View>
 
-      <Text variant="headlineMedium" style={styles.title}>Request Sent!</Text>
+      <Text variant="headlineMedium" style={styles.title}>{t('bookingSuccess.title')}</Text>
 
       <Text style={styles.subtitle}>
-        Your rental request for{' '}
-        <Text style={styles.listingName}>"{listingTitle}"</Text>
-        {' '}has been sent. The owner will respond within 48 hours.
+        {t('bookingSuccess.subtitle', { title: listingTitle })}
       </Text>
 
       <View style={styles.idBox}>
-        <Text style={styles.idLabel}>Request ID</Text>
+        <Text style={styles.idLabel}>{t('bookingSuccess.requestId')}</Text>
         <Text style={styles.idValue}>{rentalRequestId}</Text>
       </View>
 
@@ -42,7 +42,7 @@ export const BookingSuccessScreen = () => {
           contentStyle={styles.btnContent}
           icon="message-outline"
         >
-          View My Requests
+          {t('bookingSuccess.viewRequests')}
         </Button>
         <Button
           mode="outlined"
@@ -51,12 +51,12 @@ export const BookingSuccessScreen = () => {
           contentStyle={styles.btnContent}
           icon="home-outline"
         >
-          Back to Home
+          {t('bookingSuccess.backHome')}
         </Button>
       </View>
 
       <Text style={styles.footerNote}>
-        You'll receive a notification when the owner responds.
+        {t('bookingSuccess.footer')}
       </Text>
     </View>
   );

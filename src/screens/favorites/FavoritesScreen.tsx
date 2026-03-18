@@ -8,6 +8,7 @@ import { ActivityIndicator, Button, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { ListingCard } from '../../components/listing/ListingCard';
+import { useI18n } from '../../i18n';
 import { useListingStore } from '../../store/listingStore';
 import { colors, typography } from '../../theme';
 import { FavoritesStackParamList } from '../../types/navigation';
@@ -18,6 +19,7 @@ const ITEMS_PER_PAGE = 20;
 
 export const FavoritesScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { t } = useI18n();
   const { user } = useUser();
   const {
     favoriteItems,
@@ -87,20 +89,20 @@ export const FavoritesScreen = () => {
               onPress={() => navigation.goBack()}
             >
               <MaterialCommunityIcons name="arrow-left" size={20} color={colors.textSecondary} />
-              <Text style={styles.backBtnText}>Back to Browse</Text>
+              <Text style={styles.backBtnText}>{t('common.backToBrowse')}</Text>
             </TouchableOpacity>
 
             <View style={styles.titleRow}>
               <MaterialCommunityIcons name="heart" size={32} color="#EF4444" />
               <Text variant="headlineMedium" style={styles.title}>
-                My Favorites
+                {t('favorites.title')}
               </Text>
             </View>
 
             <Text variant="bodyLarge" style={styles.countText}>
               {isFavoritesLoading
-                ? 'Loading...'
-                : `${favoriteItems.length} ${favoriteItems.length === 1 ? 'item' : 'items'} saved${totalPages > 1 ? ` (Page ${Math.min(page, totalPages)} of ${totalPages})` : ''}`}
+                ? t('common.loading')
+                : `${t(favoriteItems.length === 1 ? 'favorites.count' : 'favorites.count_plural', { count: favoriteItems.length })}${totalPages > 1 ? ` ${t('favorites.page', { page: Math.min(page, totalPages), total: totalPages })}` : ''}`}
             </Text>
           </View>
         }
@@ -108,23 +110,23 @@ export const FavoritesScreen = () => {
           isFavoritesLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.loadingText}>Loading favorites...</Text>
+              <Text style={styles.loadingText}>{t('favorites.loading')}</Text>
             </View>
           ) : (
             <View style={styles.emptyContainer}>
               <MaterialCommunityIcons name="heart-outline" size={64} color="#D1D5DB" />
               <Text variant="bodyLarge" style={styles.emptyTitle}>
-                No favorites yet.
+                {t('favorites.emptyTitle')}
               </Text>
               <Text variant="bodyMedium" style={styles.emptySubtitle}>
-                Start browsing to add items to your favorites!
+                {t('favorites.emptySubtitle')}
               </Text>
               <Button
                 mode="contained"
                 onPress={() => navigation.getParent()?.navigate('HomeTab')}
                 style={styles.browseButton}
               >
-                Browse Items
+                {t('favorites.browseItems')}
               </Button>
             </View>
           )

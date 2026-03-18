@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useI18n } from '../../i18n';
 import { Category } from '../../types/listing';
 import { colors, typography } from '../../theme';
 
@@ -11,16 +12,19 @@ interface CategoryRowProps {
   onViewAll?: () => void;
 }
 
-export const CategoryRow = ({ categories, onPress, onViewAll }: CategoryRowProps) => (
+export const CategoryRow = ({ categories, onPress, onViewAll }: CategoryRowProps) => {
+  const { t } = useI18n();
+
+  return (
   <View style={styles.container}>
     <View style={styles.header}>
       <Text variant="titleMedium" style={styles.sectionTitle}>
-        Browse by Category
+        {t('home.category.title')}
       </Text>
       {onViewAll && (
         <TouchableOpacity onPress={onViewAll}>
           <Text variant="labelMedium" style={styles.viewAll}>
-            View All
+            {t('home.viewAll')}
           </Text>
         </TouchableOpacity>
       )}
@@ -44,13 +48,14 @@ export const CategoryRow = ({ categories, onPress, onViewAll }: CategoryRowProps
             {item.name}
           </Text>
           <Text variant="bodySmall" style={styles.count}>
-            {item.count} items
+            {t('home.category.itemsCount', { count: item.count })}
           </Text>
         </TouchableOpacity>
       )}
     />
   </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   container: {

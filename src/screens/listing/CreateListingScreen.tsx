@@ -14,6 +14,7 @@ import { uploadFile } from '../../services/listingService';
 import { geocodeLocation } from '../../utils/geocodeLocation';
 import { RootStackParamList } from '../../types/navigation';
 import { toast } from '../../store/toastStore';
+import { useI18n } from '../../i18n';
 
 const CATEGORIES = [
     { value: 'electronics', label: 'Electronics', icon: 'laptop' },
@@ -59,6 +60,7 @@ const INITIAL_FORM_DATA: CreateListingFormData = {
 };
 
 export const CreateListingScreen = () => {
+    const { t } = useI18n();
     const navigation = useNavigation();
     const route = useRoute<RouteProp<RootStackParamList, 'EditItem'>>();
     const itemId = (route.params as any)?.itemId as string | undefined;
@@ -129,17 +131,17 @@ export const CreateListingScreen = () => {
 
     const addPricingTier = useCallback(() => {
         if (!newTier.days || !newTier.price) {
-            toast.warning('Please enter both days and price for the tier.');
+            toast.warning(t('createListing.tierMissingValues'));
             return;
         }
         const days = parseInt(newTier.days);
         const price = parseFloat(newTier.price);
         if (isNaN(days) || isNaN(price) || days <= 0 || price <= 0) {
-            toast.error('Days and price must be positive numbers.');
+            toast.error(t('createListing.tierInvalid'));
             return;
         }
         if (formData.pricing_tiers.some(t => t.days === days)) {
-            toast.warning('A pricing tier for this duration already exists.');
+            toast.warning(t('createListing.tierExists'));
             return;
         }
         setFormData(prev => ({
@@ -159,7 +161,7 @@ export const CreateListingScreen = () => {
     const pickImages = useCallback(async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            toast.warning('Please grant photo library access to upload images.');
+            toast.warning(t('createListing.photoPermission'));
             return;
         }
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -180,7 +182,7 @@ export const CreateListingScreen = () => {
             setUploadedImages(prev => [...prev, ...urls].slice(0, 10));
         } catch (error) {
             console.error('Image upload failed:', error);
-            toast.error('Failed to upload images. Please try again.');
+            toast.error(t('createListing.uploadImagesFailed'));
         } finally {
             setIsUploading(false);
         }
@@ -189,7 +191,7 @@ export const CreateListingScreen = () => {
     const pickVideos = useCallback(async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            toast.warning('Please grant photo library access to upload videos.');
+            toast.warning(t('createListing.videoPermission'));
             return;
         }
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -205,7 +207,7 @@ export const CreateListingScreen = () => {
             setUploadedVideos(prev => [...prev, url]);
         } catch (error) {
             console.error('Video upload failed:', error);
-            toast.error('Failed to upload video. Please try again.');
+            toast.error(t('createListing.uploadVideoFailed'));
         } finally {
             setIsUploading(false);
         }
@@ -235,11 +237,11 @@ export const CreateListingScreen = () => {
     const handleContinue = useCallback(() => {
         if (!isStepValid(step)) {
             const messages: Record<number, string> = {
-                1: 'Please fill in title, description, category, and location.',
-                2: 'Please upload at least one photo.',
-                3: 'Please set a daily rate.',
+                1: t('createListing.step1Invalid'),
+                2: t('createListing.step2Invalid'),
+                3: t('createListing.step3Invalid'),
             };
-            toast.warning(messages[step] || 'Please complete all required fields.');
+            toast.warning(messages[step] || t('createListing.completeRequired'));
             return;
         }
         setStep(prev => prev + 1);
@@ -247,7 +249,7 @@ export const CreateListingScreen = () => {
 
     const handleSubmit = useCallback(async () => {
         if (!isStepValid(3)) {
-            toast.warning('Please set a daily rate.');
+            toast.warning(t('createListing.step3Invalid'));
             return;
         }
 
@@ -292,20 +294,21 @@ export const CreateListingScreen = () => {
 
             if (isEditMode && itemId) {
                 await updateItem(itemId, payload);
-                toast.success('Your item has been updated!', () => navigation.goBack());
+                toast.success(t('createListing.updatedSuccess'), () => navigation.goBack());
             } else {
                 await createItem(payload);
-                toast.success('Your item has been listed!', () => navigation.goBack());
+                toast.success(t('createListing.listedSuccess'), () => navigation.goBack());
             }
         } catch (error) {
             console.error('Error saving item:', error);
-            toast.error('Failed to save listing. Please try again.');
+            toast.error(t('createListing.saveFailed'));
         }
-    }, [formData, uploadedImages, uploadedVideos, createItem, updateItem, navigation, isStepValid, isEditMode, itemId]);
+    }, [formData, uploadedImages, uploadedVideos, createItem, updateItem, navigation, isStepValid, isEditMode, itemId, t]);
 
-    const categoryLabel = categories.find(c => c.name === formData.category)?.name || 
-                        CATEGORIES.find(c => c.value === formData.category || c.label === formData.category)?.label || '';
-    const conditionLabel = CONDITIONS.find(c => c.value === formData.condition)?.label || 'Good';
+    const categoryLabel = categories.find(c => c.name === formData.category)?.name ||
+                        (formData.category ? t(`createListing.categories.${formData.category.toLowerCase()}`) : '') ||
+                        (formData.category ? t(`createListing.categories.${CATEGORIES.find(c => c.label === formData.category)?.value || ''}`) : '') || '';
+    const conditionLabel = formData.condition ? t(`createListing.conditions.${formData.condition}`) : t('createListing.conditions.good');
     React.useEffect(() => {
         fetchCategories();
     }, [fetchCategories]);
@@ -320,9 +323,9 @@ export const CreateListingScreen = () => {
                 <View style={styles.contentWrapper}>
                     {/* Header */}
                     <View style={styles.headerContainer}>
-                        <Text style={styles.pageTitle}>List Your Item</Text>
+                        <Text style={styles.pageTitle}>{t('createListing.title')}</Text>
                         <Text style={styles.pageSubtitle}>
-                            Share your items with the community and start earning
+                            {t('createListing.subtitle')}
                         </Text>
                     </View>
 
@@ -354,10 +357,10 @@ export const CreateListingScreen = () => {
                         <View style={styles.warningBanner}>
                             <MaterialCommunityIcons name="alert-outline" size={20} color="#B45309" style={styles.warningIcon} />
                             <View style={styles.warningTextContainer}>
-                                <Text style={styles.warningTitle}>Connect your bank account to receive payouts</Text>
+                                <Text style={styles.warningTitle}>{t('createListing.bankWarningTitle')}</Text>
                                 <Text style={styles.warningText}>
-                                    You can list items, but you won't be able to receive payments until you connect your bank account.{' '}
-                                    <Text style={styles.warningLink}>Connect now</Text>
+                                    {t('createListing.bankWarningBody')}{' '}
+                                    <Text style={styles.warningLink}>{t('createListing.connectNow')}</Text>
                                 </Text>
                             </View>
                         </View>
@@ -367,15 +370,15 @@ export const CreateListingScreen = () => {
                     <Surface style={styles.formCard} elevation={0}>
                         {step === 1 && (
                             <>
-                                <Text style={styles.sectionTitle}>Tell us about your item</Text>
+                                <Text style={styles.sectionTitle}>{t('createListing.step1Title')}</Text>
 
                                 <View style={styles.formSection}>
                                     {/* Item Title */}
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Item Title</Text>
+                                        <Text style={styles.label}>{t('createListing.itemTitle')}</Text>
                                         <TextInput
                                             mode="outlined"
-                                            placeholder="e.g., Canon EOS R5 Camera"
+                                            placeholder={t('createListing.itemTitlePlaceholder')}
                                             value={formData.title}
                                             onChangeText={(text) => handleInputChange('title', text)}
                                             outlineColor={colors.border}
@@ -387,10 +390,10 @@ export const CreateListingScreen = () => {
 
                                     {/* Description */}
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Description</Text>
+                                        <Text style={styles.label}>{t('createListing.descriptionLabel')}</Text>
                                         <TextInput
                                             mode="outlined"
-                                            placeholder="Describe your item in detail..."
+                                            placeholder={t('createListing.descriptionPlaceholder')}
                                             value={formData.description}
                                             onChangeText={(text) => handleInputChange('description', text)}
                                             multiline
@@ -404,7 +407,7 @@ export const CreateListingScreen = () => {
 
                                     {/* Category */}
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Category</Text>
+                                        <Text style={styles.label}>{t('createListing.categoryLabel')}</Text>
                                         <Menu
                                             visible={categoryMenuVisible}
                                             onDismiss={() => setCategoryMenuVisible(false)}
@@ -412,7 +415,7 @@ export const CreateListingScreen = () => {
                                             anchor={
                                                 <TouchableOpacity style={styles.dropdownContainer} onPress={() => setCategoryMenuVisible(true)}>
                                                     <Text style={formData.category ? styles.dropdownTextValue : styles.dropdownText}>
-                                                        {categoryLabel || 'Choose a category'}
+                                                        {categoryLabel || t('createListing.chooseCategory')}
                                                     </Text>
                                                     <MaterialCommunityIcons name="chevron-down" size={20} color="#6B7280" />
                                                 </TouchableOpacity>
@@ -425,7 +428,7 @@ export const CreateListingScreen = () => {
                                                         handleInputChange('category', cat.name);
                                                         setCategoryMenuVisible(false);
                                                     }}
-                                                    title={cat.name}
+                                                    title={t(`createListing.categories.${cat.name.toLowerCase()}`) === `createListing.categories.${cat.name.toLowerCase()}` ? cat.name : t(`createListing.categories.${cat.name.toLowerCase()}`)}
                                                     leadingIcon={cat.icon as any}
                                                     titleStyle={formData.category === cat.name ? styles.menuItemActiveText : undefined}
                                                 />
@@ -433,10 +436,10 @@ export const CreateListingScreen = () => {
                                                 <Menu.Item
                                                     key={cat.value}
                                                     onPress={() => {
-                                                        handleInputChange('category', cat.label);
+                                                        handleInputChange('category', cat.value);
                                                         setCategoryMenuVisible(false);
                                                     }}
-                                                    title={cat.label}
+                                                    title={t(`createListing.categories.${cat.value}`)}
                                                     leadingIcon={cat.icon as any}
                                                 />
                                             ))}
@@ -445,7 +448,7 @@ export const CreateListingScreen = () => {
 
                                     {/* Condition */}
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Condition</Text>
+                                        <Text style={styles.label}>{t('createListing.conditionLabel')}</Text>
                                         <Menu
                                             visible={conditionMenuVisible}
                                             onDismiss={() => setConditionMenuVisible(false)}
@@ -463,7 +466,7 @@ export const CreateListingScreen = () => {
                                                         handleInputChange('condition', cond.value);
                                                         setConditionMenuVisible(false);
                                                     }}
-                                                    title={cond.label}
+                                                    title={t(`createListing.conditions.${cond.value}`)}
                                                 />
                                             ))}
                                         </Menu>
@@ -473,11 +476,11 @@ export const CreateListingScreen = () => {
                                     <View style={styles.inputGroup}>
                                         <View style={styles.labelRow}>
                                             <MaterialCommunityIcons name="map-marker-outline" size={16} color="#334155" />
-                                            <Text style={[styles.label, { marginBottom: 0, marginLeft: 6 }]}>Location (City/Neighborhood)</Text>
+                                            <Text style={[styles.label, { marginBottom: 0, marginLeft: 6 }]}>{t('createListing.locationLabel')}</Text>
                                         </View>
                                         <TextInput
                                             mode="outlined"
-                                            placeholder="e.g., Downtown Brooklyn, New York"
+                                            placeholder={t('createListing.locationPlaceholder')}
                                             value={formData.location}
                                             onChangeText={(text) => handleInputChange('location', text)}
                                             outlineColor={colors.border}
@@ -491,14 +494,14 @@ export const CreateListingScreen = () => {
 
                                     {/* Detailed Address */}
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Detailed Address (Optional & Private)</Text>
+                                        <Text style={styles.label}>{t('createListing.addressLabel')}</Text>
                                         <Text style={styles.subtext}>
-                                            This information is private and will only be shared with confirmed renters
+                                            {t('createListing.addressHint')}
                                         </Text>
 
                                         <TextInput
                                             mode="outlined"
-                                            placeholder="Street address (optional)"
+                                            placeholder={t('createListing.streetPlaceholder')}
                                             value={formData.street_address}
                                             onChangeText={(text) => handleInputChange('street_address', text)}
                                             outlineColor={colors.border}
@@ -510,7 +513,7 @@ export const CreateListingScreen = () => {
                                         <View style={styles.rowInputs}>
                                             <TextInput
                                                 mode="outlined"
-                                                placeholder="Postal/ZIP code"
+                                                placeholder={t('createListing.postcodePlaceholder')}
                                                 value={formData.postcode}
                                                 onChangeText={(text) => handleInputChange('postcode', text)}
                                                 outlineColor={colors.border}
@@ -520,7 +523,7 @@ export const CreateListingScreen = () => {
                                             />
                                             <TextInput
                                                 mode="outlined"
-                                                placeholder="Country (optional)"
+                                                placeholder={t('createListing.countryPlaceholder')}
                                                 value={formData.country}
                                                 onChangeText={(text) => handleInputChange('country', text)}
                                                 outlineColor={colors.border}
@@ -537,7 +540,7 @@ export const CreateListingScreen = () => {
                                             onPress={() => handleInputChange('show_on_map', !formData.show_on_map)}
                                             color="#A855F7"
                                         />
-                                        <Text style={styles.checkboxLabel}>Show this item on the interactive map</Text>
+                                        <Text style={styles.checkboxLabel}>{t('createListing.showOnMap')}</Text>
                                     </View>
                                 </View>
                             </>
@@ -545,20 +548,20 @@ export const CreateListingScreen = () => {
 
                         {step === 2 && (
                             <>
-                                <Text style={styles.sectionTitle}>Add photos and videos</Text>
+                                <Text style={styles.sectionTitle}>{t('createListing.step2Title')}</Text>
 
                                 <View style={styles.formSection}>
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Photos ({uploadedImages.length}/10)</Text>
+                                        <Text style={styles.label}>{t('createListing.photosLabel', { count: uploadedImages.length })}</Text>
                                         <TouchableOpacity style={styles.uploadAreaImages} onPress={pickImages} disabled={isUploading}>
                                             {isUploading ? (
                                                 <ActivityIndicator size="large" color="#94A3B8" />
                                             ) : (
                                                 <MaterialCommunityIcons name="image-outline" size={48} color="#94A3B8" />
                                             )}
-                                            <Text style={styles.uploadTitle}>Upload Photos</Text>
-                                            <Text style={styles.uploadSubtext}>Add up to 10 photos of your item</Text>
-                                            <Text style={styles.uploadHint}>Images will be automatically compressed for{"\n"}faster upload</Text>
+                                            <Text style={styles.uploadTitle}>{t('createListing.uploadPhotos')}</Text>
+                                            <Text style={styles.uploadSubtext}>{t('createListing.uploadPhotosHint')}</Text>
+                                            <Text style={styles.uploadHint}>{t('createListing.uploadPhotosNote')}</Text>
                                         </TouchableOpacity>
                                         {uploadedImages.length > 0 && (
                                             <View style={styles.mediaPreviewRow}>
@@ -575,16 +578,16 @@ export const CreateListingScreen = () => {
                                     </View>
 
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Videos (Optional) ({uploadedVideos.length})</Text>
+                                        <Text style={styles.label}>{t('createListing.videosLabel', { count: uploadedVideos.length })}</Text>
                                         <TouchableOpacity style={styles.uploadAreaVideos} onPress={pickVideos} disabled={isUploading}>
                                             {isUploading ? (
                                                 <ActivityIndicator size="large" color="#A855F7" />
                                             ) : (
                                                 <MaterialCommunityIcons name="video-outline" size={48} color="#A855F7" />
                                             )}
-                                            <Text style={styles.uploadTitle}>Upload Short Videos</Text>
-                                            <Text style={styles.uploadSubtext}>Add videos to showcase your item (max 30{"\n"}seconds each)</Text>
-                                            <Text style={styles.uploadHintVideo}>Keep videos under 10MB for best results</Text>
+                                            <Text style={styles.uploadTitle}>{t('createListing.uploadVideos')}</Text>
+                                            <Text style={styles.uploadSubtext}>{t('createListing.uploadVideosHint')}</Text>
+                                            <Text style={styles.uploadHintVideo}>{t('createListing.uploadVideosNote')}</Text>
                                         </TouchableOpacity>
                                         {uploadedVideos.length > 0 && (
                                             <View style={styles.mediaPreviewRow}>
@@ -607,12 +610,12 @@ export const CreateListingScreen = () => {
 
                         {step === 3 && (
                             <>
-                                <Text style={styles.sectionTitle}>Set pricing and booking rules</Text>
+                                <Text style={styles.sectionTitle}>{t('createListing.step3Title')}</Text>
 
                                 <View style={styles.formSection}>
 
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Daily Rate ($)</Text>
+                                        <Text style={styles.label}>{t('createListing.dailyRate')}</Text>
                                         <View style={styles.numberInputContainer}>
                                             <TextInput
                                                 mode="outlined"
@@ -629,11 +632,11 @@ export const CreateListingScreen = () => {
                                                 <MaterialCommunityIcons name="unfold-more-horizontal" size={20} color="#94A3B8" style={{ transform: [{ rotate: '90deg' }] }} />
                                             </View>
                                         </View>
-                                        <Text style={styles.helperText}>Default price per day</Text>
+                                        <Text style={styles.helperText}>{t('createListing.dailyRateHint')}</Text>
                                     </View>
 
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Security Deposit ($)</Text>
+                                        <Text style={styles.label}>{t('createListing.securityDeposit')}</Text>
                                         <View style={styles.numberInputContainer}>
                                             <TextInput
                                                 mode="outlined"
@@ -654,9 +657,9 @@ export const CreateListingScreen = () => {
 
                                     {/* Tiered Pricing Block */}
                                     <View style={styles.tieredPricingBlock}>
-                                        <Text style={styles.label}>Tiered Pricing (Optional)</Text>
+                                        <Text style={styles.label}>{t('createListing.tieredPricing')}</Text>
                                         <Text style={styles.subtext}>
-                                            Offer discounts for longer rentals (e.g., 7 days for{"\n"}$150)
+                                            {t('createListing.tieredPricingHint')}
                                         </Text>
 
                                         {formData.pricing_tiers.length > 0 && (
@@ -664,7 +667,7 @@ export const CreateListingScreen = () => {
                                                 {formData.pricing_tiers.map((tier, idx) => (
                                                     <View key={idx} style={styles.tierItemRow}>
                                                         <Text style={styles.tierItemText}>
-                                                            {tier.days} {tier.days === 1 ? 'day' : 'days'}: ${tier.price.toFixed(2)}
+                                                            {tier.days} {tier.days === 1 ? t('createListing.day') : t('createListing.days')}: ${tier.price.toFixed(2)}
                                                         </Text>
                                                         <TouchableOpacity onPress={() => removePricingTier(idx)}>
                                                             <MaterialCommunityIcons name="close-circle" size={20} color="#EF4444" />
@@ -678,7 +681,7 @@ export const CreateListingScreen = () => {
                                             <View style={[styles.numberInputContainer, { flex: 1, marginRight: 12 }]}>
                                                 <TextInput
                                                     mode="outlined"
-                                                    placeholder="Days (e.g., 7)"
+                                                    placeholder={t('createListing.tierDaysPlaceholder')}
                                                     value={newTier.days}
                                                     onChangeText={(text) => setNewTier(prev => ({ ...prev, days: text }))}
                                                     outlineColor={colors.border}
@@ -694,7 +697,7 @@ export const CreateListingScreen = () => {
                                             <View style={[styles.numberInputContainer, { flex: 1 }]}>
                                                 <TextInput
                                                     mode="outlined"
-                                                    placeholder="Price (e.g., 150)"
+                                                    placeholder={t('createListing.tierPricePlaceholder')}
                                                     value={newTier.price}
                                                     onChangeText={(text) => setNewTier(prev => ({ ...prev, price: text }))}
                                                     outlineColor={colors.border}
@@ -716,7 +719,7 @@ export const CreateListingScreen = () => {
                                             labelStyle={styles.addTierBtnLabel}
                                             onPress={addPricingTier}
                                         >
-                                            Add Pricing Tier
+                                            {t('createListing.addPricingTier')}
                                         </Button>
                                     </View>
 
@@ -724,14 +727,14 @@ export const CreateListingScreen = () => {
                                     <View style={styles.bookingRulesBlock}>
                                         <View style={styles.labelRow}>
                                             <MaterialCommunityIcons name="calendar-outline" size={18} color="#0F172A" />
-                                            <Text style={styles.bookingRulesTitle}>Booking Rules</Text>
+                                            <Text style={styles.bookingRulesTitle}>{t('createListing.bookingRules')}</Text>
                                         </View>
                                         <Text style={[styles.subtext, { marginBottom: 24 }]}>
-                                            Set your rental requirements and preferences
+                                            {t('createListing.bookingRulesHint')}
                                         </Text>
 
                                         <View style={styles.inputGroup}>
-                                            <Text style={styles.smallLabel}>Minimum Days</Text>
+                                            <Text style={styles.smallLabel}>{t('createListing.minimumDays')}</Text>
                                             <View style={styles.numberInputContainer}>
                                                 <TextInput
                                                     mode="outlined"
@@ -751,7 +754,7 @@ export const CreateListingScreen = () => {
                                         </View>
 
                                         <View style={styles.inputGroup}>
-                                            <Text style={styles.smallLabel}>Maximum Days</Text>
+                                            <Text style={styles.smallLabel}>{t('createListing.maximumDays')}</Text>
                                             <View style={styles.numberInputContainer}>
                                                 <TextInput
                                                     mode="outlined"
@@ -771,7 +774,7 @@ export const CreateListingScreen = () => {
                                         </View>
 
                                         <View style={styles.inputGroup}>
-                                            <Text style={styles.smallLabel}>Notice Period (hours)</Text>
+                                            <Text style={styles.smallLabel}>{t('createListing.noticePeriod')}</Text>
                                             <View style={styles.numberInputContainer}>
                                                 <TextInput
                                                     mode="outlined"
@@ -788,14 +791,14 @@ export const CreateListingScreen = () => {
                                                     <MaterialCommunityIcons name="unfold-more-horizontal" size={20} color="#94A3B8" style={{ transform: [{ rotate: '90deg' }] }} />
                                                 </View>
                                             </View>
-                                            <Text style={styles.helperText}>Hours before pickup</Text>
+                                            <Text style={styles.helperText}>{t('createListing.noticePeriodHint')}</Text>
                                         </View>
 
                                         <View style={styles.preferencesCard}>
                                             <View style={styles.preferenceRow}>
                                                 <View style={styles.preferenceText}>
-                                                    <Text style={styles.preferenceTitle}>Instant Booking</Text>
-                                                    <Text style={styles.preferenceDesc}>Allow renters to book without your{"\n"}approval</Text>
+                                                    <Text style={styles.preferenceTitle}>{t('createListing.instantBooking')}</Text>
+                                                    <Text style={styles.preferenceDesc}>{t('createListing.instantBookingHint')}</Text>
                                                 </View>
                                                 <Checkbox.Android
                                                     status={formData.instant_booking ? 'checked' : 'unchecked'}
@@ -809,8 +812,8 @@ export const CreateListingScreen = () => {
 
                                             <View style={styles.preferenceRow}>
                                                 <View style={styles.preferenceText}>
-                                                    <Text style={styles.preferenceTitle}>Same-Day Pickup</Text>
-                                                    <Text style={styles.preferenceDesc}>Allow pickup on the same day as booking</Text>
+                                                    <Text style={styles.preferenceTitle}>{t('createListing.sameDayPickup')}</Text>
+                                                    <Text style={styles.preferenceDesc}>{t('createListing.sameDayPickupHint')}</Text>
                                                 </View>
                                                 <Checkbox.Android
                                                     status={formData.same_day_pickup ? 'checked' : 'unchecked'}
@@ -824,7 +827,7 @@ export const CreateListingScreen = () => {
 
                                     {/* Delivery Options */}
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Delivery Options</Text>
+                                        <Text style={styles.label}>{t('createListing.deliveryOptions')}</Text>
 
                                         <TouchableOpacity
                                             style={styles.checkboxRowRaw}
@@ -837,7 +840,7 @@ export const CreateListingScreen = () => {
                                                 color="#A855F7"
                                                 uncheckedColor="#CBD5E1"
                                             />
-                                            <Text style={styles.deliveryOptionLabel}>Pickup at location</Text>
+                                            <Text style={styles.deliveryOptionLabel}>{t('createListing.pickupAtLocation')}</Text>
                                         </TouchableOpacity>
 
                                         <TouchableOpacity
@@ -851,14 +854,14 @@ export const CreateListingScreen = () => {
                                                 color="#A855F7"
                                                 uncheckedColor="#CBD5E1"
                                             />
-                                            <Text style={styles.deliveryOptionLabel}>Delivery to renter</Text>
+                                            <Text style={styles.deliveryOptionLabel}>{t('createListing.deliveryToRenter')}</Text>
                                         </TouchableOpacity>
                                     </View>
 
                                     {formData.delivery_options.includes('delivery') && (
                                         <View style={styles.rowInputs}>
                                             <View style={[styles.inputGroup, styles.flex1, { marginRight: 12 }]}>
-                                                <Text style={styles.smallLabel}>Delivery Fee ($)</Text>
+                                                <Text style={styles.smallLabel}>{t('createListing.deliveryFee')}</Text>
                                                 <TextInput
                                                     mode="outlined"
                                                     placeholder="0.00"
@@ -872,7 +875,7 @@ export const CreateListingScreen = () => {
                                                 />
                                             </View>
                                             <View style={[styles.inputGroup, styles.flex1]}>
-                                                <Text style={styles.smallLabel}>Max Distance (miles)</Text>
+                                                <Text style={styles.smallLabel}>{t('createListing.maxDistance')}</Text>
                                                 <TextInput
                                                     mode="outlined"
                                                     placeholder="10"
@@ -890,10 +893,10 @@ export const CreateListingScreen = () => {
 
                                     {/* Pricing Summary */}
                                     <View style={styles.pricingSummaryCard}>
-                                        <Text style={styles.pricingSummaryTitle}>Pricing Summary</Text>
+                                        <Text style={styles.pricingSummaryTitle}>{t('createListing.pricingSummary')}</Text>
 
                                         <View style={styles.summaryRow}>
-                                            <Text style={styles.summaryLabel}>Base daily rate:</Text>
+                                            <Text style={styles.summaryLabel}>{t('createListing.baseDailyRate')}</Text>
                                             <Text style={styles.summaryValue}>${dailyRate.toFixed(2)}/day</Text>
                                         </View>
 
@@ -905,13 +908,13 @@ export const CreateListingScreen = () => {
                                         ))}
 
                                         <View style={styles.summaryRow}>
-                                            <Text style={styles.summaryLabel}>Security deposit:</Text>
+                                            <Text style={styles.summaryLabel}>{t('createListing.securityDepositSummary')}</Text>
                                             <Text style={styles.summaryValue}>${depositAmount.toFixed(2)}</Text>
                                         </View>
 
                                         {formData.delivery_options.includes('delivery') && parseFloat(formData.delivery_fee) > 0 && (
                                             <View style={styles.summaryRow}>
-                                                <Text style={styles.summaryLabel}>Delivery fee:</Text>
+                                                <Text style={styles.summaryLabel}>{t('createListing.deliveryFeeSummary')}</Text>
                                                 <Text style={styles.summaryValue}>${(parseFloat(formData.delivery_fee) || 0).toFixed(2)}</Text>
                                             </View>
                                         )}
@@ -920,7 +923,7 @@ export const CreateListingScreen = () => {
 
                                         {formData.pricing_tiers.length === 0 && (
                                             <View style={styles.summaryRow}>
-                                                <Text style={styles.summaryLabel}>Weekly estimate (base rate):</Text>
+                                                <Text style={styles.summaryLabel}>{t('createListing.weeklyEstimate')}</Text>
                                                 <Text style={styles.summaryValueBold}>${(dailyRate * 7).toFixed(2)}</Text>
                                             </View>
                                         )}
@@ -939,7 +942,7 @@ export const CreateListingScreen = () => {
                                     style={styles.previousBtn}
                                     labelStyle={styles.previousBtnLabel}
                                 >
-                                    Previous
+                                    {t('createListing.previous')}
                                 </Button>
                             ) : (
                                 <View style={styles.spacer} />
@@ -955,7 +958,7 @@ export const CreateListingScreen = () => {
                                 style={[styles.continueBtn, step === 3 && { backgroundColor: '#71DCA3' }]}
                                 labelStyle={styles.continueBtnLabel}
                             >
-                                {isGeocodingLocation ? 'Getting location...' : isSubmitting ? 'Publishing...' : step === 3 ? 'List Item' : 'Continue'}
+                                {isGeocodingLocation ? t('createListing.gettingLocation') : isSubmitting ? t('createListing.publishing') : step === 3 ? t('createListing.listItem') : t('createListing.continue')}
                             </Button>
                         </View>
                     </Surface>

@@ -12,6 +12,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSignIn } from "@clerk/expo/legacy";
 import { getEmailError } from "../../utils/validators";
 import { colors, typography } from "../../theme";
+import { useI18n } from "../../i18n";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import type { AuthStackParamList } from "../../types/navigation";
 
@@ -20,6 +21,7 @@ type Props = {
 };
 
 export const ForgotPasswordScreen = ({ navigation }: Props) => {
+  const { t } = useI18n();
   const { isLoaded, signIn, setActive } = useSignIn();
   const [email, setEmail] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
@@ -48,12 +50,12 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
         identifier: email,
       });
       setCodeSent(true);
-      setSuccessMessage(`Verification code sent to ${email}`);
+      setSuccessMessage(t('auth.verificationCodeSent', { email }));
     } catch (err: any) {
       setError(
         err?.errors?.[0]?.message ||
           err?.message ||
-          "Failed to send verification code",
+          t('auth.codeVerificationFailed'),
       );
     } finally {
       setIsLoading(false);
@@ -63,7 +65,7 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
   const handleVerifyCode = async () => {
     if (!isLoaded) return;
     if (!code) {
-      setError("Verification code is required");
+      setError(t('auth.verificationCodeRequired'));
       return;
     }
 
@@ -77,16 +79,16 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
 
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
-        setSuccessMessage("Password reset successful. You are now signed in.");
+        setSuccessMessage(t('auth.passwordResetSuccess'));
       } else if (result.status === "needs_new_password") {
         setIsVerifyingCode(false);
         setIsSettingPassword(true);
       } else {
-        setError("Code verification could not be completed");
+        setError(t('auth.codeVerificationIncomplete'));
       }
     } catch (err: any) {
       setError(
-        err?.errors?.[0]?.message || err?.message || "Failed to verify code",
+        err?.errors?.[0]?.message || err?.message || t('auth.codeVerificationFailed'),
       );
     } finally {
       setIsLoading(false);
@@ -96,11 +98,11 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
   const handleResetPassword = async () => {
     if (!isLoaded) return;
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t('auth.passwordsDoNotMatch'));
       return;
     }
     if (password.length < 8) {
-      setError("Password must be at least 8 characters");
+      setError(t('auth.passwordMinLength'));
       return;
     }
 
@@ -114,11 +116,11 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
       } else {
-        setError("Password reset could not be completed");
+        setError(t('auth.passwordResetIncomplete'));
       }
     } catch (err: any) {
       setError(
-        err?.errors?.[0]?.message || err?.message || "Failed to reset password",
+        err?.errors?.[0]?.message || err?.message || t('auth.passwordResetFailed'),
       );
     } finally {
       setIsLoading(false);
@@ -147,17 +149,16 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
                   size={20}
                   color={colors.textSecondary}
                 />
-                <Text style={styles.backText}>Back to sign in</Text>
+                <Text style={styles.backText}>{t('auth.backToSignIn')}</Text>
               </TouchableOpacity>
 
               {/* Title */}
-              <Text style={styles.title}>Reset your password</Text>
+              <Text style={styles.title}>{t('auth.resetPassword')}</Text>
               <Text style={styles.subtitle}>
-                Enter your email address and we'll send you a verification code
-                to reset your password.
+                {t('auth.resetPasswordSubtitle')}
               </Text>
 
-              <Text style={styles.inputLabel}>Email</Text>
+              <Text style={styles.inputLabel}>{t('auth.email')}</Text>
               <TextInput
                 mode="outlined"
                 dense
@@ -167,7 +168,7 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
                   setError(null);
                 }}
                 onBlur={() => setEmailTouched(true)}
-                placeholder="you@example.com"
+                placeholder={t('auth.emailPlaceholder')}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 left={<TextInput.Icon icon="email-outline" size={20} />}
@@ -190,7 +191,7 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
                 labelStyle={styles.submitButtonLabel}
                 buttonColor="#111827"
               >
-                Send verification code
+                {t('auth.sendVerificationCode')}
               </Button>
             </>
           ) : codeSent && !isSettingPassword ? (
@@ -202,13 +203,13 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
                   color="#4B5563"
                 />
               </View>
-              <Text style={styles.verifyTitle}>Verify your code</Text>
+              <Text style={styles.verifyTitle}>{t('auth.verifyYourCode')}</Text>
               <Text style={styles.verifySubtitle}>
-                We've sent a verification code to{"\n"}
+                {t('auth.verifySubtitle')}{"\n"}
                 <Text style={styles.verifyEmail}>{email}</Text>
               </Text>
 
-              <Text style={styles.inputLabel}>Verification Code</Text>
+              <Text style={styles.inputLabel}>{t('auth.verificationCodeLabel')}</Text>
               <TextInput
                 mode="outlined"
                 dense
@@ -217,7 +218,7 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
                   setCode(t);
                   setError(null);
                 }}
-                placeholder="Enter 6-digit code"
+                placeholder={t('auth.verificationCodePlaceholder')}
                 autoCapitalize="none"
                 keyboardType="numeric"
                 maxLength={6}
@@ -249,13 +250,13 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
                 labelStyle={styles.submitButtonLabel}
                 buttonColor={colors.primary}
               >
-                Verify Code
+                {t('auth.verifyCode')}
               </Button>
 
               <View style={styles.resendContainer}>
-                <Text style={styles.linkText}>Didn't receive the code? </Text>
+                <Text style={styles.linkText}>{t('auth.didntReceive')}</Text>
                 <TouchableOpacity onPress={handleSendCode} disabled={isLoading}>
-                  <Text style={styles.linkTextHighlight}>Resend</Text>
+                  <Text style={styles.linkTextHighlight}>{t('auth.resend')}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -274,18 +275,18 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
                   size={18}
                   color={colors.textSecondary}
                 />
-                <Text style={styles.backToEmailText}>Back to email</Text>
+                <Text style={styles.backToEmailText}>{t('auth.backToEmail')}</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <View>
               {/* Title */}
-              <Text style={styles.title}>Set new password</Text>
+              <Text style={styles.title}>{t('auth.setNewPassword')}</Text>
               <Text style={styles.subtitle}>
-                Enter your new password for Rentany
+                {t('auth.setNewPasswordSubtitle')}
               </Text>
 
-              <Text style={styles.inputLabel}>New Password</Text>
+              <Text style={styles.inputLabel}>{t('auth.newPassword')}</Text>
               <TextInput
                 mode="outlined"
                 dense
@@ -304,10 +305,10 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
                 disabled={isLoading}
               />
               <Text style={styles.helperText}>
-                Must be at least 8 characters
+                {t('auth.passwordHint')}
               </Text>
 
-              <Text style={styles.inputLabel}>Confirm New Password</Text>
+              <Text style={styles.inputLabel}>{t('auth.confirmNewPassword')}</Text>
               <TextInput
                 mode="outlined"
                 dense
@@ -342,7 +343,7 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
                 labelStyle={styles.submitButtonLabel}
                 buttonColor="#111827"
               >
-                Reset password
+                {t('auth.resetPasswordAction')}
               </Button>
 
               <TouchableOpacity
@@ -350,7 +351,7 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
                 disabled={isLoading}
                 style={styles.backToEmailBtn}
               >
-                <Text style={styles.backToEmailText}>Back to sign in</Text>
+                <Text style={styles.backToEmailText}>{t('auth.backToSignIn')}</Text>
               </TouchableOpacity>
             </View>
           )}
