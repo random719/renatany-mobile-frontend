@@ -18,6 +18,7 @@ import * as Sharing from 'expo-sharing';
 import { AppBottomNavBar } from '../../components/common/AppBottomNavBar';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
+import { useI18n } from '../../i18n';
 import { getRentalRequests } from '../../services/rentalService';
 import { getListingById } from '../../services/listingService';
 import { api } from '../../services/api';
@@ -35,27 +36,6 @@ interface ItemInfo {
   title: string;
   images?: string[];
 }
-
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'All Rentals' },
-  { key: 'as_renter', label: 'As Renter' },
-  { key: 'as_owner', label: 'As Owner' },
-  { key: 'completed', label: 'Completed' },
-  { key: 'active', label: 'Active' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'cancelled', label: 'Cancelled' },
-];
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  approved: 'Approved',
-  rejected: 'Rejected',
-  paid: 'Paid',
-  cancelled: 'Cancelled',
-  completed: 'Completed',
-  inquiry: 'Inquiry',
-  declined: 'Declined',
-};
 
 const STATUS_COLORS: Record<string, string> = {
   pending: '#F59E0B',
@@ -88,6 +68,7 @@ const formatDateRange = (startDate: string, endDate: string) => {
 
 export const RentalHistoryScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { t } = useI18n();
   const { user: clerkUser } = useUser();
   const { getToken } = useAuth();
   const { user } = useAuthStore();
@@ -168,7 +149,7 @@ export const RentalHistoryScreen = () => {
       // Get a fresh Clerk session token
       const token = await getToken();
       if (!token) {
-        toast.error('Session expired. Please log in again.');
+        toast.error(t('rentalHistory.sessionExpired'));
         setDownloadingId(null);
         return;
       }
@@ -189,16 +170,16 @@ export const RentalHistoryScreen = () => {
           dialogTitle: `Receipt - ${rentalId}`,
         });
       } else {
-        toast.success('Receipt downloaded successfully.');
+        toast.success(t('rentalHistory.receiptDownloaded'));
       }
     } catch (err: any) {
       const msg = err?.message || '';
       if (msg.includes('401') || msg.includes('Unauthorized')) {
-        toast.error('Session Expired: Please log in again to download receipts.');
+        toast.error(t('rentalHistory.sessionExpiredReceipt'));
       } else if (msg.includes('400') || msg.includes('only available')) {
-        toast.warning('Receipt Unavailable: Receipts are only available for paid or completed rentals.');
+        toast.warning(t('rentalHistory.receiptUnavailable'));
       } else {
-        toast.error('Download Failed: Unable to download receipt. Please try again.');
+        toast.error(t('rentalHistory.receiptFailed'));
       }
     } finally {
       setDownloadingId(null);
@@ -228,7 +209,7 @@ export const RentalHistoryScreen = () => {
         item?.title,
         rental.renter_email,
         rental.owner_email,
-        STATUS_LABELS[rental.status] || rental.status,
+        t(`rentalHistory.status.${rental.status}`),
       ]
         .filter(Boolean)
         .join(' ')
@@ -240,7 +221,7 @@ export const RentalHistoryScreen = () => {
 
   const renderCard = ({ item: rental }: { item: RentalRequest }) => {
     const itemInfo = items[rental.item_id];
-    const title = itemInfo?.title || rental.item_id?.replace(/[-_]/g, ' ') || 'Product';
+    const title = itemInfo?.title || rental.item_id?.replace(/[-_]/g, ' ') || t('rentalHistory.productFallback');
     const imageUrl = itemInfo?.images?.[0];
     const isRenter = rental.renter_email === userEmail;
 
@@ -274,7 +255,7 @@ export const RentalHistoryScreen = () => {
               </Text>
               <View style={[styles.statusPill, { backgroundColor: `${accent}15` }]}>
                 <Text style={[styles.statusPillText, { color: accent }]}>
-                  {STATUS_LABELS[rental.status] || rental.status}
+                  {t(`rentalHistory.status.${rental.status}`)}
                 </Text>
               </View>
             </View>
@@ -282,7 +263,7 @@ export const RentalHistoryScreen = () => {
             {/* Role badge */}
             <View style={[styles.roleBadge, { backgroundColor: isRenter ? '#EFF6FF' : '#F0FDF4' }]}>
               <Text style={[styles.roleBadgeText, { color: isRenter ? '#1D4ED8' : '#15803D' }]}>
-                {isRenter ? 'You rented' : 'You rented out'}
+                {isRenter ? t('rentalHistory.youRented') : t('rentalHistory.youRentedOut')}
               </Text>
             </View>
 
@@ -297,7 +278,11 @@ export const RentalHistoryScreen = () => {
             </View>
 
             <Text style={styles.breakdownText} numberOfLines={1}>
-              Rental ${rentalCost.toFixed(2)} • Fee ${platformFee.toFixed(2)} • Deposit ${securityDeposit.toFixed(2)}
+              {t('rentalHistory.breakdown', {
+                rental: rentalCost.toFixed(2),
+                fee: platformFee.toFixed(2),
+                deposit: securityDeposit.toFixed(2),
+              })}
             </Text>
           </View>
         </View>
@@ -311,12 +296,12 @@ export const RentalHistoryScreen = () => {
           {isDownloading ? (
             <>
               <ActivityIndicator size="small" color="#111827" />
-              <Text style={styles.receiptButtonText}>Downloading...</Text>
+              <Text style={styles.receiptButtonText}>{t('rentalHistory.downloading')}</Text>
             </>
           ) : (
             <>
               <MaterialCommunityIcons name="download" size={18} color="#111827" />
-              <Text style={styles.receiptButtonText}>Receipt</Text>
+              <Text style={styles.receiptButtonText}>{t('rentalHistory.receipt')}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -324,7 +309,11 @@ export const RentalHistoryScreen = () => {
     );
   };
 
-  const selectedFilterLabel = FILTERS.find((filter) => filter.key === selectedFilter)?.label ?? 'All Rentals';
+  const filters = (['all', 'as_renter', 'as_owner', 'completed', 'active', 'pending', 'cancelled'] as const).map((key) => ({
+    key,
+    label: t(`rentalHistory.filters.${key}`),
+  }));
+  const selectedFilterLabel = filters.find((filter) => filter.key === selectedFilter)?.label ?? t('rentalHistory.filters.all');
 
   return (
     <View style={styles.container}>
@@ -348,16 +337,16 @@ export const RentalHistoryScreen = () => {
             <GlobalHeader />
 
             <View style={styles.heroSection}>
-              <Text style={styles.pageTitle}>Rental History</Text>
+              <Text style={styles.pageTitle}>{t('rentalHistory.title')}</Text>
               <Text style={styles.pageSubtitle}>
-                View all your completed rentals and download receipts
+                {t('rentalHistory.subtitle')}
               </Text>
 
               <TextInput
                 mode="outlined"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholder="Search rentals..."
+                placeholder={t('rentalHistory.searchPlaceholder')}
                 style={styles.searchInput}
                 outlineStyle={styles.searchOutline}
                 left={<TextInput.Icon icon="magnify" color="#94A3B8" />}
@@ -380,7 +369,7 @@ export const RentalHistoryScreen = () => {
                   </TouchableOpacity>
                 }
               >
-                {FILTERS.map((filter) => (
+                {filters.map((filter) => (
                   <Menu.Item
                     key={filter.key}
                     onPress={() => {
@@ -404,9 +393,9 @@ export const RentalHistoryScreen = () => {
           !isLoading ? (
             <View style={styles.emptyCard}>
               <MaterialCommunityIcons name="file-search-outline" size={44} color="#94A3B8" />
-              <Text style={styles.emptyTitle}>No rentals found</Text>
+              <Text style={styles.emptyTitle}>{t('rentalHistory.emptyTitle')}</Text>
               <Text style={styles.emptySubtitle}>
-                Try a different search or switch the rental filter.
+                {t('rentalHistory.emptySubtitle')}
               </Text>
             </View>
           ) : null

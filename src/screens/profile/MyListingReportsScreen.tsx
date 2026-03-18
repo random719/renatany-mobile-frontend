@@ -5,28 +5,13 @@ import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from '
 import { ActivityIndicator, Surface, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
+import { useI18n } from '../../i18n';
 import * as listingService from '../../services/listingService';
 import { colors, typography } from '../../theme';
 
-const REASON_LABELS: Record<string, string> = {
-  fraud: 'Fraudulent Listing',
-  stolen_item: 'Suspected Stolen Item',
-  prohibited_item: 'Prohibited Item',
-  misleading: 'Misleading Description/Photos',
-  price_gouging: 'Price Gouging',
-  spam: 'Spam or Duplicate',
-  other: 'Other',
-};
-
-const STATUS_META: Record<string, { label: string; bg: string; text: string }> = {
-  pending: { label: 'Pending Review', bg: '#FEF3C7', text: '#92400E' },
-  investigating: { label: 'Investigating', bg: '#DBEAFE', text: '#1D4ED8' },
-  resolved: { label: 'Resolved', bg: '#DCFCE7', text: '#166534' },
-  dismissed: { label: 'Dismissed', bg: '#F1F5F9', text: '#475569' },
-};
-
 export const MyListingReportsScreen = () => {
   const navigation = useNavigation<any>();
+  const { t } = useI18n();
   const [reports, setReports] = useState<listingService.UserListingReport[]>([]);
   const [itemTitles, setItemTitles] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -84,49 +69,61 @@ export const MyListingReportsScreen = () => {
             <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
           <View style={styles.headerTextWrap}>
-            <Text style={styles.headerTitle}>My Listing Reports</Text>
-            <Text style={styles.headerSubtitle}>Track the reports you have submitted and their review status.</Text>
+            <Text style={styles.headerTitle}>{t('listingReports.title')}</Text>
+            <Text style={styles.headerSubtitle}>{t('listingReports.subtitle')}</Text>
           </View>
         </View>
 
         {isLoading ? (
           <View style={styles.loaderWrap}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loaderText}>Loading your reports...</Text>
+            <Text style={styles.loaderText}>{t('listingReports.loading')}</Text>
           </View>
         ) : reports.length === 0 ? (
           <Surface style={styles.emptyCard} elevation={0}>
-            <MaterialCommunityIcons name="shield-search-outline" size={46} color="#94A3B8" />
-            <Text style={styles.emptyTitle}>No listing reports yet</Text>
-            <Text style={styles.emptySubtitle}>
-              When you report a listing, it will appear here so you can follow the review status.
-            </Text>
+            <MaterialCommunityIcons name="shield-star-outline" size={46} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>{t('listingReports.emptyTitle')}</Text>
+            <Text style={styles.emptySubtitle}>{t('listingReports.emptySubtitle')}</Text>
           </Surface>
         ) : (
           <View style={styles.listWrap}>
             {reports.map((report) => {
-              const status = STATUS_META[report.status] || STATUS_META.pending;
+              const statusTone =
+                {
+                  pending: { bg: '#FEF3C7', text: '#92400E' },
+                  investigating: { bg: '#DBEAFE', text: '#1D4ED8' },
+                  resolved: { bg: '#DCFCE7', text: '#166534' },
+                  dismissed: { bg: '#F1F5F9', text: '#475569' },
+                }[report.status] || { bg: '#FEF3C7', text: '#92400E' };
+              const statusLabel =
+                t(`listingReports.status.${report.status}`) === `listingReports.status.${report.status}`
+                  ? report.status
+                  : t(`listingReports.status.${report.status}`);
+              const reasonLabel =
+                t(`listingReports.reasons.${report.reason}`) === `listingReports.reasons.${report.reason}`
+                  ? report.reason
+                  : t(`listingReports.reasons.${report.reason}`);
               return (
                 <Surface key={report.id} style={styles.reportCard} elevation={0}>
                   <View style={styles.reportTopRow}>
                     <View style={styles.reportTitleWrap}>
-                      <Text style={styles.reportTitle}>{itemTitles[report.item_id] || 'Listing'}</Text>
+                      <Text style={styles.reportTitle}>{itemTitles[report.item_id] || t('listingReports.listingFallback')}</Text>
                       <Text style={styles.reportDate}>
-                        Reported {new Date(report.created_date || report.created_at).toLocaleDateString('en-US', {
+                        {t('listingReports.reportedOn', { date: new Date(report.created_date || report.created_at).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric',
-                        })}
+                        }) })}
                       </Text>
                     </View>
-                    <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-                      <Text style={[styles.statusBadgeText, { color: status.text }]}>{status.label}</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: statusTone.bg }]}>
+                      <Text style={[styles.statusBadgeText, { color: statusTone.text }]}>{statusLabel}</Text>
                     </View>
                   </View>
 
                   <View style={styles.reasonRow}>
                     <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#8B5CF6" />
-                    <Text style={styles.reasonText}>{REASON_LABELS[report.reason] || report.reason}</Text>
+                    <Text style={styles.reasonText}>{reasonLabel}</Text>
                   </View>
 
                   <Text style={styles.descriptionText}>{report.description}</Text>
@@ -136,7 +133,9 @@ export const MyListingReportsScreen = () => {
                       <View style={styles.metaChip}>
                         <MaterialCommunityIcons name="paperclip" size={15} color="#475569" />
                         <Text style={styles.metaChipText}>
-                          {report.evidence_urls.length} evidence file{report.evidence_urls.length > 1 ? 's' : ''}
+                          {t(report.evidence_urls.length === 1 ? 'listingReports.evidenceCount' : 'listingReports.evidenceCount_plural', {
+                            count: report.evidence_urls.length,
+                          })}
                         </Text>
                       </View>
                     </View>
@@ -144,7 +143,7 @@ export const MyListingReportsScreen = () => {
 
                   {report.admin_notes ? (
                     <View style={styles.notesBox}>
-                      <Text style={styles.notesLabel}>Admin note</Text>
+                      <Text style={styles.notesLabel}>{t('listingReports.adminNote')}</Text>
                       <Text style={styles.notesText}>{report.admin_notes}</Text>
                     </View>
                   ) : null}
@@ -192,7 +191,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   headerTitle: {
-    fontSize: typography.h2,
+    fontSize: typography.pageTitle,
     fontWeight: '800',
     color: colors.textPrimary,
   },
@@ -220,7 +219,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   emptyTitle: {
-    fontSize: typography.h3,
+    fontSize: typography.sectionTitle,
     fontWeight: '800',
     color: colors.textPrimary,
   },
@@ -252,7 +251,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   reportTitle: {
-    fontSize: typography.h3,
+    fontSize: typography.sectionTitle,
     fontWeight: '800',
     color: colors.textPrimary,
   },

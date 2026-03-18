@@ -10,18 +10,26 @@ const interpolate = (template: string, params?: Record<string, string | number>)
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => String(params[key] ?? ''));
 };
 
+export const translate = (
+  language: SupportedLanguage,
+  key: string,
+  params?: Record<string, string | number>,
+) => {
+  const selected = getValue(translations[language], key);
+  const fallback = getValue(translations.en, key);
+  const value = selected ?? fallback ?? key;
+  return typeof value === 'string' ? interpolate(value, params) : value;
+};
+
+export const tNow = (key: string, params?: Record<string, string | number>) =>
+  translate(useLanguageStore.getState().language, key, params);
+
 export const useI18n = () => {
   const language = useLanguageStore((s) => s.language);
   const setLanguage = useLanguageStore((s) => s.setLanguage);
 
   const t = useMemo(
-    () =>
-      (key: string, params?: Record<string, string | number>) => {
-        const selected = getValue(translations[language], key);
-        const fallback = getValue(translations.en, key);
-        const value = selected ?? fallback ?? key;
-        return typeof value === 'string' ? interpolate(value, params) : value;
-      },
+    () => (key: string, params?: Record<string, string | number>) => translate(language, key, params),
     [language]
   );
 

@@ -7,6 +7,7 @@ import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Touchabl
 import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
 import { useUser } from '@clerk/expo';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
+import { useI18n } from '../../i18n';
 import { createDispute, getDisputeById } from '../../services/disputeService';
 import { api } from '../../services/api';
 import { uploadFile } from '../../services/listingService';
@@ -25,18 +26,13 @@ const STATUS_COLOR: Record<Dispute['status'], string> = {
   closed: '#6B7280',
 };
 
-const REASONS = [
-  { value: 'item_damaged', label: 'Item Was Damaged' },
-  { value: 'item_not_returned', label: 'Item Not Returned' },
-  { value: 'item_not_as_described', label: 'Item Not As Described' },
-  { value: 'payment_issue', label: 'Payment Issue' },
-  { value: 'other', label: 'Other' },
-];
+const REASONS = ['item_damaged', 'item_not_returned', 'item_not_as_described', 'payment_issue', 'other'] as const;
 
 export const DisputeDetailScreen = () => {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { disputeId } = route.params;
+  const { t } = useI18n();
   const { user: clerkUser } = useUser();
   const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress;
   const isNew = disputeId === 'new';
@@ -125,7 +121,7 @@ export const DisputeDetailScreen = () => {
   const getRentalLabel = (r: any) => {
     const id = r.id || r._id;
     const item = itemsMap[r.item_id];
-    const itemTitle = item?.title || 'Unknown item';
+    const itemTitle = item?.title || t('disputeDetail.unknownItem');
     const date = new Date(r.created_date || r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     return `${itemTitle} — ${date}`;
   };
@@ -151,7 +147,7 @@ export const DisputeDetailScreen = () => {
       );
       setEvidenceFiles((prev) => [...prev, ...uploaded]);
     } catch {
-      toast.error('Could not add evidence. Please try again.');
+      toast.error(t('disputeDetail.addEvidenceFailed'));
     } finally {
       setIsUploadingEvidence(false);
     }
@@ -163,11 +159,11 @@ export const DisputeDetailScreen = () => {
 
   const handleSubmit = async () => {
     if (!selectedRentalId || !reason || !description.trim()) {
-      toast.warning('Please select a rental, reason, and provide a description.');
+      toast.warning(t('disputeDetail.validation'));
       return;
     }
     if (!userEmail) {
-      toast.error('You must be logged in.');
+      toast.error(t('disputeDetail.loginRequired'));
       return;
     }
     setIsSubmitting(true);
@@ -180,9 +176,9 @@ export const DisputeDetailScreen = () => {
         description: description.trim(),
         evidence_urls: evidenceFiles.map((file) => file.uploadedUrl).filter(Boolean),
       });
-      toast.success('Your dispute has been submitted and our team will review it shortly.', () => navigation.goBack());
+      toast.success(t('disputeDetail.submitted'), () => navigation.goBack());
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.message || 'Failed to file dispute.';
+      const msg = err?.response?.data?.error || err?.message || t('disputeDetail.submitFailed');
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -215,7 +211,7 @@ export const DisputeDetailScreen = () => {
             <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text variant="titleLarge" style={styles.headerTitle}>
-            {isNew ? 'File a Dispute' : 'Dispute Details'}
+            {isNew ? t('disputeDetail.fileTitle') : t('disputeDetail.detailsTitle')}
           </Text>
         </View>
 
@@ -226,10 +222,8 @@ export const DisputeDetailScreen = () => {
                 <MaterialCommunityIcons name="alert-outline" size={22} color="#C2410C" />
               </View>
               <View style={styles.heroContent}>
-                <Text style={styles.heroTitle}>Tell us what went wrong</Text>
-                <Text style={styles.heroText}>
-                  Select the rental, explain the issue clearly, and attach photos if you have them. We&apos;ll notify the other party and review the case.
-                </Text>
+                <Text style={styles.heroTitle}>{t('disputeDetail.heroTitle')}</Text>
+                <Text style={styles.heroText}>{t('disputeDetail.heroText')}</Text>
               </View>
             </View>
 
@@ -237,8 +231,8 @@ export const DisputeDetailScreen = () => {
             <View style={styles.card} onLayout={(e) => { fieldPositions.current.rental = e.nativeEvent.layout.y; }}>
               <View style={styles.sectionHeaderRow}>
                 <View>
-                  <Text style={styles.sectionLabel}>Select Rental *</Text>
-                  <Text style={styles.sectionHint}>Only paid or completed rentals can be disputed.</Text>
+                  <Text style={styles.sectionLabel}>{t('disputeDetail.selectRental')}</Text>
+                  <Text style={styles.sectionHint}>{t('disputeDetail.rentalHint')}</Text>
                 </View>
                 <MaterialCommunityIcons name="calendar-check-outline" size={20} color="#64748B" />
               </View>
@@ -247,7 +241,7 @@ export const DisputeDetailScreen = () => {
               ) : rentalRequests.length === 0 ? (
                 <View style={styles.emptyRentalsBox}>
                   <MaterialCommunityIcons name="inbox-outline" size={28} color="#94A3B8" />
-                  <Text style={styles.emptyRentalsText}>No eligible rentals found. Only paid or completed rentals can be disputed.</Text>
+                  <Text style={styles.emptyRentalsText}>{t('disputeDetail.noEligibleRentals')}</Text>
                 </View>
               ) : (
                 <>
@@ -256,7 +250,7 @@ export const DisputeDetailScreen = () => {
                     onPress={() => setShowRentalPicker(!showRentalPicker)}
                   >
                     <Text style={selectedRentalId ? styles.reasonSelected : styles.reasonPlaceholder} numberOfLines={1}>
-                      {selectedRental ? getRentalLabel(selectedRental) : 'Select a rental'}
+                      {selectedRental ? getRentalLabel(selectedRental) : t('disputeDetail.selectRentalPlaceholder')}
                     </Text>
                     <MaterialCommunityIcons name={showRentalPicker ? 'chevron-up' : 'chevron-down'} size={20} color={colors.textSecondary} />
                   </TouchableOpacity>
@@ -275,7 +269,7 @@ export const DisputeDetailScreen = () => {
                                 {getRentalLabel(r)}
                               </Text>
                               <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
-                                {r.status} · {r.renter_email === userEmail ? `Owner: ${r.owner_email}` : `Renter: ${r.renter_email}`}
+                                {r.status} · {r.renter_email === userEmail ? t('disputeDetail.ownerLabel', { email: r.owner_email }) : t('disputeDetail.renterLabel', { email: r.renter_email })}
                               </Text>
                             </View>
                             {selectedRentalId === id && <MaterialCommunityIcons name="check" size={16} color={colors.primary} />}
@@ -293,7 +287,7 @@ export const DisputeDetailScreen = () => {
                       <MaterialCommunityIcons name="cube-outline" size={18} color="#1D4ED8" />
                     </View>
                     <View style={styles.selectedRentalContent}>
-                      <Text style={styles.selectedRentalTitle}>{itemsMap[selectedRental.item_id]?.title || 'Selected rental'}</Text>
+                      <Text style={styles.selectedRentalTitle}>{itemsMap[selectedRental.item_id]?.title || t('disputeDetail.selectedRental')}</Text>
                       <Text style={styles.selectedRentalMeta}>
                         {selectedRental.status.toUpperCase()} · {new Date(selectedRental.start_date || selectedRental.created_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         {selectedRental.end_date ? ` - ${new Date(selectedRental.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
@@ -301,7 +295,7 @@ export const DisputeDetailScreen = () => {
                     </View>
                   </View>
                   <View style={styles.againstInfoBox}>
-                    <Text style={styles.againstInfoLabel}>Dispute against</Text>
+                    <Text style={styles.againstInfoLabel}>{t('disputeDetail.disputeAgainst')}</Text>
                     <Text style={styles.againstInfoValue}>{againstEmail}</Text>
                   </View>
                 </View>
@@ -311,8 +305,8 @@ export const DisputeDetailScreen = () => {
             <View style={styles.card}>
               <View style={styles.sectionHeaderRow}>
                 <View>
-                  <Text style={styles.sectionLabel}>Reason *</Text>
-                  <Text style={styles.sectionHint}>Choose the option that best describes the problem.</Text>
+                  <Text style={styles.sectionLabel}>{t('disputeDetail.reasonLabel')}</Text>
+                  <Text style={styles.sectionHint}>{t('disputeDetail.reasonHint')}</Text>
                 </View>
                 <MaterialCommunityIcons name="format-list-bulleted" size={20} color="#64748B" />
               </View>
@@ -321,7 +315,7 @@ export const DisputeDetailScreen = () => {
                 onPress={() => setShowReasonPicker(!showReasonPicker)}
               >
                 <Text style={reason ? styles.reasonSelected : styles.reasonPlaceholder}>
-                  {REASONS.find(r => r.value === reason)?.label || 'Select a reason'}
+                  {reason ? t(`disputeDetail.reasons.${reason}`) : t('disputeDetail.reasonPlaceholder')}
                 </Text>
                 <MaterialCommunityIcons
                   name={showReasonPicker ? 'chevron-up' : 'chevron-down'}
@@ -333,14 +327,14 @@ export const DisputeDetailScreen = () => {
                 <View style={styles.reasonList}>
                   {REASONS.map((r) => (
                     <TouchableOpacity
-                      key={r.value}
-                      style={[styles.reasonItem, reason === r.value && styles.reasonItemActive]}
-                      onPress={() => { setReason(r.value); setShowReasonPicker(false); }}
+                      key={r}
+                      style={[styles.reasonItem, reason === r && styles.reasonItemActive]}
+                      onPress={() => { setReason(r); setShowReasonPicker(false); }}
                     >
-                      <Text style={[styles.reasonItemText, reason === r.value && styles.reasonItemTextActive]}>
-                        {r.label}
+                      <Text style={[styles.reasonItemText, reason === r && styles.reasonItemTextActive]}>
+                        {t(`disputeDetail.reasons.${r}`)}
                       </Text>
-                      {reason === r.value && <MaterialCommunityIcons name="check" size={16} color={colors.primary} />}
+                      {reason === r && <MaterialCommunityIcons name="check" size={16} color={colors.primary} />}
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -350,8 +344,8 @@ export const DisputeDetailScreen = () => {
             <View style={styles.card} onLayout={(e) => { fieldPositions.current.description = e.nativeEvent.layout.y; }}>
               <View style={styles.sectionHeaderRow}>
                 <View>
-                  <Text style={styles.sectionLabel}>Description *</Text>
-                  <Text style={styles.sectionHint}>Share the timeline, what happened, and what outcome you expect.</Text>
+                  <Text style={styles.sectionLabel}>{t('disputeDetail.descriptionLabel')}</Text>
+                  <Text style={styles.sectionHint}>{t('disputeDetail.descriptionHint')}</Text>
                 </View>
                 <MaterialCommunityIcons name="text-box-outline" size={20} color="#64748B" />
               </View>
@@ -359,7 +353,7 @@ export const DisputeDetailScreen = () => {
                 value={description}
                 onChangeText={setDescription}
                 mode="outlined"
-                placeholder="Please provide detailed information about the issue..."
+                placeholder={t('disputeDetail.descriptionPlaceholder')}
                 multiline
                 numberOfLines={6}
                 style={styles.input}
@@ -370,8 +364,8 @@ export const DisputeDetailScreen = () => {
             <View style={styles.card}>
               <View style={styles.sectionHeaderRow}>
                 <View>
-                  <Text style={styles.sectionLabel}>Additional Evidence</Text>
-                  <Text style={styles.sectionHint}>Upload photos that support your dispute. This is optional but recommended.</Text>
+                  <Text style={styles.sectionLabel}>{t('disputeDetail.additionalEvidence')}</Text>
+                  <Text style={styles.sectionHint}>{t('disputeDetail.additionalEvidenceHint')}</Text>
                 </View>
                 <MaterialCommunityIcons name="image-multiple-outline" size={20} color="#64748B" />
               </View>
@@ -387,7 +381,7 @@ export const DisputeDetailScreen = () => {
                   <MaterialCommunityIcons name="upload-outline" size={18} color={colors.primary} />
                 )}
                 <Text style={styles.uploadButtonText}>
-                  {isUploadingEvidence ? 'Uploading...' : 'Add Evidence'}
+                  {isUploadingEvidence ? t('disputeDetail.uploading') : t('disputeDetail.addEvidence')}
                 </Text>
               </TouchableOpacity>
 
@@ -405,7 +399,7 @@ export const DisputeDetailScreen = () => {
               ) : (
                 <View style={styles.emptyEvidenceBox}>
                   <MaterialCommunityIcons name="image-off-outline" size={24} color="#94A3B8" />
-                  <Text style={styles.emptyEvidenceText}>No evidence added yet.</Text>
+                  <Text style={styles.emptyEvidenceText}>{t('disputeDetail.noEvidence')}</Text>
                 </View>
               )}
             </View>
@@ -413,7 +407,7 @@ export const DisputeDetailScreen = () => {
             <View style={styles.noteCard}>
               <MaterialCommunityIcons name="information-outline" size={18} color="#C2410C" />
               <Text style={styles.noteText}>
-                Filing a dispute notifies the other party and the admin team. Please include clear details and any relevant evidence.
+                {t('disputeDetail.infoNote')}
               </Text>
             </View>
 
@@ -427,7 +421,7 @@ export const DisputeDetailScreen = () => {
               contentStyle={styles.submitBtnContent}
               icon="flag-outline"
             >
-              Submit Dispute
+              {t('disputeDetail.submit')}
             </Button>
           </>
         ) : dispute ? (
@@ -448,32 +442,32 @@ export const DisputeDetailScreen = () => {
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.sectionLabel}>Details</Text>
-              <InfoRow label="Rental ID" value={dispute.rental_request_id} />
-              <InfoRow label="Filed by" value={dispute.filed_by_email} />
-              <InfoRow label="Against" value={dispute.against_email} />
-              <InfoRow label="Reason" value={REASONS.find(r => r.value === dispute.reason)?.label || dispute.reason.replace(/_/g, ' ')} />
+              <Text style={styles.sectionLabel}>{t('disputeDetail.details')}</Text>
+              <InfoRow label={t('disputeDetail.rentalId')} value={dispute.rental_request_id} />
+              <InfoRow label={t('disputeDetail.filedBy')} value={dispute.filed_by_email} />
+              <InfoRow label={t('disputeDetail.against')} value={dispute.against_email} />
+              <InfoRow label={t('disputeDetail.reason')} value={t(`disputeDetail.reasons.${dispute.reason}`)} />
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.sectionLabel}>Description</Text>
+              <Text style={styles.sectionLabel}>{t('disputeDetail.description')}</Text>
               <Text style={styles.descText}>{dispute.description}</Text>
             </View>
 
             {dispute.decision && (
               <View style={styles.card}>
-                <Text style={styles.sectionLabel}>Resolution</Text>
-                <InfoRow label="Decision" value={dispute.decision.replace(/_/g, ' ')} />
+                <Text style={styles.sectionLabel}>{t('disputeDetail.resolution')}</Text>
+                <InfoRow label={t('disputeDetail.decision')} value={dispute.decision.replace(/_/g, ' ')} />
                 {dispute.resolution && <Text style={styles.descText}>{dispute.resolution}</Text>}
                 {dispute.refund_to_renter !== undefined && (
-                  <InfoRow label="Refund to renter" value={`$${dispute.refund_to_renter?.toFixed(2)}`} />
+                  <InfoRow label={t('disputeDetail.refundToRenter')} value={`$${dispute.refund_to_renter?.toFixed(2)}`} />
                 )}
               </View>
             )}
 
             {dispute.admin_notes && (
               <View style={[styles.card, styles.adminCard]}>
-                <Text style={styles.sectionLabel}>Admin Notes</Text>
+                <Text style={styles.sectionLabel}>{t('disputeDetail.adminNotes')}</Text>
                 <Text style={styles.descText}>{dispute.admin_notes}</Text>
               </View>
             )}
@@ -484,12 +478,12 @@ export const DisputeDetailScreen = () => {
               style={styles.closeBtn}
               contentStyle={styles.submitBtnContent}
             >
-              Close
+              {t('disputeDetail.close')}
             </Button>
           </>
         ) : (
           <View style={styles.centered}>
-            <Text style={styles.notFoundText}>Dispute not found.</Text>
+            <Text style={styles.notFoundText}>{t('disputeDetail.notFound')}</Text>
           </View>
         )}
       </ScrollView>

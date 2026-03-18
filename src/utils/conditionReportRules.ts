@@ -1,3 +1,4 @@
+import { tNow } from '../i18n';
 import { ConditionReport, RentalRequest } from '../types/models';
 
 const PICKUP_REPORT_START_HOURS_BEFORE = 2;
@@ -60,22 +61,22 @@ export const getConditionReportRules = (
 
   let pickupStatusMessage: string | undefined;
   if (rental.status !== 'paid' && !userPickupReport) {
-    pickupStatusMessage = 'Pickup reports are only available while the rental is in paid status.';
+    pickupStatusMessage = tNow('conditionRules.pickupPaidOnly');
   } else if (!userPickupReport && hoursSinceStart < -PICKUP_REPORT_START_HOURS_BEFORE) {
-    pickupStatusMessage = 'Pickup reports open 2 hours before the rental start time.';
+    pickupStatusMessage = tNow('conditionRules.pickupOpensBefore', { hours: PICKUP_REPORT_START_HOURS_BEFORE });
   } else if (!userPickupReport && isPickupWindowPassed) {
-    pickupStatusMessage = 'The pickup report window closed 2 hours after the rental start time.';
+    pickupStatusMessage = tNow('conditionRules.pickupClosedAfter', { hours: PICKUP_REPORT_END_HOURS_AFTER });
   }
 
   let returnStatusMessage: string | undefined;
   if (rental.status !== 'paid' && !userReturnReport) {
-    returnStatusMessage = 'Return reports are only available while the rental is in paid status.';
+    returnStatusMessage = tNow('conditionRules.returnPaidOnly');
   } else if (!userReturnReport && !hasAllPickupReports) {
-    returnStatusMessage = 'Both pickup reports must be submitted before return reports can be created.';
+    returnStatusMessage = tNow('conditionRules.returnNeedsPickup');
   } else if (!userReturnReport && hoursSinceEnd < 0) {
-    returnStatusMessage = 'Return reports can only be submitted after the rental end time.';
+    returnStatusMessage = tNow('conditionRules.returnAfterEnd');
   } else if (!userReturnReport && isReturnDeadlinePassed) {
-    returnStatusMessage = 'The return report deadline passed 3 hours after the rental end time.';
+    returnStatusMessage = tNow('conditionRules.returnDeadlinePassed', { hours: RETURN_REPORT_DEADLINE_HOURS_AFTER });
   }
 
   return {

@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
+import { useI18n } from '../../i18n';
 import { getConditionReports } from '../../services/conditionReportService';
 import { getMessages, sendMessage } from '../../services/messageService';
 import { createCheckoutSession, releaseRentalPayment, syncPaymentStatus } from '../../services/paymentService';
@@ -100,6 +101,7 @@ const bubbleStyles = StyleSheet.create({
 export const ChatScreen = () => {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
+  const { t } = useI18n();
   const { rentalRequestId, otherUserEmail } = route.params;
 
   const { user: clerkUser } = useUser();
@@ -224,7 +226,7 @@ export const ChatScreen = () => {
             await sendSystemNote(options.systemMessage);
             await loadChatData(true);
           } catch (error: any) {
-            toast.error(error?.response?.data?.error || error?.message || 'Action failed. Please try again.');
+            toast.error(error?.response?.data?.error || error?.message || t('chat.actionFailed'));
           } finally {
             setIsUpdatingStatus(false);
           }
@@ -244,13 +246,13 @@ export const ChatScreen = () => {
       const checkoutUrl = response.url || response.checkout_url;
       const checkoutSessionId = response.session_id;
       if (!checkoutUrl) {
-        throw new Error('No checkout URL received.');
+        throw new Error(t('chat.paymentFailed'));
       }
 
       const authResult = await WebBrowser.openAuthSessionAsync(checkoutUrl, nativeCheckoutCallback);
 
       if (authResult.type === 'cancel') {
-        toast.warning('Checkout was cancelled before payment completed.');
+        toast.warning(t('chat.checkoutCancelled'));
         return;
       }
 
@@ -280,13 +282,13 @@ export const ChatScreen = () => {
 
       const updatedRental = await refreshRentalUntilSettled();
       if (updatedRental?.status === 'paid' || updatedRental?.status === 'completed') {
-        await sendSystemNote('Payment received. This rental is now confirmed and active.');
-        toast.success('Your rental payment was submitted successfully.');
+        await sendSystemNote(t('chat.paymentReceivedNote'));
+        toast.success(t('chat.paymentSubmitted'));
       } else {
-        toast.info('Payment submitted. We are still waiting for confirmation. Pull to refresh or reopen this chat in a moment.');
+        toast.info(t('chat.paymentPending'));
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || error?.message || 'Payment failed. Please try again.');
+      toast.error(error?.response?.data?.error || error?.message || t('chat.paymentFailed'));
     } finally {
       setIsProcessingPayment(false);
       await loadChatData(true);
@@ -296,21 +298,21 @@ export const ChatScreen = () => {
   const handleRelease = useCallback(async () => {
     if (!rental) return;
     Alert.alert(
-      'Complete rental',
-      'This will release payment to the owner and mark the rental as completed once backend checks pass.',
+      t('chat.completeTitle'),
+      t('chat.completePrompt'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Complete',
+          text: t('chat.complete'),
           onPress: async () => {
             setIsUpdatingStatus(true);
             try {
               await releaseRentalPayment(rental.id);
-              await sendSystemNote('Payment released. This rental is now completed.');
+              await sendSystemNote(t('chat.paymentReleasedNote'));
               await loadChatData(true);
-              toast.success('Rental completed. Payment was released successfully.');
+              toast.success(t('chat.rentalCompleted'));
             } catch (error: any) {
-              toast.error(error?.response?.data?.error || error?.message || 'Unable to complete rental. Please try again later.');
+              toast.error(error?.response?.data?.error || error?.message || t('chat.rentalCompleteFailed'));
             } finally {
               setIsUpdatingStatus(false);
             }
@@ -336,18 +338,18 @@ export const ChatScreen = () => {
   const statusTone = useMemo(() => {
     switch (rental?.status) {
       case 'approved':
-        return { bg: '#DBEAFE', text: '#1D4ED8', label: 'Approved' };
+        return { bg: '#DBEAFE', text: '#1D4ED8', label: t('conversations.status.approved') };
       case 'paid':
-        return { bg: '#F3E8FF', text: '#7C3AED', label: 'Paid' };
+        return { bg: '#F3E8FF', text: '#7C3AED', label: t('conversations.status.paid') };
       case 'completed':
-        return { bg: '#DCFCE7', text: '#15803D', label: 'Completed' };
+        return { bg: '#DCFCE7', text: '#15803D', label: t('conversations.status.completed') };
       case 'declined':
       case 'rejected':
         return { bg: '#FEE2E2', text: '#B91C1C', label: rental.status };
       case 'cancelled':
-        return { bg: '#F1F5F9', text: '#64748B', label: 'Cancelled' };
+        return { bg: '#F1F5F9', text: '#64748B', label: t('conversations.status.cancelled') };
       default:
-        return { bg: '#FEF3C7', text: '#B45309', label: rental?.status || 'Loading' };
+        return { bg: '#FEF3C7', text: '#B45309', label: rental?.status || t('common.loading') };
     }
   }, [rental?.status]);
 
@@ -385,26 +387,26 @@ export const ChatScreen = () => {
                 <TouchableOpacity
                   style={[styles.actionButton, styles.primaryAction]}
                   onPress={() => handleStatusAction('approved', {
-                    title: 'Approve request',
-                    message: 'Approving will let the renter proceed to payment.',
-                    systemMessage: 'Request approved. The renter can now proceed with payment.',
+                    title: t('chat.approveTitle'),
+                    message: t('chat.approvePrompt'),
+                    systemMessage: t('chat.approveSystem'),
                   })}
                   disabled={isUpdatingStatus}
                 >
                   <MaterialCommunityIcons name="check" size={18} color="#FFFFFF" />
-                  <Text style={styles.primaryActionText}>Approve</Text>
+                  <Text style={styles.primaryActionText}>{t('chat.approve')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionButton, styles.secondaryDangerAction]}
                   onPress={() => handleStatusAction('declined', {
-                    title: 'Decline request',
-                    message: 'This request will be declined for the renter.',
-                    systemMessage: 'Request declined.',
+                    title: t('chat.declineTitle'),
+                    message: t('chat.declinePrompt'),
+                    systemMessage: t('chat.declineSystem'),
                   })}
                   disabled={isUpdatingStatus}
                 >
                   <MaterialCommunityIcons name="close" size={18} color="#B91C1C" />
-                  <Text style={styles.secondaryDangerText}>Decline</Text>
+                  <Text style={styles.secondaryDangerText}>{t('chat.decline')}</Text>
                 </TouchableOpacity>
               </>
             ) : null}
@@ -420,7 +422,7 @@ export const ChatScreen = () => {
                   <MaterialCommunityIcons name="credit-card-outline" size={18} color="#FFFFFF" />
                 )}
                 <Text style={styles.primaryActionText}>
-                  {isProcessingPayment ? 'Opening checkout...' : 'Pay now'}
+                  {isProcessingPayment ? t('chat.openingCheckout') : t('chat.payNow')}
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -428,14 +430,14 @@ export const ChatScreen = () => {
               <TouchableOpacity
                 style={[styles.actionButton, styles.secondaryAction]}
                 onPress={() => handleStatusAction('cancelled', {
-                  title: 'Cancel request',
-                  message: 'This rental request will be cancelled.',
-                  systemMessage: 'Rental request cancelled by renter.',
+                  title: t('chat.cancelTitle'),
+                  message: t('chat.cancelPrompt'),
+                  systemMessage: t('chat.cancelSystem'),
                 })}
                 disabled={isUpdatingStatus}
               >
                 <MaterialCommunityIcons name="close-circle-outline" size={18} color="#475569" />
-                <Text style={styles.secondaryActionText}>Cancel</Text>
+                <Text style={styles.secondaryActionText}>{t('chat.cancel')}</Text>
               </TouchableOpacity>
             ) : null}
             {canCompleteRental ? (
@@ -445,22 +447,22 @@ export const ChatScreen = () => {
                 disabled={isUpdatingStatus}
               >
                 <MaterialCommunityIcons name="cash-check" size={18} color="#FFFFFF" />
-                <Text style={styles.primaryActionText}>Complete rental</Text>
+                <Text style={styles.primaryActionText}>{t('chat.complete')}</Text>
               </TouchableOpacity>
             ) : null}
           </View>
         ) : null}
         {rental.status === 'approved' && isRenter ? (
-          <Text style={styles.statusHint}>Owner approved this request. Complete payment to activate the rental.</Text>
+          <Text style={styles.statusHint}>{t('chat.approvedHint')}</Text>
         ) : null}
         {rental.status === 'paid' ? (
           <>
             <View style={styles.reportMeta}>
               <Text style={styles.reportMetaText}>
-                Pickup reports: {reportRules?.pickupReports.length || 0}/2
+                {t('chat.pickupReports', { count: reportRules?.pickupReports.length || 0 })}
               </Text>
               <Text style={styles.reportMetaText}>
-                Return reports: {reportRules?.returnReports.length || 0}/2
+                {t('chat.returnReports', { count: reportRules?.returnReports.length || 0 })}
               </Text>
             </View>
             <View style={styles.reportActionRow}>
@@ -479,7 +481,7 @@ export const ChatScreen = () => {
               >
                 <MaterialCommunityIcons name="clipboard-check-outline" size={18} color="#1F2937" />
                 <Text style={styles.reportActionText}>
-                  {reportRules?.userPickupReport ? 'View Pickup Report' : 'Pickup Report'}
+                  {reportRules?.userPickupReport ? t('chat.viewPickupReport') : t('chat.pickupReport')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -497,14 +499,14 @@ export const ChatScreen = () => {
               >
                 <MaterialCommunityIcons name="clipboard-arrow-left-outline" size={18} color="#1F2937" />
                 <Text style={styles.reportActionText}>
-                  {reportRules?.userReturnReport ? 'View Return Report' : 'Return Report'}
+                  {reportRules?.userReturnReport ? t('chat.viewReturnReport') : t('chat.returnReport')}
                 </Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.statusHint}>
               {canCompleteRental
-                ? 'Payment is confirmed and all condition report checks have passed. The owner can complete the rental.'
-                : 'Payment is confirmed. Completion unlocks only after the rental end time and both pickup and return reports are submitted.'}
+                ? t('chat.completionReady')
+                : t('chat.completionWaiting')}
             </Text>
             {!reportRules?.canCreatePickupReport && !reportRules?.userPickupReport && reportRules?.pickupStatusMessage ? (
               <Text style={styles.statusHint}>{reportRules.pickupStatusMessage}</Text>
@@ -555,7 +557,7 @@ export const ChatScreen = () => {
         </TouchableOpacity>
         <View style={styles.chatHeaderInfo}>
           <Text style={styles.chatTitle} numberOfLines={1}>{otherUserEmail}</Text>
-          <Text style={styles.chatSub}>Rental Request Chat</Text>
+          <Text style={styles.chatSub}>{t('chat.title')}</Text>
         </View>
         <TouchableOpacity onPress={() => loadChatData(false)} style={styles.refreshBtn}>
           <MaterialCommunityIcons name="refresh" size={20} color={colors.textSecondary} />
@@ -589,7 +591,7 @@ export const ChatScreen = () => {
               ListEmptyComponent={
                 <View style={styles.emptyState}>
                   <MaterialCommunityIcons name="chat-outline" size={56} color="#CBD5E1" />
-                  <Text style={styles.emptyText}>No messages yet. Start the conversation!</Text>
+                  <Text style={styles.emptyText}>{t('chat.empty')}</Text>
                 </View>
               }
             />
@@ -601,7 +603,7 @@ export const ChatScreen = () => {
             style={styles.input}
             value={inputText}
             onChangeText={setInputText}
-            placeholder="Type a message..."
+            placeholder={t('chat.inputPlaceholder')}
             placeholderTextColor="#94A3B8"
             multiline
             returnKeyType="default"

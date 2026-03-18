@@ -14,6 +14,7 @@ import { ActivityIndicator, Button, Text } from 'react-native-paper';
 import { useUser } from '@clerk/expo';
 import * as ImagePicker from 'expo-image-picker';
 import { ScreenLayout } from '../../components/common/ScreenLayout';
+import { useI18n } from '../../i18n';
 import { getDisputes } from '../../services/disputeService';
 import { api } from '../../services/api';
 import { colors, typography } from '../../theme';
@@ -51,6 +52,7 @@ interface UserInfo {
 
 export const DisputesScreen = () => {
     const navigation = useNavigation<Nav>();
+    const { t } = useI18n();
     const { user: clerkUser } = useUser();
     const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress;
 
@@ -171,7 +173,7 @@ export const DisputesScreen = () => {
             }
             setNewEvidenceUrls((prev) => [...prev, ...uploadedUrls]);
         } catch {
-            toast.error('Failed to upload images.');
+            toast.error(t('disputes.failedUpload'));
         } finally {
             setIsUploading(false);
         }
@@ -186,10 +188,10 @@ export const DisputesScreen = () => {
             setShowEvidenceModal(false);
             setNewEvidenceUrls([]);
             setSelectedDispute(null);
-            toast.success('Evidence added successfully!');
+            toast.success(t('disputes.evidenceAdded'));
             await loadData();
         } catch {
-            toast.error('Failed to add evidence.');
+            toast.error(t('disputes.evidenceAddFailed'));
         } finally {
             setIsUploading(false);
         }
@@ -201,7 +203,7 @@ export const DisputesScreen = () => {
             const item = items[req.item_id];
             if (item) return item.title;
         }
-        return 'Item not found';
+        return t('disputes.itemNotFound');
     };
 
     const getOtherUser = (dispute: Dispute, type: 'filed' | 'against') => {
@@ -229,14 +231,14 @@ export const DisputesScreen = () => {
                     </View>
                     <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg, borderColor: statusStyle.border }]}>
                         <Text style={[styles.statusText, { color: statusStyle.text }]}>
-                            {dispute.status.replace('_', ' ')}
+                            {t(`disputes.status.${dispute.status}`)}
                         </Text>
                     </View>
                 </View>
 
                 {/* Reason + Description */}
                 <View style={styles.reasonBox}>
-                    <Text style={styles.reasonLabel}>Reason: {dispute.reason.replace(/_/g, ' ')}</Text>
+                    <Text style={styles.reasonLabel}>{t('disputes.reason', { value: dispute.reason.replace(/_/g, ' ') })}</Text>
                     <Text style={styles.reasonDesc} numberOfLines={3}>{dispute.description}</Text>
                 </View>
 
@@ -246,14 +248,14 @@ export const DisputesScreen = () => {
                     onPress={() => navigation.navigate('DisputeDetail', { disputeId: dispute.id })}
                 >
                     <MaterialCommunityIcons name="file-document-outline" size={16} color="#1D4ED8" />
-                    <Text style={styles.viewDetailsBtnText}>View Details</Text>
+                    <Text style={styles.viewDetailsBtnText}>{t('disputes.viewDetails')}</Text>
                 </TouchableOpacity>
 
                 {/* Evidence images */}
                 {dispute.evidence_urls && dispute.evidence_urls.length > 0 && (
                     <View style={styles.evidenceSection}>
                         <View style={styles.evidenceHeader}>
-                            <Text style={styles.evidenceLabel}>Evidence ({dispute.evidence_urls.length}):</Text>
+                            <Text style={styles.evidenceLabel}>{t('disputes.evidence', { count: dispute.evidence_urls.length })}</Text>
                             {type === 'filed' && dispute.status === 'open' && (
                                 <TouchableOpacity
                                     style={styles.addMoreBtn}
@@ -264,7 +266,7 @@ export const DisputesScreen = () => {
                                     }}
                                 >
                                     <MaterialCommunityIcons name="plus" size={14} color="#6366F1" />
-                                    <Text style={styles.addMoreText}>Add More</Text>
+                                    <Text style={styles.addMoreText}>{t('disputes.addMore')}</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -289,24 +291,24 @@ export const DisputesScreen = () => {
                         }}
                     >
                         <MaterialCommunityIcons name="camera-plus-outline" size={16} color="#6366F1" />
-                        <Text style={styles.addMoreText}>Add Evidence</Text>
+                        <Text style={styles.addMoreText}>{t('disputes.addEvidence')}</Text>
                     </TouchableOpacity>
                 )}
 
                 {/* Resolution */}
                 {dispute.resolution && (
                     <View style={styles.resolutionBox}>
-                        <Text style={styles.resolutionLabel}>Resolution:</Text>
+                        <Text style={styles.resolutionLabel}>{t('disputes.resolution')}</Text>
                         <Text style={styles.resolutionText}>{dispute.resolution}</Text>
                     </View>
                 )}
 
                 {/* Footer: date + other user */}
                 <View style={styles.disputeFooter}>
-                    <Text style={styles.disputeDate}>Filed {formatDate(dispute.created_date)}</Text>
+                    <Text style={styles.disputeDate}>{t('disputes.filedOn', { date: formatDate(dispute.created_date) })}</Text>
                     {otherUser && (
                         <View style={styles.otherUserRow}>
-                            <Text style={styles.otherUserLabel}>{type === 'filed' ? 'Against:' : 'From:'}</Text>
+                            <Text style={styles.otherUserLabel}>{type === 'filed' ? t('disputes.against') : t('disputes.from')}</Text>
                             <MaterialCommunityIcons name="account" size={14} color="#0F172A" />
                             <Text style={styles.otherUserName}>
                                 {otherUser.username ? `@${otherUser.username}` : otherUser.full_name || otherUser.email}
@@ -324,21 +326,21 @@ export const DisputesScreen = () => {
                 <View style={styles.contentWrapper}>
                     <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
                         <MaterialCommunityIcons name="arrow-left" size={20} color="#475569" />
-                        <Text style={styles.backBtnText}>Back</Text>
+                        <Text style={styles.backBtnText}>{t('common.back')}</Text>
                     </TouchableOpacity>
 
                     <View style={styles.titleRow}>
                         <MaterialCommunityIcons name="alert-decagram-outline" size={32} color="#EF4444" />
-                        <Text style={styles.title}>Disputes</Text>
+                        <Text style={styles.title}>{t('disputes.title')}</Text>
                     </View>
-                    <Text style={styles.subtitle}>Manage rental disputes and resolutions</Text>
+                    <Text style={styles.subtitle}>{t('disputes.subtitle')}</Text>
 
                     <TouchableOpacity
                         style={styles.fileBtn}
                         onPress={() => navigation.navigate('DisputeDetail', { disputeId: 'new' })}
                     >
                         <MaterialCommunityIcons name="plus" size={16} color="#FFFFFF" />
-                        <Text style={styles.fileBtnText}>File Dispute</Text>
+                        <Text style={styles.fileBtnText}>{t('disputes.fileDispute')}</Text>
                     </TouchableOpacity>
 
                     <View>
@@ -348,14 +350,14 @@ export const DisputesScreen = () => {
                             onPress={() => setActiveTab('filed')}
                         >
                             <MaterialCommunityIcons name="file-document-outline" size={18} color={activeTab === 'filed' ? '#1E293B' : '#64748B'} />
-                            <Text style={activeTab === 'filed' ? styles.activeTabText : styles.tabText}>Filed by Me ({filedByMe.length})</Text>
+                            <Text style={activeTab === 'filed' ? styles.activeTabText : styles.tabText}>{t('disputes.filedByMe', { count: filedByMe.length })}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.tab, activeTab === 'against' && styles.activeTab]}
                             onPress={() => setActiveTab('against')}
                         >
                             <MaterialCommunityIcons name="comment-alert-outline" size={18} color={activeTab === 'against' ? '#1E293B' : '#64748B'} />
-                            <Text style={activeTab === 'against' ? styles.activeTabText : styles.tabText}>Against Me ({againstMe.length})</Text>
+                            <Text style={activeTab === 'against' ? styles.activeTabText : styles.tabText}>{t('disputes.againstMe', { count: againstMe.length })}</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -367,10 +369,10 @@ export const DisputesScreen = () => {
                         <View style={styles.emptyCard}>
                             <MaterialCommunityIcons name="alert-circle-outline" size={56} color="#CBD5E1" />
                             <Text style={styles.emptyTitle}>
-                                {activeTab === 'filed' ? 'No disputes filed' : 'No disputes received'}
+                                {activeTab === 'filed' ? t('disputes.emptyFiledTitle') : t('disputes.emptyAgainstTitle')}
                             </Text>
                             <Text style={styles.emptySubtitle}>
-                                {activeTab === 'filed' ? "You haven't filed any disputes" : 'No one has filed a dispute against you'}
+                                {activeTab === 'filed' ? t('disputes.emptyFiledSubtitle') : t('disputes.emptyAgainstSubtitle')}
                             </Text>
                         </View>
                     ) : (
@@ -387,23 +389,23 @@ export const DisputesScreen = () => {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Add More Evidence</Text>
+                            <Text style={styles.modalTitle}>{t('disputes.addMoreEvidence')}</Text>
                             <TouchableOpacity onPress={() => { setShowEvidenceModal(false); setNewEvidenceUrls([]); setSelectedDispute(null); }}>
                                 <MaterialCommunityIcons name="close" size={24} color="#64748B" />
                             </TouchableOpacity>
                         </View>
                         <Text style={styles.modalDesc}>
-                            Upload additional evidence to support your dispute. This will be reviewed by the admin team.
+                            {t('disputes.modalDescription')}
                         </Text>
 
                         <TouchableOpacity style={styles.pickBtn} onPress={handlePickEvidence} disabled={isUploading}>
                             <MaterialCommunityIcons name="upload" size={18} color="#475569" />
-                            <Text style={styles.pickBtnText}>{isUploading ? 'Uploading...' : 'Select Images'}</Text>
+                            <Text style={styles.pickBtnText}>{isUploading ? t('disputes.uploading') : t('disputes.selectImages')}</Text>
                         </TouchableOpacity>
 
                         {newEvidenceUrls.length > 0 && (
                             <View>
-                                <Text style={styles.evidenceCountText}>{newEvidenceUrls.length} file(s) ready:</Text>
+                                <Text style={styles.evidenceCountText}>{t('disputes.filesReady', { count: newEvidenceUrls.length })}</Text>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
                                     {newEvidenceUrls.map((url, idx) => (
                                         <Image key={idx} source={{ uri: url }} style={styles.evidencePreview} />
@@ -419,7 +421,7 @@ export const DisputesScreen = () => {
                                 disabled={isUploading}
                                 style={styles.modalCancelBtn}
                             >
-                                Cancel
+                                {t('common.cancel')}
                             </Button>
                             <Button
                                 mode="contained"
@@ -428,7 +430,7 @@ export const DisputesScreen = () => {
                                 loading={isUploading}
                                 style={styles.modalSubmitBtn}
                             >
-                                Add Evidence
+                                {t('disputes.addEvidence')}
                             </Button>
                         </View>
                     </View>
