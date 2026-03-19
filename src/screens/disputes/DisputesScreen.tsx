@@ -52,9 +52,10 @@ interface UserInfo {
 
 export const DisputesScreen = () => {
     const navigation = useNavigation<Nav>();
-    const { t } = useI18n();
+    const { language, t } = useI18n();
     const { user: clerkUser } = useUser();
     const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress;
+    const locale = language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
 
     const [disputes, setDisputes] = useState<Dispute[]>([]);
     const [items, setItems] = useState<Record<string, ItemInfo>>({});
@@ -213,7 +214,7 @@ export const DisputesScreen = () => {
 
     const formatDate = (dateStr: string) => {
         const d = new Date(dateStr);
-        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
     };
 
     const renderDisputeCard = (dispute: Dispute, type: 'filed' | 'against') => {

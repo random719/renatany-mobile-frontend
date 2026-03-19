@@ -32,10 +32,11 @@ export const DisputeDetailScreen = () => {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { disputeId } = route.params;
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const { user: clerkUser } = useUser();
   const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress;
   const isNew = disputeId === 'new';
+  const locale = language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
 
   const [dispute, setDispute] = useState<Dispute | null>(null);
   const [isLoading, setIsLoading] = useState(!isNew);
@@ -122,7 +123,7 @@ export const DisputeDetailScreen = () => {
     const id = r.id || r._id;
     const item = itemsMap[r.item_id];
     const itemTitle = item?.title || t('disputeDetail.unknownItem');
-    const date = new Date(r.created_date || r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const date = new Date(r.created_date || r.created_at).toLocaleDateString(locale, { month: 'short', day: 'numeric' });
     return `${itemTitle} — ${date}`;
   };
 
@@ -269,7 +270,7 @@ export const DisputeDetailScreen = () => {
                                 {getRentalLabel(r)}
                               </Text>
                               <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
-                                {r.status} · {r.renter_email === userEmail ? t('disputeDetail.ownerLabel', { email: r.owner_email }) : t('disputeDetail.renterLabel', { email: r.renter_email })}
+                                {t(`rentalHistory.status.${r.status}`)} · {r.renter_email === userEmail ? t('disputeDetail.ownerLabel', { email: r.owner_email }) : t('disputeDetail.renterLabel', { email: r.renter_email })}
                               </Text>
                             </View>
                             {selectedRentalId === id && <MaterialCommunityIcons name="check" size={16} color={colors.primary} />}
@@ -289,8 +290,8 @@ export const DisputeDetailScreen = () => {
                     <View style={styles.selectedRentalContent}>
                       <Text style={styles.selectedRentalTitle}>{itemsMap[selectedRental.item_id]?.title || t('disputeDetail.selectedRental')}</Text>
                       <Text style={styles.selectedRentalMeta}>
-                        {selectedRental.status.toUpperCase()} · {new Date(selectedRental.start_date || selectedRental.created_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        {selectedRental.end_date ? ` - ${new Date(selectedRental.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                        {t(`rentalHistory.status.${selectedRental.status}`).toUpperCase()} · {new Date(selectedRental.start_date || selectedRental.created_date).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
+                        {selectedRental.end_date ? ` - ${new Date(selectedRental.end_date).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}` : ''}
                       </Text>
                     </View>
                   </View>
@@ -430,11 +431,11 @@ export const DisputeDetailScreen = () => {
               <View style={styles.statusRow}>
                 <View style={[styles.statusBadge, { backgroundColor: STATUS_COLOR[dispute.status] + '20' }]}>
                   <Text style={[styles.statusText, { color: STATUS_COLOR[dispute.status] }]}>
-                    {dispute.status.replace('_', ' ').toUpperCase()}
+                    {t(`disputes.status.${dispute.status}`).toUpperCase()}
                   </Text>
                 </View>
                 <Text style={styles.dateText}>
-                  {new Date(dispute.created_date).toLocaleDateString('en-US', {
+                  {new Date(dispute.created_date).toLocaleDateString(locale, {
                     month: 'short', day: 'numeric', year: 'numeric',
                   })}
                 </Text>
@@ -456,8 +457,11 @@ export const DisputeDetailScreen = () => {
 
             {dispute.decision && (
               <View style={styles.card}>
-                <Text style={styles.sectionLabel}>{t('disputeDetail.resolution')}</Text>
-                <InfoRow label={t('disputeDetail.decision')} value={dispute.decision.replace(/_/g, ' ')} />
+              <Text style={styles.sectionLabel}>{t('disputeDetail.resolution')}</Text>
+                <InfoRow
+                  label={t('disputeDetail.decision')}
+                  value={t(`adminDisputes.${dispute.decision === 'favor_renter' ? 'favorRenter' : dispute.decision === 'favor_owner' ? 'favorOwner' : 'split'}`)}
+                />
                 {dispute.resolution && <Text style={styles.descText}>{dispute.resolution}</Text>}
                 {dispute.refund_to_renter !== undefined && (
                   <InfoRow label={t('disputeDetail.refundToRenter')} value={`$${dispute.refund_to_renter?.toFixed(2)}`} />

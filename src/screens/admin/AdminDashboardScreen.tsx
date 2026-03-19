@@ -13,6 +13,7 @@ import { ActivityIndicator, Text } from "react-native-paper";
 import Svg, { Circle, Line, Polyline, Rect, Text as SvgText } from "react-native-svg";
 import { GlobalHeader } from "../../components/common/GlobalHeader";
 import { Footer } from "../../components/home/Footer";
+import { useI18n } from "../../i18n";
 import { getAdminDashboardData } from "../../services/adminService";
 import {
   AdminDashboardData,
@@ -26,21 +27,16 @@ import {
 } from "../../types/admin";
 import { colors, iconSize, typography } from "../../theme";
 
-const TABS: { key: AdminTabKey; label: string }[] = [
-  { key: "overview", label: "Overview" },
-  { key: "users", label: "Users" },
-  { key: "revenue", label: "Revenue" },
-  { key: "moderation", label: "Moderation" },
-  { key: "health", label: "Health" },
-];
-
 const CHART_W = 320;
 const CHART_H = 170;
 const CHART_PADDING = 22;
 const CHART_AXIS_FONT_SIZE = typography.small;
 
-const formatLastUpdated = (value: Date) =>
-  value.toLocaleString("en-US", {
+const getLocale = (language: string) =>
+  language === "fr" ? "fr-FR" : language === "es" ? "es-ES" : language === "de" ? "de-DE" : "en-US";
+
+const formatLastUpdated = (value: Date, locale: string) =>
+  value.toLocaleString(locale, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -48,8 +44,8 @@ const formatLastUpdated = (value: Date) =>
     minute: "2-digit",
   });
 
-const formatActivityTime = (iso: string) =>
-  new Date(iso).toLocaleString("en-US", {
+const formatActivityTime = (iso: string, locale: string) =>
+  new Date(iso).toLocaleString(locale, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -99,15 +95,25 @@ const UsersMetricCard = ({
   </View>
 );
 
-const RevenueTrendChart = ({ data }: { data: RevenuePoint[] }) => {
+const RevenueTrendChart = ({
+  data,
+  title,
+  emptyText,
+  legend,
+}: {
+  data: RevenuePoint[];
+  title: string;
+  emptyText: string;
+  legend: string;
+}) => {
   if (!data.length) {
     return (
       <View style={styles.chartCard}>
         <View style={styles.sectionHeaderRow}>
           <MaterialCommunityIcons name="trending-up" size={iconSize.lg} color="#16A34A" />
-          <Text style={styles.chartTitle}>Revenue Trend (Last 30 Days)</Text>
+          <Text style={styles.chartTitle}>{title}</Text>
         </View>
-        <Text style={styles.emptyChartText}>No revenue data available yet.</Text>
+        <Text style={styles.emptyChartText}>{emptyText}</Text>
       </View>
     );
   }
@@ -133,7 +139,7 @@ const RevenueTrendChart = ({ data }: { data: RevenuePoint[] }) => {
     <View style={styles.chartCard}>
       <View style={styles.sectionHeaderRow}>
         <MaterialCommunityIcons name="trending-up" size={iconSize.lg} color="#16A34A" />
-        <Text style={styles.chartTitle}>Revenue Trend (Last 30 Days)</Text>
+        <Text style={styles.chartTitle}>{title}</Text>
       </View>
       <Svg width="100%" height={CHART_H + 30} viewBox={`0 0 ${CHART_W} ${CHART_H + 30}`}>
         {axisLabels.map((tick) => {
@@ -209,20 +215,32 @@ const RevenueTrendChart = ({ data }: { data: RevenuePoint[] }) => {
           );
         })}
       </Svg>
-      <Text style={styles.chartLegend}>-o Revenue ($)</Text>
+      <Text style={styles.chartLegend}>{legend}</Text>
     </View>
   );
 };
 
-const CategoryChart = ({ data }: { data: CategoryPerformanceItem[] }) => {
+const CategoryChart = ({
+  data,
+  title,
+  emptyText,
+  itemsLabel,
+  rentalsLabel,
+}: {
+  data: CategoryPerformanceItem[];
+  title: string;
+  emptyText: string;
+  itemsLabel: string;
+  rentalsLabel: string;
+}) => {
   if (!data.length) {
     return (
       <View style={styles.chartCard}>
         <View style={styles.sectionHeaderRow}>
           <MaterialCommunityIcons name="cube-outline" size={iconSize.lg} color="#2563EB" />
-          <Text style={styles.chartTitle}>Category Performance</Text>
+          <Text style={styles.chartTitle}>{title}</Text>
         </View>
-        <Text style={styles.emptyChartText}>No category data available yet.</Text>
+        <Text style={styles.emptyChartText}>{emptyText}</Text>
       </View>
     );
   }
@@ -236,7 +254,7 @@ const CategoryChart = ({ data }: { data: CategoryPerformanceItem[] }) => {
     <View style={styles.chartCard}>
       <View style={styles.sectionHeaderRow}>
         <MaterialCommunityIcons name="cube-outline" size={iconSize.lg} color="#2563EB" />
-        <Text style={styles.chartTitle}>Category Performance</Text>
+        <Text style={styles.chartTitle}>{title}</Text>
       </View>
       <Svg width="100%" height={CHART_H + 34} viewBox={`0 0 ${CHART_W} ${CHART_H + 34}`}>
         {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
@@ -311,22 +329,30 @@ const CategoryChart = ({ data }: { data: CategoryPerformanceItem[] }) => {
       <View style={styles.categoryLegendRow}>
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, { backgroundColor: "#3B82F6" }]} />
-          <Text style={styles.chartLegend}>Items</Text>
+          <Text style={styles.chartLegend}>{itemsLabel}</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, { backgroundColor: "#10B981" }]} />
-          <Text style={styles.chartLegend}>Rentals</Text>
+          <Text style={styles.chartLegend}>{rentalsLabel}</Text>
         </View>
       </View>
     </View>
   );
 };
 
-const ActivityFeed = ({ items }: { items: RecentActivityItem[] }) => (
+const ActivityFeed = ({
+  items,
+  locale,
+  title,
+}: {
+  items: RecentActivityItem[];
+  locale: string;
+  title: string;
+}) => (
   <View style={styles.activityCard}>
     <View style={styles.sectionHeaderRow}>
       <MaterialCommunityIcons name="history" size={iconSize.lg} color="#2563EB" />
-      <Text style={styles.cardTitle}>Recent Activity</Text>
+      <Text style={styles.cardTitle}>{title}</Text>
     </View>
     {items.slice(0, 5).map((item) => (
       <View key={item.id} style={styles.activityItem}>
@@ -335,18 +361,30 @@ const ActivityFeed = ({ items }: { items: RecentActivityItem[] }) => (
         </View>
         <View style={styles.activityTextWrap}>
           <Text style={styles.activityMessage}>{item.message}</Text>
-          <Text style={styles.activityTime}>{formatActivityTime(item.timestamp)}</Text>
+          <Text style={styles.activityTime}>{formatActivityTime(item.timestamp, locale)}</Text>
         </View>
       </View>
     ))}
   </View>
 );
 
-const RevenueByCategoryCard = ({ data }: { data: RevenueCategoryItem[] }) => (
+const RevenueByCategoryCard = ({
+  data,
+  title,
+  itemsLabel,
+  rentalsLabel,
+  revenueLabel,
+}: {
+  data: RevenueCategoryItem[];
+  title: string;
+  itemsLabel: string;
+  rentalsLabel: string;
+  revenueLabel: string;
+}) => (
   <View style={styles.chartCard}>
     <View style={styles.sectionHeaderRow}>
       <MaterialCommunityIcons name="currency-usd" size={iconSize.lg} color="#16A34A" />
-      <Text style={styles.cardTitle}>Revenue by Category</Text>
+      <Text style={styles.cardTitle}>{title}</Text>
     </View>
     {data.slice(0, 4).map((item) => (
       <View key={item.category} style={styles.revenueCategoryRow}>
@@ -356,19 +394,29 @@ const RevenueByCategoryCard = ({ data }: { data: RevenueCategoryItem[] }) => (
         <View style={styles.revenueCategoryText}>
           <Text style={styles.revenueCategoryTitle}>{item.category}</Text>
           <Text style={styles.revenueCategoryMeta}>
-            {item.items} items • {item.rentals} rentals
+            {item.items} {itemsLabel} • {item.rentals} {rentalsLabel}
           </Text>
         </View>
         <View style={styles.revenueCategoryAmount}>
           <Text style={styles.revenueCategoryValue}>${item.revenue.toFixed(2)}</Text>
-          <Text style={styles.revenueCategoryLabel}>Revenue</Text>
+          <Text style={styles.revenueCategoryLabel}>{revenueLabel}</Text>
         </View>
       </View>
     ))}
   </View>
 );
 
-const DailyRevenueBreakdownChart = ({ data }: { data: DailyRevenuePoint[] }) => {
+const DailyRevenueBreakdownChart = ({
+  data,
+  title,
+  rentalsLabel,
+  revenueLabel,
+}: {
+  data: DailyRevenuePoint[];
+  title: string;
+  rentalsLabel: string;
+  revenueLabel: string;
+}) => {
   const visibleData = data.slice(-30);
   const maxRentals = Math.max(...visibleData.map((d) => d.rentals), 1);
   const maxRevenue = Math.max(...visibleData.map((d) => d.revenue), 1);
@@ -378,7 +426,7 @@ const DailyRevenueBreakdownChart = ({ data }: { data: DailyRevenuePoint[] }) => 
 
   return (
     <View style={styles.chartCard}>
-      <Text style={styles.cardTitle}>Daily Revenue Breakdown</Text>
+      <Text style={styles.cardTitle}>{title}</Text>
       <Svg width="100%" height={CHART_H + 34} viewBox={`0 0 ${CHART_W} ${CHART_H + 34}`}>
         {[0, 1, 2, 3, 4].map((tick) => {
           const y = CHART_H - CHART_PADDING - (tick / 4) * (CHART_H - CHART_PADDING * 2);
@@ -475,11 +523,11 @@ const DailyRevenueBreakdownChart = ({ data }: { data: DailyRevenuePoint[] }) => 
       <View style={styles.categoryLegendRow}>
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, { backgroundColor: "#3B82F6" }]} />
-          <Text style={styles.chartLegend}># Rentals</Text>
+          <Text style={styles.chartLegend}>{rentalsLabel}</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, { backgroundColor: "#10B981" }]} />
-          <Text style={styles.chartLegend}>Revenue ($)</Text>
+          <Text style={styles.chartLegend}>{revenueLabel}</Text>
         </View>
       </View>
     </View>
@@ -488,12 +536,21 @@ const DailyRevenueBreakdownChart = ({ data }: { data: DailyRevenuePoint[] }) => 
 
 export const AdminDashboardScreen = () => {
   const navigation = useNavigation<any>();
+  const { language, t } = useI18n();
   const [activeTab, setActiveTab] = useState<AdminTabKey>("overview");
   const [dashboardData, setDashboardData] = useState<AdminDashboardData | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [implementingOptimization, setImplementingOptimization] = useState<string | null>(null);
   const [optimizationResults, setOptimizationResults] = useState<Record<string, { success: boolean; message: string }>>({});
+  const locale = getLocale(language);
+  const tabs: { key: AdminTabKey; label: string }[] = [
+    { key: "overview", label: t("adminDashboard.tabs.overview") },
+    { key: "users", label: t("adminDashboard.tabs.users") },
+    { key: "revenue", label: t("adminDashboard.tabs.revenue") },
+    { key: "moderation", label: t("adminDashboard.tabs.moderation") },
+    { key: "health", label: t("adminDashboard.tabs.health") },
+  ];
 
   const implementOptimization = useCallback(async (optimizationType: string) => {
     setImplementingOptimization(optimizationType);
@@ -561,8 +618,8 @@ export const AdminDashboardScreen = () => {
   const renderTabContent = () => {
     if (!dashboardData) {
       return (
-        <View style={styles.placeholderState}>
-          <Text style={styles.placeholderText}>Loading dashboard...</Text>
+          <View style={styles.placeholderState}>
+          <Text style={styles.placeholderText}>{t("adminDashboard.loading")}</Text>
         </View>
       );
     }
@@ -575,9 +632,20 @@ export const AdminDashboardScreen = () => {
               <MetricCard key={metric.id} metric={metric} />
             ))}
           </View>
-          <RevenueTrendChart data={dashboardData.revenueTrend} />
-          <CategoryChart data={dashboardData.categoryPerformance} />
-          <ActivityFeed items={dashboardData.recentActivity} />
+          <RevenueTrendChart
+            data={dashboardData.revenueTrend}
+            title={t("adminDashboard.revenueTrendTitle")}
+            emptyText={t("adminDashboard.noRevenueData")}
+            legend={t("adminDashboard.revenueLegend")}
+          />
+          <CategoryChart
+            data={dashboardData.categoryPerformance}
+            title={t("adminDashboard.categoryPerformanceTitle")}
+            emptyText={t("adminDashboard.noCategoryData")}
+            itemsLabel={t("adminDashboard.itemsLabel")}
+            rentalsLabel={t("adminDashboard.rentalsLabel")}
+          />
+          <ActivityFeed items={dashboardData.recentActivity} locale={locale} title={t("adminDashboard.recentActivity")} />
         </>
       );
     }
@@ -640,34 +708,45 @@ export const AdminDashboardScreen = () => {
         <>
           <View style={styles.metricsGrid}>
             <UsersMetricCard
-              title="Total Revenue"
+              title={t("adminDashboard.totalRevenue")}
               value={`$${dashboardData.totalRevenueAllTime.toFixed(2)}`}
-              subtitle="All time"
+              subtitle={t("adminDashboard.allTime")}
               color="#16A34A"
             />
             <UsersMetricCard
-              title="This Month"
+              title={t("adminDashboard.thisMonth")}
               value={`$${dashboardData.revenueThisMonth.toFixed(2)}`}
-              subtitle="Platform fees"
-              change={`${dashboardData.revenueGrowth > 0 ? '+' : ''}${dashboardData.revenueGrowth}% vs last month`}
+              subtitle={t("adminDashboard.platformFees")}
+              change={`${dashboardData.revenueGrowth > 0 ? '+' : ''}${dashboardData.revenueGrowth}% ${t("adminDashboard.vsLastMonth")}`}
               color="#10B981"
               iconName="trending-up"
             />
             <UsersMetricCard
-              title="This Week"
+              title={t("adminDashboard.thisWeek")}
               value={`$${dashboardData.revenueThisWeek.toFixed(2)}`}
-              subtitle="Last 7 days"
+              subtitle={t("adminDashboard.last7Days")}
               color="#2563EB"
             />
             <UsersMetricCard
-              title="Pending Payouts"
+              title={t("adminDashboard.pendingPayouts")}
               value={`$${dashboardData.pendingPayouts.toFixed(2)}`}
-              subtitle={`$${dashboardData.paidOutAmount.toFixed(2)} paid`}
+              subtitle={t("adminDashboard.paidAmount", { amount: dashboardData.paidOutAmount.toFixed(2) })}
               color="#D97706"
             />
           </View>
-          <RevenueByCategoryCard data={dashboardData.revenueByCategory} />
-          <DailyRevenueBreakdownChart data={dashboardData.dailyRevenueBreakdown} />
+          <RevenueByCategoryCard
+            data={dashboardData.revenueByCategory}
+            title={t("adminDashboard.revenueByCategory")}
+            itemsLabel={t("adminDashboard.itemsLabel")}
+            rentalsLabel={t("adminDashboard.rentalsLabel")}
+            revenueLabel={t("adminDashboard.revenueLabel")}
+          />
+          <DailyRevenueBreakdownChart
+            data={dashboardData.dailyRevenueBreakdown}
+            title={t("adminDashboard.dailyRevenueBreakdown")}
+            rentalsLabel={t("adminDashboard.rentalsLegend")}
+            revenueLabel={t("adminDashboard.revenueLegendShort")}
+          />
         </>
       );
     }
@@ -677,74 +756,74 @@ export const AdminDashboardScreen = () => {
         <>
           <View style={styles.metricsGrid}>
             <UsersMetricCard
-              title="Open Disputes"
+              title={t("adminDashboard.openDisputes")}
               value={String(dashboardData.openDisputesCount)}
-              subtitle="Requiring attention"
+              subtitle={t("adminDashboard.requiringAttention")}
               color="#DC2626"
             />
             <UsersMetricCard
-              title="User Reports"
+              title={t("nav.userReports")}
               value={String(dashboardData.userReportsCount)}
-              subtitle="Pending review"
+              subtitle={t("adminDashboard.pendingReview")}
               color="#D97706"
             />
             <UsersMetricCard
-              title="Listing Reports"
+              title={t("nav.listingReports")}
               value={String(dashboardData.listingReportsCount || 0)}
-              subtitle="Pending review"
+              subtitle={t("adminDashboard.pendingReview")}
               color="#A855F7"
             />
             <UsersMetricCard
-              title="Pending Requests"
+              title={t("adminDashboard.pendingRequests")}
               value={String(dashboardData.pendingRequestsCount)}
-              subtitle="Awaiting approval"
+              subtitle={t("adminDashboard.awaitingApproval")}
               color="#2563EB"
             />
           </View>
           <View style={styles.userManagementCard}>
             <View style={styles.sectionHeaderRow}>
               <MaterialCommunityIcons name="alert-outline" size={iconSize.lg} color="#DC2626" />
-              <Text style={styles.cardTitle}>Quick Actions</Text>
+              <Text style={styles.cardTitle}>{t("adminDashboard.quickActions")}</Text>
             </View>
             <View style={styles.quickActionsList}>
               <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('AdminDisputes')}>
                 <MaterialCommunityIcons name="alert-outline" size={iconSize.md} color="#DC2626" />
-                <Text style={styles.quickActionText}>Review Disputes ({dashboardData.openDisputesCount})</Text>
+                <Text style={styles.quickActionText}>{t("adminDashboard.reviewDisputes", { count: dashboardData.openDisputesCount })}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('AdminUserReports')}>
                 <MaterialCommunityIcons name="account-group-outline" size={iconSize.md} color="#D97706" />
-                <Text style={styles.quickActionText}>Review User Reports ({dashboardData.userReportsCount})</Text>
+                <Text style={styles.quickActionText}>{t("adminDashboard.reviewUserReports", { count: dashboardData.userReportsCount })}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('AdminListingReports')}>
                 <MaterialCommunityIcons name="package-variant-closed" size={iconSize.md} color="#0EA5E9" />
-                <Text style={styles.quickActionText}>Review Listing Reports ({dashboardData.listingReportsCount || 0})</Text>
+                <Text style={styles.quickActionText}>{t("adminDashboard.reviewListingReports", { count: dashboardData.listingReportsCount || 0 })}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('AdminModeration')}>
                 <MaterialCommunityIcons name="clock-outline" size={iconSize.md} color="#2563EB" />
-                <Text style={styles.quickActionText}>Review Pending Requests ({dashboardData.pendingRequestsCount})</Text>
+                <Text style={styles.quickActionText}>{t("adminDashboard.reviewPendingRequests", { count: dashboardData.pendingRequestsCount })}</Text>
               </TouchableOpacity>
             </View>
           </View>
           <View style={styles.userManagementCard}>
             <View style={styles.sectionHeaderRow}>
               <MaterialCommunityIcons name="cube-outline" size={iconSize.lg} color="#2563EB" />
-              <Text style={styles.cardTitle}>Platform Statistics</Text>
+              <Text style={styles.cardTitle}>{t("adminDashboard.platformStatistics")}</Text>
             </View>
             <View style={styles.statsList}>
               <View style={styles.statRow}>
-                <Text style={styles.statLabel}>Total Items</Text>
+                <Text style={styles.statLabel}>{t("adminDashboard.totalItems")}</Text>
                 <Text style={styles.statValue}>{dashboardData.totalItems}</Text>
               </View>
               <View style={styles.statRow}>
-                <Text style={styles.statLabel}>Active Items</Text>
+                <Text style={styles.statLabel}>{t("adminDashboard.activeItems")}</Text>
                 <Text style={[styles.statValue, { color: "#16A34A" }]}>{dashboardData.activeItems}</Text>
               </View>
               <View style={styles.statRow}>
-                <Text style={styles.statLabel}>Total Rentals</Text>
+                <Text style={styles.statLabel}>{t("adminDashboard.totalRentals")}</Text>
                 <Text style={styles.statValue}>{dashboardData.totalRentals}</Text>
               </View>
               <View style={styles.statRow}>
-                <Text style={styles.statLabel}>Completed</Text>
+                <Text style={styles.statLabel}>{t("adminDashboard.completed")}</Text>
                 <Text style={[styles.statValue, { color: "#2563EB" }]}>{dashboardData.completedRentals}</Text>
               </View>
             </View>
@@ -766,27 +845,38 @@ export const AdminDashboardScreen = () => {
               backgroundColor: dashboardData.systemStatus === 'Healthy' ? '#22C55E' :
                 dashboardData.systemStatus === 'Degraded' ? '#EAB308' : '#EF4444'
             }]} />
-            <Text style={styles.cardTitle}>System Status: {dashboardData.systemStatus}</Text>
+            <Text style={styles.cardTitle}>
+              {t("adminDashboard.systemStatus", {
+                status:
+                  dashboardData.systemStatus === "Healthy"
+                    ? t("adminDashboard.status.healthy")
+                    : dashboardData.systemStatus === "Degraded"
+                      ? t("adminDashboard.status.degraded")
+                      : dashboardData.systemStatus === "Warning"
+                        ? t("adminDashboard.status.warning")
+                        : t("adminDashboard.status.critical"),
+              })}
+            </Text>
           </View>
           <View style={styles.metricsGrid}>
              <View style={styles.healthSubCard}>
-               <Text style={styles.healthSubTitle}>Uptime</Text>
+               <Text style={styles.healthSubTitle}>{t("adminDashboard.uptime")}</Text>
                <Text style={[styles.healthSubValue, { color: "#16A34A" }]}>{dashboardData.uptime}%</Text>
-               <Text style={styles.healthSubText}>Last 30 days</Text>
+               <Text style={styles.healthSubText}>{t("adminDashboard.last30Days")}</Text>
              </View>
           </View>
           <View style={styles.metricsGrid}>
              <View style={styles.healthSubCard}>
-               <Text style={styles.healthSubTitle}>Rate Limit Issues</Text>
+               <Text style={styles.healthSubTitle}>{t("adminDashboard.rateLimitIssues")}</Text>
                <Text style={styles.healthSubValue}>{dashboardData.rateLimitIssues}</Text>
-               <Text style={styles.healthSubText}>Last 24 hours</Text>
+               <Text style={styles.healthSubText}>{t("adminDashboard.last24Hours")}</Text>
              </View>
           </View>
           <View style={styles.metricsGrid}>
              <View style={styles.healthSubCard}>
-               <Text style={styles.healthSubTitle}>API Errors</Text>
+               <Text style={styles.healthSubTitle}>{t("adminDashboard.apiErrors")}</Text>
                <Text style={styles.healthSubValue}>{dashboardData.apiErrors}</Text>
-               <Text style={styles.healthSubText}>Recent errors</Text>
+               <Text style={styles.healthSubText}>{t("adminDashboard.recentErrors")}</Text>
              </View>
           </View>
 
@@ -794,7 +884,7 @@ export const AdminDashboardScreen = () => {
           <View style={[styles.singlePaneCard, { marginTop: 14 }]}>
              <View style={styles.sectionHeaderRow}>
                <MaterialCommunityIcons name="clock-outline" size={iconSize.lg} color="#2563EB" />
-               <Text style={styles.cardTitle}>Page Load Times</Text>
+               <Text style={styles.cardTitle}>{t("adminDashboard.pageLoadTimes")}</Text>
              </View>
              <View style={styles.pageLoadList}>
                {dashboardData.pageLoadTimes.map((item, idx) => (
@@ -814,24 +904,24 @@ export const AdminDashboardScreen = () => {
                    </View>
                    <View style={styles.pageLoadRight}>
                      {item.loadTime === null ? (
-                       <Text style={styles.pageLoadNotMeasured}>Not measured</Text>
+                       <Text style={styles.pageLoadNotMeasured}>{t("adminDashboard.notMeasured")}</Text>
                      ) : (
                        <>
                          <Text style={styles.pageLoadTimeVal}>{item.loadTime}s</Text>
                          {item.loadTime < 2 ? (
                            <View style={styles.fastPill}>
                              <MaterialCommunityIcons name="checkbox-marked" size={14} color="#16A34A" />
-                             <Text style={styles.fastPillText}>Fast</Text>
+                             <Text style={styles.fastPillText}>{t("adminDashboard.fast")}</Text>
                            </View>
                          ) : item.loadTime < 5 ? (
                            <View style={[styles.fastPill, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
                              <MaterialCommunityIcons name="alert" size={14} color="#D97706" />
-                             <Text style={[styles.fastPillText, { color: '#D97706' }]}>Slow</Text>
+                             <Text style={[styles.fastPillText, { color: '#D97706' }]}>{t("adminDashboard.slow")}</Text>
                            </View>
                          ) : (
                            <View style={[styles.fastPill, { backgroundColor: '#FEE2E2', borderColor: '#FECACA' }]}>
                              <MaterialCommunityIcons name="alert-circle" size={14} color="#DC2626" />
-                             <Text style={[styles.fastPillText, { color: '#DC2626' }]}>Critical</Text>
+                             <Text style={[styles.fastPillText, { color: '#DC2626' }]}>{t("adminDashboard.status.critical")}</Text>
                            </View>
                          )}
                        </>
@@ -842,7 +932,7 @@ export const AdminDashboardScreen = () => {
              </View>
              <View style={styles.infoBox}>
                <Text style={styles.infoBoxText}>
-                 <Text style={{ fontWeight: "700", color: "#1E3A8A" }}>Performance Targets:</Text> Fast: {"<2s"} | Acceptable: 2-5s | Needs Optimization: {">5s"}
+                 <Text style={{ fontWeight: "700", color: "#1E3A8A" }}>{t("adminDashboard.performanceTargets")}</Text> {t("adminDashboard.performanceTargetValues")}
                </Text>
              </View>
           </View>
@@ -852,7 +942,7 @@ export const AdminDashboardScreen = () => {
         <View style={styles.singlePaneCard}>
           <View style={styles.sectionHeaderRow}>
             <MaterialCommunityIcons name="clock-outline" size={iconSize.lg} color="#D97706" />
-            <Text style={styles.cardTitle}>Slow Loading Pages</Text>
+            <Text style={styles.cardTitle}>{t("adminDashboard.slowLoadingPages")}</Text>
           </View>
           {dashboardData.slowPages.map((page, idx) => (
             <View key={idx} style={styles.slowPageCard}>
@@ -865,7 +955,7 @@ export const AdminDashboardScreen = () => {
           <View style={styles.recommendationsBox}>
             <View style={styles.recommendationsHeader}>
               <MaterialCommunityIcons name="lightbulb-on" size={18} color="#D97706" style={{ marginTop: 2 }} />
-              <Text style={styles.recommendationsTitle}>Recommendations:</Text>
+              <Text style={styles.recommendationsTitle}>{t("adminDashboard.recommendations")}</Text>
             </View>
             {dashboardData.slowPageRecommendations.map((rec, idx) => (
               <Text key={idx} style={styles.recommendationItem}>• {rec}</Text>
@@ -877,14 +967,14 @@ export const AdminDashboardScreen = () => {
         <View style={styles.singlePaneCard}>
            <View style={styles.sectionHeaderRow}>
              <MaterialCommunityIcons name="alert-outline" size={iconSize.lg} color="#DC2626" />
-             <Text style={styles.cardTitle}>Recent API Errors</Text>
+             <Text style={styles.cardTitle}>{t("adminDashboard.recentApiErrors")}</Text>
            </View>
            <View style={styles.apiErrorsEmpty}>
              <MaterialCommunityIcons name="check-circle-outline" size={48} color="#16A34A" />
-             <Text style={styles.apiErrorsTextMain}>No errors detected!</Text>
-             <Text style={styles.apiErrorsTextSub}>System running smoothly</Text>
-           </View>
+             <Text style={styles.apiErrorsTextMain}>{t("adminDashboard.noErrorsDetected")}</Text>
+             <Text style={styles.apiErrorsTextSub}>{t("adminDashboard.systemRunningSmoothly")}</Text>
         </View>
+       </View>
 
         {/* Performance Optimization Guide */}
         <View style={styles.singlePaneCard}>
@@ -1015,7 +1105,7 @@ export const AdminDashboardScreen = () => {
         <View style={styles.singlePaneCard}>
           <View style={styles.sectionHeaderRow}>
              <MaterialCommunityIcons name="shield-outline" size={iconSize.lg} color="#0F172A" />
-             <Text style={styles.cardTitle}>Golden Rules for Fast &{"\n"}Reliable Apps</Text>
+             <Text style={styles.cardTitle}>{t("adminDashboard.goldenRulesTitle")}</Text>
           </View>
           <View style={styles.goldenRulesList}>
             {dashboardData.goldenRules.map((rule, idx) => (
@@ -1060,7 +1150,7 @@ export const AdminDashboardScreen = () => {
         <View style={[styles.singlePaneCard, styles.monitorCard]}>
           <View style={styles.sectionHeaderRow}>
              <MaterialCommunityIcons name="pulse" size={iconSize.lg} color="#6B21A8" />
-             <Text style={[styles.cardTitle, { color: "#6B21A8" }]}>How to Monitor{"\n"}Performance</Text>
+             <Text style={[styles.cardTitle, { color: "#6B21A8" }]}>{t("adminDashboard.monitorPerformanceTitle")}</Text>
           </View>
           <View style={styles.monitorList}>
             {dashboardData.monitoringSteps.map((step) => (
@@ -1079,25 +1169,25 @@ export const AdminDashboardScreen = () => {
         <View style={[styles.singlePaneCard, styles.quickReferenceCard]}>
           <View style={styles.sectionHeaderRow}>
              <MaterialCommunityIcons name="lightning-bolt" size={iconSize.lg} color="#FBBF24" />
-             <Text style={[styles.cardTitle, { color: "#FFFFFF" }]}>Performance Quick{"\n"}Reference</Text>
+             <Text style={[styles.cardTitle, { color: "#FFFFFF" }]}>{t("adminDashboard.quickReferenceTitle")}</Text>
           </View>
           
-          <Text style={styles.quickRefSectionTitle}>Page Load Times:</Text>
+          <Text style={styles.quickRefSectionTitle}>{t("adminDashboard.pageLoadTimesSection")}</Text>
           {dashboardData.quickReference.pageLoadTimes.map((item, idx) => (
             <Text key={`plt-${idx}`} style={styles.quickRefText}>{item}</Text>
           ))}
 
-          <Text style={styles.quickRefSectionTitle}>Image Sizes:</Text>
+          <Text style={styles.quickRefSectionTitle}>{t("adminDashboard.imageSizesSection")}</Text>
           {dashboardData.quickReference.imageSizes.map((item, idx) => (
             <Text key={`is-${idx}`} style={styles.quickRefText}>{item}</Text>
           ))}
 
-          <Text style={styles.quickRefSectionTitle}>API Best Practices:</Text>
+          <Text style={styles.quickRefSectionTitle}>{t("adminDashboard.apiBestPracticesSection")}</Text>
           {dashboardData.quickReference.apiBestPractices.map((item, idx) => (
             <Text key={`abp-${idx}`} style={styles.quickRefText}>{item}</Text>
           ))}
 
-          <Text style={styles.quickRefSectionTitle}>Data Loading:</Text>
+          <Text style={styles.quickRefSectionTitle}>{t("adminDashboard.dataLoadingSection")}</Text>
           {dashboardData.quickReference.dataLoading.map((item, idx) => (
             <Text key={`dl-${idx}`} style={styles.quickRefText}>{item}</Text>
           ))}
@@ -1107,7 +1197,7 @@ export const AdminDashboardScreen = () => {
         <View style={styles.singlePaneCard}>
           <View style={styles.sectionHeaderRow}>
              <MaterialCommunityIcons name="shield-outline" size={iconSize.lg} color="#2563EB" />
-             <Text style={styles.cardTitle}>Common Issues & Solutions</Text>
+             <Text style={styles.cardTitle}>{t("adminDashboard.commonIssuesTitle")}</Text>
           </View>
           <View style={styles.issuesList}>
             {dashboardData.commonIssues.map((issue) => (
@@ -1122,7 +1212,7 @@ export const AdminDashboardScreen = () => {
                 <View style={styles.solutionBox}>
                   <View style={styles.solutionHeader}>
                     <MaterialCommunityIcons name="checkbox-marked" size={16} color="#16A34A" />
-                    <Text style={styles.solutionTitle}>Solution:</Text>
+                    <Text style={styles.solutionTitle}>{t("adminDashboard.solution")}</Text>
                   </View>
                   {issue.solutions.map((sol, idx) => (
                     <Text key={idx} style={styles.solutionText}>• {sol}</Text>
@@ -1137,12 +1227,12 @@ export const AdminDashboardScreen = () => {
         <View style={[styles.singlePaneCard, styles.bestPracticesCard]}>
           <View style={styles.sectionHeaderRow}>
              <MaterialCommunityIcons name="lightning-bolt-outline" size={iconSize.lg} color="#4F46E5" />
-             <Text style={styles.cardTitle}>Performance Best Practices</Text>
+             <Text style={styles.cardTitle}>{t("adminDashboard.bestPracticesTitle")}</Text>
           </View>
           <View style={[styles.bestPracticesList, { backgroundColor: "#FFFFFF" }]}>
             <View style={styles.bestPracticeHeaderRow}>
               <MaterialCommunityIcons name="check-circle-outline" size={20} color="#16A34A" />
-              <Text style={styles.bestPracticeHeader}>DO</Text>
+              <Text style={styles.bestPracticeHeader}>{t("adminDashboard.do")}</Text>
             </View>
             {dashboardData.bestPractices.do.map((practice, idx) => (
               <View key={`do-${idx}`} style={styles.bestPracticeRow}>
@@ -1157,7 +1247,7 @@ export const AdminDashboardScreen = () => {
           <View style={[styles.bestPracticesList, { backgroundColor: "#FFFFFF" }]}>
             <View style={styles.bestPracticeHeaderRow}>
               <MaterialCommunityIcons name="close" size={20} color="#DC2626" />
-              <Text style={styles.bestPracticeHeaderDont}>DON'T</Text>
+              <Text style={styles.bestPracticeHeaderDont}>{t("adminDashboard.dont")}</Text>
             </View>
             {dashboardData.bestPractices.dont.map((practice, idx) => (
               <View key={`dont-${idx}`} style={styles.bestPracticeRow}>
@@ -1183,17 +1273,17 @@ export const AdminDashboardScreen = () => {
         <View style={styles.headerBlock}>
           <View style={styles.titleRow}>
             <MaterialCommunityIcons name="pulse" size={iconSize.hero} color="#2563EB" />
-            <Text style={styles.pageTitle}>Admin Dashboard</Text>
+            <Text style={styles.pageTitle}>{t("nav.adminDashboard")}</Text>
           </View>
-          <Text style={styles.subtitle}>Complete platform overview and management</Text>
-          <Text style={styles.updatedAt}>Last updated: {formatLastUpdated(lastUpdated)}</Text>
+          <Text style={styles.subtitle}>{t("adminDashboard.subtitle")}</Text>
+          <Text style={styles.updatedAt}>{t("adminDashboard.lastUpdated", { date: formatLastUpdated(lastUpdated, locale) })}</Text>
           <TouchableOpacity style={styles.refreshBtn} onPress={loadDashboard}>
             <MaterialCommunityIcons
               name={isRefreshing ? "loading" : "refresh"}
               size={iconSize.md}
               color="#111827"
             />
-            <Text style={styles.refreshText}>Refresh</Text>
+            <Text style={styles.refreshText}>{t("common.refresh")}</Text>
           </TouchableOpacity>
         </View>
 
@@ -1202,7 +1292,7 @@ export const AdminDashboardScreen = () => {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tabsContainer}
         >
-          {TABS.map((tab) => {
+          {tabs.map((tab) => {
             const active = tab.key === activeTab;
             return (
               <TouchableOpacity
@@ -1223,7 +1313,7 @@ export const AdminDashboardScreen = () => {
               size={iconSize.lg}
               color="#D97706"
             />
-            <Text style={styles.sectionTitle}>Key Metrics</Text>
+            <Text style={styles.sectionTitle}>{t("adminDashboard.keyMetrics")}</Text>
           </View>
           {renderTabContent()}
         </View>

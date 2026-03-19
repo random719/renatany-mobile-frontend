@@ -11,7 +11,8 @@ import { colors, typography } from '../../theme';
 
 export const MyListingReportsScreen = () => {
   const navigation = useNavigation<any>();
-  const { t } = useI18n();
+  const { language, t } = useI18n();
+  const locale = language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
   const [reports, setReports] = useState<listingService.UserListingReport[]>([]);
   const [itemTitles, setItemTitles] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -109,7 +110,7 @@ export const MyListingReportsScreen = () => {
                     <View style={styles.reportTitleWrap}>
                       <Text style={styles.reportTitle}>{itemTitles[report.item_id] || t('listingReports.listingFallback')}</Text>
                       <Text style={styles.reportDate}>
-                        {t('listingReports.reportedOn', { date: new Date(report.created_date || report.created_at).toLocaleDateString('en-US', {
+                        {t('listingReports.reportedOn', { date: new Date(report.created_date || report.created_at).toLocaleDateString(locale, {
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric',

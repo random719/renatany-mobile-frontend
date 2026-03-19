@@ -28,10 +28,11 @@ interface BlockedRange {
 }
 
 export const ManageAvailabilityScreen = () => {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const route = useRoute<Route>();
   const navigation = useNavigation();
   const { itemId, itemTitle } = route.params;
+  const locale = language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
 
   const [blockedRanges, setBlockedRanges] = useState<BlockedRange[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -180,7 +181,7 @@ export const ManageAvailabilityScreen = () => {
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const reasons = [

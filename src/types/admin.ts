@@ -113,7 +113,7 @@ export interface AdminDashboardData {
   totalRentals: number;
   completedRentals: number;
   healthChecks: HealthItem[];
-  systemStatus: "Critical" | "Healthy" | "Warning";
+  systemStatus: "Critical" | "Healthy" | "Warning" | "Degraded";
   uptime: number;
   rateLimitIssues: number;
   apiErrors: number;

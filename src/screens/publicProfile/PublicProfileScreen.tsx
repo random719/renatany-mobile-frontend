@@ -44,9 +44,10 @@ interface Review {
 
 export const PublicProfileScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const route = useRoute<Route>();
   const { userEmail } = route.params;
+  const locale = language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
 
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [listings, setListings] = useState<ListingItem[]>([]);
@@ -130,7 +131,7 @@ export const PublicProfileScreen = () => {
       <View style={styles.reviewHeader}>
         {renderStars(item.rating)}
         <Text style={styles.reviewDate}>
-          {new Date(item.created_date).toLocaleDateString()}
+          {new Date(item.created_date).toLocaleDateString(locale)}
         </Text>
       </View>
       <Text style={styles.reviewComment}>{item.comment}</Text>
@@ -210,7 +211,7 @@ export const PublicProfileScreen = () => {
               </View>
               {profile.created_at && (
                 <Text style={styles.memberSince}>
-                  {t('publicProfile.memberSince', { date: new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) })}
+                  {t('publicProfile.memberSince', { date: new Date(profile.created_at).toLocaleDateString(locale, { month: 'long', year: 'numeric' }) })}
                 </Text>
               )}
             </View>
