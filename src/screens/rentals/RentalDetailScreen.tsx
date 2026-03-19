@@ -2,10 +2,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Button, Text } from 'react-native-paper';
 import { useAuth, useUser } from '@clerk/expo';
-import { File, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
+import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { useI18n } from '../../i18n';
@@ -67,7 +68,7 @@ export const RentalDetailScreen = () => {
   const [itemInfo, setItemInfo] = useState<ItemInfo | null>(null);
   const [conditionReports, setConditionReports] = useState<ConditionReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [downloadingReceipt, setDownloadingReceipt] = useState(false);
+  const [receiptActionLoading, setReceiptActionLoading] = useState<'download' | 'share' | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -107,27 +108,91 @@ export const RentalDetailScreen = () => {
     })();
   }, [rentalId]);
 
+  const getReceiptRequest = async () => {
+    if (!rental) return;
+    const baseUrl = api.defaults.baseURL || '';
+    const token = await getToken();
+    if (!token) {
+      toast.error(t('rentalDetail.sessionExpired'));
+      return null;
+    }
+    const receiptUrl = `${baseUrl}/receipts?rental_request_id=${encodeURIComponent(rental.id)}&lang=${encodeURIComponent(language)}`;
+    return { receiptUrl, token };
+  };
+
+  const downloadReceiptFile = async () => {
+    const request = await getReceiptRequest();
+    if (!request || !rental) return null;
+    const destination = new File(Paths.cache, `receipt-${rental.id}.pdf`);
+    return File.downloadFileAsync(request.receiptUrl, destination, {
+      headers: {
+        Authorization: `Bearer ${request.token}`,
+        Accept: 'application/pdf',
+      },
+      idempotent: true,
+    });
+  };
+
   const handleDownloadReceipt = async () => {
     if (!rental) return;
-    setDownloadingReceipt(true);
+    setReceiptActionLoading('download');
     try {
-      const baseUrl = api.defaults.baseURL || '';
-      const token = await getToken();
-      if (!token) {
-        toast.error(t('rentalDetail.sessionExpired'));
-        setDownloadingReceipt(false);
-        return;
-      }
-      const receiptUrl = `${baseUrl}/receipts?rental_request_id=${encodeURIComponent(rental.id)}`;
+      const request = await getReceiptRequest();
+      if (!request) return;
 
-      const destination = new File(Paths.cache, `receipt-${rental.id}.pdf`);
-      const downloaded = await File.downloadFileAsync(receiptUrl, destination, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/pdf',
-        },
-        idempotent: true,
-      });
+      if (Platform.OS === 'web') {
+        const downloaded = await downloadReceiptFile();
+        if (!downloaded) return;
+      } else if (Platform.OS === 'android') {
+        const downloaded = await downloadReceiptFile();
+        if (!downloaded) return;
+
+        const permissions = await LegacyFileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (!permissions.granted) return;
+
+        const base64 = await downloaded.base64();
+        const fileUri = await LegacyFileSystem.StorageAccessFramework.createFileAsync(
+          permissions.directoryUri,
+          `receipt-${rental.id}-${Date.now()}`,
+          'application/pdf',
+        );
+        await LegacyFileSystem.writeAsStringAsync(fileUri, base64, {
+          encoding: LegacyFileSystem.EncodingType.Base64,
+        });
+      } else {
+        const targetDirectory = await Directory.pickDirectoryAsync();
+        const targetFile = targetDirectory.createFile(`receipt-${rental.id}-${Date.now()}.pdf`, 'application/pdf');
+        await File.downloadFileAsync(request.receiptUrl, targetFile, {
+          headers: {
+            Authorization: `Bearer ${request.token}`,
+            Accept: 'application/pdf',
+          },
+          idempotent: true,
+        });
+      }
+      toast.success(t('rentalDetail.receiptDownloaded'));
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.toLowerCase().includes('cancel')) {
+        return;
+      } else if (msg.includes('401') || msg.includes('Unauthorized')) {
+        toast.error(t('rentalDetail.sessionExpiredReceipt'));
+      } else if (msg.includes('400') || msg.includes('only available')) {
+        toast.warning(t('rentalDetail.receiptUnavailable'));
+      } else {
+        toast.error(t('rentalDetail.receiptFailed'));
+      }
+    } finally {
+      setReceiptActionLoading(null);
+    }
+  };
+
+  const handleShareReceipt = async () => {
+    if (!rental) return;
+    setReceiptActionLoading('share');
+    try {
+      const downloaded = await downloadReceiptFile();
+      if (!downloaded) return;
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(downloaded.uri, {
@@ -147,7 +212,7 @@ export const RentalDetailScreen = () => {
         toast.error(t('rentalDetail.receiptFailed'));
       }
     } finally {
-      setDownloadingReceipt(false);
+      setReceiptActionLoading(null);
     }
   };
 
@@ -318,13 +383,24 @@ export const RentalDetailScreen = () => {
           <Button
             mode="outlined"
             onPress={handleDownloadReceipt}
-            loading={downloadingReceipt}
-            disabled={downloadingReceipt}
+            loading={receiptActionLoading === 'download'}
+            disabled={receiptActionLoading !== null}
             style={styles.receiptBtn}
             contentStyle={styles.btnContent}
             icon="download"
           >
             {t('rentalDetail.downloadReceipt')}
+          </Button>
+          <Button
+            mode="outlined"
+            onPress={handleShareReceipt}
+            loading={receiptActionLoading === 'share'}
+            disabled={receiptActionLoading !== null}
+            style={styles.receiptBtn}
+            contentStyle={styles.btnContent}
+            icon="share-variant-outline"
+          >
+            {t('rentalDetail.shareReceipt')}
           </Button>
 
           {/* Condition Reports */}

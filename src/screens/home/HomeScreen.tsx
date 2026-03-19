@@ -217,6 +217,29 @@ export const HomeScreen = () => {
  
   const activeFiltersCount = getActiveFiltersCount();
   const hasActiveFilters = activeFiltersCount > 0;
+
+  const getCategoryLabel = useCallback(
+    (categoryName?: string) => {
+      if (!categoryName) return t("home.allCategories");
+
+      const normalized = categoryName.trim().toLowerCase();
+      const keyByName: Record<string, string> = {
+        electronics: "home.category.electronics",
+        tools: "home.category.tools",
+        fashion: "home.category.fashion",
+        sports: "home.category.sports",
+        vehicles: "home.category.vehicles",
+        home: "home.category.home",
+        books: "home.category.books",
+        music: "home.category.music",
+        photography: "home.category.photography",
+        other: "home.category.other",
+      };
+
+      return keyByName[normalized] ? t(keyByName[normalized]) : categoryName;
+    },
+    [t],
+  );
  
   const handleClear = () => {
     setQuery('');
@@ -423,7 +446,7 @@ export const HomeScreen = () => {
                 contentStyle={styles.menuContent}
                 anchor={
                   <TouchableOpacity style={styles.dropdownBtn} onPress={() => setCategoryMenuVisible(true)}>
-                    <Text style={styles.dropdownText}>{selectedCategory || t("home.allCategories")}</Text>
+                    <Text style={styles.dropdownText}>{getCategoryLabel(selectedCategory)}</Text>
                     <MaterialCommunityIcons
                       name="chevron-down"
                       size={20}
@@ -443,7 +466,7 @@ export const HomeScreen = () => {
                     <Menu.Item 
                       key={cat.id} 
                       onPress={() => handleCategorySelect(cat.name)} 
-                      title={cat.name} 
+                      title={getCategoryLabel(cat.name)} 
                       leadingIcon={cat.icon as any}
                       titleStyle={selectedCategory === cat.name ? styles.menuItemActiveText : undefined}
                     />
@@ -544,7 +567,7 @@ export const HomeScreen = () => {
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagsContainer}>
                     {selectedCategory && (
                       <View style={styles.filterTag}>
-                        <Text style={styles.filterTagText}>{selectedCategory}</Text>
+                        <Text style={styles.filterTagText}>{getCategoryLabel(selectedCategory)}</Text>
                         <TouchableOpacity onPress={() => handleCategorySelect(undefined)}>
                           <MaterialCommunityIcons name="close" size={14} color="#4B5563" />
                         </TouchableOpacity>

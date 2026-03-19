@@ -108,7 +108,8 @@ export const CreateListingScreen = () => {
     }, [selectedListing?.id, isEditMode, itemId]);
     const [uploadedImages, setUploadedImages] = useState<string[]>([]);
     const [uploadedVideos, setUploadedVideos] = useState<string[]>([]);
-    const [isUploading, setIsUploading] = useState(false);
+    const [isUploadingImages, setIsUploadingImages] = useState(false);
+    const [isUploadingVideos, setIsUploadingVideos] = useState(false);
     const [isGeocodingLocation, setIsGeocodingLocation] = useState(false);
     const [newTier, setNewTier] = useState({ days: '', price: '' });
     const [categoryMenuVisible, setCategoryMenuVisible] = useState(false);
@@ -172,7 +173,7 @@ export const CreateListingScreen = () => {
         });
         if (result.canceled || !result.assets?.length) return;
 
-        setIsUploading(true);
+        setIsUploadingImages(true);
         try {
             const urls: string[] = [];
             for (const asset of result.assets) {
@@ -184,7 +185,7 @@ export const CreateListingScreen = () => {
             console.error('Image upload failed:', error);
             toast.error(t('createListing.uploadImagesFailed'));
         } finally {
-            setIsUploading(false);
+            setIsUploadingImages(false);
         }
     }, [uploadedImages.length]);
 
@@ -201,7 +202,7 @@ export const CreateListingScreen = () => {
         });
         if (result.canceled || !result.assets?.length) return;
 
-        setIsUploading(true);
+        setIsUploadingVideos(true);
         try {
             const url = await uploadFile(result.assets[0].uri, 'video');
             setUploadedVideos(prev => [...prev, url]);
@@ -209,7 +210,7 @@ export const CreateListingScreen = () => {
             console.error('Video upload failed:', error);
             toast.error(t('createListing.uploadVideoFailed'));
         } finally {
-            setIsUploading(false);
+            setIsUploadingVideos(false);
         }
     }, []);
 
@@ -429,7 +430,7 @@ export const CreateListingScreen = () => {
                                                         setCategoryMenuVisible(false);
                                                     }}
                                                     title={t(`createListing.categories.${cat.name.toLowerCase()}`) === `createListing.categories.${cat.name.toLowerCase()}` ? cat.name : t(`createListing.categories.${cat.name.toLowerCase()}`)}
-                                                    leadingIcon={cat.icon as any}
+                                                    leadingIcon={formData.category === cat.name ? 'check' : (cat.icon as any)}
                                                     titleStyle={formData.category === cat.name ? styles.menuItemActiveText : undefined}
                                                 />
                                             )) : CATEGORIES.map(cat => (
@@ -440,7 +441,8 @@ export const CreateListingScreen = () => {
                                                         setCategoryMenuVisible(false);
                                                     }}
                                                     title={t(`createListing.categories.${cat.value}`)}
-                                                    leadingIcon={cat.icon as any}
+                                                    leadingIcon={formData.category === cat.value ? 'check' : (cat.icon as any)}
+                                                    titleStyle={formData.category === cat.value ? styles.menuItemActiveText : undefined}
                                                 />
                                             ))}
                                         </Menu>
@@ -452,6 +454,7 @@ export const CreateListingScreen = () => {
                                         <Menu
                                             visible={conditionMenuVisible}
                                             onDismiss={() => setConditionMenuVisible(false)}
+                                            contentStyle={styles.menuContent}
                                             anchor={
                                                 <TouchableOpacity style={styles.dropdownContainer} onPress={() => setConditionMenuVisible(true)}>
                                                     <Text style={styles.dropdownTextValue}>{conditionLabel}</Text>
@@ -467,6 +470,8 @@ export const CreateListingScreen = () => {
                                                         setConditionMenuVisible(false);
                                                     }}
                                                     title={t(`createListing.conditions.${cond.value}`)}
+                                                    leadingIcon={formData.condition === cond.value ? 'check' : undefined}
+                                                    titleStyle={formData.condition === cond.value ? styles.menuItemActiveText : undefined}
                                                 />
                                             ))}
                                         </Menu>
@@ -553,8 +558,8 @@ export const CreateListingScreen = () => {
                                 <View style={styles.formSection}>
                                     <View style={styles.inputGroup}>
                                         <Text style={styles.label}>{t('createListing.photosLabel', { count: uploadedImages.length })}</Text>
-                                        <TouchableOpacity style={styles.uploadAreaImages} onPress={pickImages} disabled={isUploading}>
-                                            {isUploading ? (
+                                        <TouchableOpacity style={styles.uploadAreaImages} onPress={pickImages} disabled={isUploadingImages || isUploadingVideos}>
+                                            {isUploadingImages ? (
                                                 <ActivityIndicator size="large" color="#94A3B8" />
                                             ) : (
                                                 <MaterialCommunityIcons name="image-outline" size={48} color="#94A3B8" />
@@ -579,8 +584,8 @@ export const CreateListingScreen = () => {
 
                                     <View style={styles.inputGroup}>
                                         <Text style={styles.label}>{t('createListing.videosLabel', { count: uploadedVideos.length })}</Text>
-                                        <TouchableOpacity style={styles.uploadAreaVideos} onPress={pickVideos} disabled={isUploading}>
-                                            {isUploading ? (
+                                        <TouchableOpacity style={styles.uploadAreaVideos} onPress={pickVideos} disabled={isUploadingImages || isUploadingVideos}>
+                                            {isUploadingVideos ? (
                                                 <ActivityIndicator size="large" color="#A855F7" />
                                             ) : (
                                                 <MaterialCommunityIcons name="video-outline" size={48} color="#A855F7" />
@@ -897,12 +902,14 @@ export const CreateListingScreen = () => {
 
                                         <View style={styles.summaryRow}>
                                             <Text style={styles.summaryLabel}>{t('createListing.baseDailyRate')}</Text>
-                                            <Text style={styles.summaryValue}>${dailyRate.toFixed(2)}/day</Text>
+                                            <Text style={styles.summaryValue}>${dailyRate.toFixed(2)}{t('createListing.perDay')}</Text>
                                         </View>
 
                                         {formData.pricing_tiers.length > 0 && formData.pricing_tiers.map((tier, idx) => (
                                             <View key={idx} style={styles.summaryRow}>
-                                                <Text style={styles.summaryLabel}>{tier.days} days:</Text>
+                                                <Text style={styles.summaryLabel}>
+                                                    {tier.days} {tier.days === 1 ? t('createListing.day') : t('createListing.days')}:
+                                                </Text>
                                                 <Text style={styles.summaryValue}>${tier.price.toFixed(2)}</Text>
                                             </View>
                                         ))}
@@ -949,7 +956,7 @@ export const CreateListingScreen = () => {
                             )}
                             <Button
                                 mode="contained"
-                                disabled={isSubmitting || isGeocodingLocation || isUploading}
+                                disabled={isSubmitting || isGeocodingLocation || isUploadingImages || isUploadingVideos}
                                 loading={isSubmitting || isGeocodingLocation}
                                 onPress={() => {
                                     if (step < 3) handleContinue();
@@ -1159,11 +1166,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 12,
+        borderColor: '#E5E7EB',
+        borderRadius: 14,
         paddingHorizontal: 14,
         height: 48,
         backgroundColor: '#FFFFFF',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.05,
+        shadowRadius: 14,
+        elevation: 2,
     },
     dropdownText: {
         color: '#4B5563', // Darker gray for better consistency with Home Screen
@@ -1429,8 +1441,9 @@ const styles = StyleSheet.create({
     },
     menuContent: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 12,
+        borderRadius: 16,
         marginTop: 8,
+        paddingVertical: 4,
     },
     menuItemActiveText: {
         color: colors.primary,

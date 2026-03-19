@@ -68,13 +68,13 @@ type RentalSubTab = 'all' | 'renter' | 'owner' | 'upcoming';
 type WalletSubTab = 'completed' | 'held' | 'payouts';
 
 const NOTIFICATION_OPTIONS = [
-  { key: 'rental_requests', label: 'Rental Requests', desc: 'New rental requests and approvals' },
-  { key: 'messages', label: 'Messages', desc: 'New messages in conversations' },
-  { key: 'payment_updates', label: 'Payment Updates', desc: 'Payment confirmations and payouts' },
-  { key: 'transaction_completed', label: 'Transaction Completed', desc: 'When a rental transaction is completed' },
-  { key: 'payout_initiated', label: 'Payout Initiated', desc: 'When a payout is initiated to your bank' },
-  { key: 'reviews', label: 'Reviews', desc: 'New reviews and ratings' },
-  { key: 'promotions', label: 'Promotions', desc: 'Deals, tips, and updates' },
+  { key: 'rental_requests' },
+  { key: 'messages' },
+  { key: 'payment_updates' },
+  { key: 'transaction_completed' },
+  { key: 'payout_initiated' },
+  { key: 'reviews' },
+  { key: 'promotions' },
 ];
 
 export const ProfileScreen = () => {
@@ -238,9 +238,7 @@ export const ProfileScreen = () => {
       setSettingsForm({
         full_name: backendUser.full_name || '',
         bio: backendUser.bio || '',
-        preferred_language: isSupportedLanguage(backendUser.preferred_language)
-          ? backendUser.preferred_language
-          : language,
+        preferred_language: language,
         notification_preferences: {
           email_notifications: true,
           push_notifications: true,
@@ -255,13 +253,7 @@ export const ProfileScreen = () => {
         },
       });
     }
-  }, [activeTab, loadReviews, loadRentals, loadDisputes, loadWallet, backendUser]);
-
-  useEffect(() => {
-    if (isSupportedLanguage(backendUser?.preferred_language) && backendUser.preferred_language !== language) {
-      setLanguage(backendUser.preferred_language);
-    }
-  }, [backendUser?.preferred_language, language, setLanguage]);
+  }, [activeTab, loadReviews, loadRentals, loadDisputes, loadWallet, backendUser, language]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -648,9 +640,9 @@ export const ProfileScreen = () => {
                   labelStyle={styles.addPaymentBtnLabel}
                   onPress={handleAddPayment}
                 >
-                  Add payment method
+                  {t('profile.addPaymentMethod')}
                 </Button>
-                <Text style={styles.helperText}>Required to rent items</Text>
+                <Text style={styles.helperText}>{t('profile.requiredToRentItems')}</Text>
               </>
             )}
 
@@ -663,17 +655,17 @@ export const ProfileScreen = () => {
                   labelStyle={styles.connectBankBtnLabel}
                   onPress={handleConnectBank}
                 >
-                  Connect bank account
+                  {t('profile.connectBankAccount')}
                 </Button>
-                <Text style={styles.helperText}>Required to receive payouts</Text>
+                <Text style={styles.helperText}>{t('profile.requiredToReceivePayouts')}</Text>
               </>
             )}
           </Surface>
 
           <Surface style={styles.card} elevation={0}>
-            <Text style={styles.cardTitle}>Trust & safety</Text>
+            <Text style={styles.cardTitle}>{t('profile.trustAndSafety')}</Text>
             <Text style={styles.safetyHelperText}>
-              Review the listing reports you have submitted and follow their latest status.
+              {t('profile.trustAndSafetyDesc')}
             </Text>
             <Button
               mode="outlined"
@@ -682,7 +674,7 @@ export const ProfileScreen = () => {
               labelStyle={styles.safetyBtnLabel}
               onPress={() => navigation.navigate('MyListingReports')}
             >
-              My Listing Reports
+              {t('profile.myListingReports')}
             </Button>
           </Surface>
 
@@ -731,14 +723,14 @@ export const ProfileScreen = () => {
               ) : (
                 <Surface style={styles.emptyCard} elevation={0}>
                   <MaterialCommunityIcons name="package-variant-closed" size={48} color="#94A3B8" />
-                  <Text style={styles.emptyTitle}>No items listed yet</Text>
-                  <Text style={styles.emptySubtitle}>Start earning by listing your first item</Text>
+                  <Text style={styles.emptyTitle}>{t('profile.noItemsListedTitle')}</Text>
+                  <Text style={styles.emptySubtitle}>{t('profile.noItemsListedSubtitle')}</Text>
                   <Button
                     mode="contained"
                     style={styles.emptyBtn}
                     onPress={() => navigation.navigate('Main', { screen: 'ListItemTab' })}
                   >
-                    List Your First Item
+                    {t('profile.listYourFirstItem')}
                   </Button>
                 </Surface>
               )}
@@ -766,14 +758,14 @@ export const ProfileScreen = () => {
                       </Text>
                     </View>
                     <Text style={styles.reviewComment}>{review.comment}</Text>
-                    <Text style={styles.reviewAuthor}>by {review.reviewer_email}</Text>
+                    <Text style={styles.reviewAuthor}>{t('profile.reviewBy', { value: review.reviewer_email })}</Text>
                   </Surface>
                 ))
               ) : (
                 <Surface style={styles.emptyCard} elevation={0}>
                   <MaterialCommunityIcons name="star-outline" size={48} color="#94A3B8" />
-                  <Text style={styles.emptyTitle}>No reviews yet</Text>
-                  <Text style={styles.emptySubtitle}>Complete rentals to receive reviews</Text>
+                  <Text style={styles.emptyTitle}>{t('profile.noReviewsTitle')}</Text>
+                  <Text style={styles.emptySubtitle}>{t('profile.noReviewsSubtitle')}</Text>
                 </Surface>
               )}
             </View>
@@ -1312,7 +1304,10 @@ export const ProfileScreen = () => {
                         styles.languageChip,
                         settingsForm.preferred_language === lang.value && styles.languageChipActive,
                       ]}
-                      onPress={() => setSettingsForm((p) => ({ ...p, preferred_language: lang.value }))}
+                      onPress={() => {
+                        setSettingsForm((p) => ({ ...p, preferred_language: lang.value }));
+                        setLanguage(lang.value);
+                      }}
                     >
                       <Text
                         style={[
@@ -1331,7 +1326,7 @@ export const ProfileScreen = () => {
               <Surface style={[styles.settingsCard, { marginTop: 16 }]} elevation={0}>
                 <View style={styles.pushNotifHeader}>
                   <MaterialCommunityIcons name="bell-outline" size={20} color="#0F172A" />
-                  <Text style={styles.settingsSectionTitle}>Push Notifications</Text>
+                  <Text style={styles.settingsSectionTitle}>{t('profile.pushNotifications')}</Text>
                 </View>
                 <Surface
                   style={[
@@ -1352,12 +1347,14 @@ export const ProfileScreen = () => {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.pushNotifTitle}>
-                        Push Notifications {settingsForm.notification_preferences.push_notifications ? 'Enabled' : 'Disabled'}
+                        {settingsForm.notification_preferences.push_notifications
+                          ? t('profile.pushNotificationsEnabled')
+                          : t('profile.pushNotificationsDisabled')}
                       </Text>
                       <Text style={styles.pushNotifDesc}>
                         {settingsForm.notification_preferences.push_notifications
-                          ? "You'll receive real-time updates"
-                          : 'Enable to receive real-time updates'}
+                          ? t('profile.pushNotificationsEnabledDesc')
+                          : t('profile.pushNotificationsDisabledDesc')}
                       </Text>
                     </View>
                     <Button
@@ -1385,7 +1382,9 @@ export const ProfileScreen = () => {
                         }))
                       }
                     >
-                      {settingsForm.notification_preferences.push_notifications ? 'Disable' : 'Enable'}
+                      {settingsForm.notification_preferences.push_notifications
+                        ? t('profile.disable')
+                        : t('profile.enable')}
                     </Button>
                   </View>
                 </Surface>
@@ -1393,13 +1392,13 @@ export const ProfileScreen = () => {
 
               {/* Notification Preferences */}
               <Surface style={[styles.settingsCard, { marginTop: 16 }]} elevation={0}>
-                <Text style={styles.settingsSectionTitle}>Notification Preferences</Text>
+                <Text style={styles.settingsSectionTitle}>{t('profile.notificationPreferences')}</Text>
 
                 {/* Master email toggle */}
                 <View style={styles.notifRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.notifLabel}>Email Notifications</Text>
-                    <Text style={styles.notifDesc}>Master switch for all email notifications</Text>
+                    <Text style={styles.notifLabel}>{t('profile.emailNotifications')}</Text>
+                    <Text style={styles.notifDesc}>{t('profile.emailNotificationsDesc')}</Text>
                   </View>
                   <Switch
                     value={settingsForm.notification_preferences.email_notifications ?? true}
@@ -1419,8 +1418,8 @@ export const ProfileScreen = () => {
                     {NOTIFICATION_OPTIONS.map((opt) => (
                       <View key={opt.key} style={styles.notifRow}>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.notifLabel}>{opt.label}</Text>
-                          <Text style={styles.notifDesc}>{opt.desc}</Text>
+                          <Text style={styles.notifLabel}>{t(`profile.notificationOptions.${opt.key}.label`)}</Text>
+                          <Text style={styles.notifDesc}>{t(`profile.notificationOptions.${opt.key}.desc`)}</Text>
                         </View>
                         <Switch
                           value={settingsForm.notification_preferences[opt.key] ?? true}
@@ -1449,7 +1448,7 @@ export const ProfileScreen = () => {
                 loading={isSaving}
                 disabled={isSaving}
               >
-                Save Changes
+                {t('profile.saveChanges')}
               </Button>
             </View>
           )}

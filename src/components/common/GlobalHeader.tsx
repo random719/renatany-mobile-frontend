@@ -55,6 +55,7 @@ export const GlobalHeader = ({ onMenuPress, onNotificationPress }: GlobalHeaderP
                             setMenuVisible(false);
                         }}
                         title={`${option.code}  ${option.label}`}
+                        leadingIcon={option.value === language ? 'check' : undefined}
                         titleStyle={option.value === language ? styles.languageMenuItemActive : undefined}
                     />
                 ))}
@@ -87,19 +88,28 @@ const styles = StyleSheet.create({
     languageSelector: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 10,
         borderWidth: 1,
-        borderColor: '#F1F5F9',
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
+        borderColor: '#E5E7EB',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        paddingHorizontal: 14,
+        height: 48,
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.06,
+        shadowRadius: 14,
+        elevation: 2,
     },
     languageText: {
         fontWeight: '600',
         color: '#0F172A',
+        fontSize: typography.body,
     },
     languageMenu: {
+        backgroundColor: '#FFFFFF',
         borderRadius: 16,
+        paddingVertical: 4,
     },
     languageMenuItemActive: {
         color: colors.primary,

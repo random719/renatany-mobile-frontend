@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
 import { Image, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { Text } from 'react-native-paper';
+import { useI18n } from '../../i18n';
 import { colors, typography } from '../../theme';
 import { Listing } from '../../types/listing';
 import { FavoriteButton } from './FavoriteButton';
@@ -13,48 +14,52 @@ interface ListingCardProps {
   style?: ViewStyle;
 }
 
-export const ListingCard = ({ listing, onPress, onToggleLike, style }: ListingCardProps) => (
-  <TouchableOpacity style={[styles.container, style]} onPress={onPress} activeOpacity={0.8}>
-    <View style={styles.imageWrapper}>
-      <Image source={{ uri: listing.images[0] }} style={styles.image} />
+export const ListingCard = ({ listing, onPress, onToggleLike, style }: ListingCardProps) => {
+  const { t } = useI18n();
 
-      {/* Pink Category Badge */}
-      <View style={styles.categoryBadge}>
-        <Text style={styles.categoryText}>{listing.category}</Text>
+  return (
+    <TouchableOpacity style={[styles.container, style]} onPress={onPress} activeOpacity={0.8}>
+      <View style={styles.imageWrapper}>
+        <Image source={{ uri: listing.images[0] }} style={styles.image} />
+
+        {/* Pink Category Badge */}
+        <View style={styles.categoryBadge}>
+          <Text style={styles.categoryText}>{listing.category}</Text>
+        </View>
+
+        <View style={styles.favoriteWrapper}>
+          <FavoriteButton isLiked={listing.isLiked} likes={listing.likes} onPress={onToggleLike} />
+        </View>
       </View>
 
-      <View style={styles.favoriteWrapper}>
-        <FavoriteButton isLiked={listing.isLiked} likes={listing.likes} onPress={onToggleLike} />
-      </View>
-    </View>
-
-    <View style={styles.info}>
-      <Text variant="titleMedium" numberOfLines={1} style={styles.title}>
-        {listing.title}
-      </Text>
-
-      <View style={styles.locationRow}>
-        <MaterialCommunityIcons name="map-marker-outline" size={14} color={colors.textSecondary} />
-        <Text variant="bodySmall" style={styles.locationText}>
-          {listing.location?.address || 'Location Unavailable'}
+      <View style={styles.info}>
+        <Text variant="titleMedium" numberOfLines={1} style={styles.title}>
+          {listing.title}
         </Text>
-      </View>
 
-      <Text variant="titleMedium" style={styles.price}>
-        €{listing.pricePerDay}
-        <Text variant="bodySmall" style={styles.perDay}>
-          /day
+        <View style={styles.locationRow}>
+          <MaterialCommunityIcons name="map-marker-outline" size={14} color={colors.textSecondary} />
+          <Text variant="bodySmall" style={styles.locationText}>
+            {listing.location?.address || 'Location Unavailable'}
+          </Text>
+        </View>
+
+        <Text variant="titleMedium" style={styles.price}>
+          €{listing.pricePerDay}
+          <Text variant="bodySmall" style={styles.perDay}>
+            /day
+          </Text>
         </Text>
-      </Text>
 
-      {/* View Button */}
-      <View style={styles.viewButton}>
-        <MaterialCommunityIcons name="eye-outline" size={16} color="#FFFFFF" />
-        <Text style={styles.viewButtonText}>View</Text>
+        {/* View Button */}
+        <View style={styles.viewButton}>
+          <MaterialCommunityIcons name="eye-outline" size={16} color="#FFFFFF" />
+          <Text style={styles.viewButtonText}>{t('common.view')}</Text>
+        </View>
       </View>
-    </View>
-  </TouchableOpacity>
-);
+    </TouchableOpacity>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {

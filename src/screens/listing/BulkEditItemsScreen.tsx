@@ -300,6 +300,7 @@ export const BulkEditItemsScreen = () => {
                                         <Menu.Item 
                                             key={idx} 
                                             title={opt.label} 
+                                            leadingIcon={bulkChanges.availability === opt.value ? 'check' : undefined}
                                             titleStyle={bulkChanges.availability === opt.value ? styles.menuItemActiveText : undefined}
                                             onPress={() => {
                                                 setBulkChanges(prev => ({ ...prev, availability: opt.value }));
@@ -433,6 +434,7 @@ export const BulkEditItemsScreen = () => {
                                             <Menu.Item 
                                                 key={idx} 
                                                 title={opt.label} 
+                                                leadingIcon={bulkChanges.instant_booking === opt.value ? 'check' : undefined}
                                                 titleStyle={bulkChanges.instant_booking === opt.value ? styles.menuItemActiveText : undefined}
                                                 onPress={() => {
                                                     setBulkChanges(prev => ({ ...prev, instant_booking: opt.value }));
@@ -448,6 +450,7 @@ export const BulkEditItemsScreen = () => {
                                     <Menu
                                         visible={sameDayPickupMenuVisible}
                                         onDismiss={() => setSameDayPickupMenuVisible(false)}
+                                        contentStyle={styles.menuContent}
                                         anchor={
                                             <TouchableOpacity style={styles.smallDropdownContainer} onPress={() => setSameDayPickupMenuVisible(true)}>
                                                 <Text style={styles.dropdownTextValueSmall}>{getTriStateLabel(bulkChanges.same_day_pickup)}</Text>
@@ -456,7 +459,7 @@ export const BulkEditItemsScreen = () => {
                                         }
                                     >
                                         {triStateOptions.map((opt, idx) => (
-                                            <Menu.Item key={idx} title={opt.label} onPress={() => {
+                                            <Menu.Item key={idx} title={opt.label} leadingIcon={bulkChanges.same_day_pickup === opt.value ? 'check' : undefined} titleStyle={bulkChanges.same_day_pickup === opt.value ? styles.menuItemActiveText : undefined} onPress={() => {
                                                 setBulkChanges(prev => ({ ...prev, same_day_pickup: opt.value }));
                                                 setSameDayPickupMenuVisible(false);
                                             }} />
@@ -702,11 +705,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 12,
+        borderColor: '#E5E7EB',
+        borderRadius: 14,
         paddingHorizontal: 14,
         height: 48,
         backgroundColor: '#FFFFFF',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.05,
+        shadowRadius: 14,
+        elevation: 2,
     },
     dropdownTextPlaceholder: {
         color: '#4B5563', // Consistent darker gray placeholder
@@ -771,12 +779,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 12,
+        borderColor: '#E5E7EB',
+        borderRadius: 14,
         paddingHorizontal: 12,
         height: 48,
         width: 140,
         backgroundColor: '#FFFFFF',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.05,
+        shadowRadius: 14,
+        elevation: 2,
     },
     dropdownTextPlaceholderSmall: {
         color: '#4B5563',
@@ -799,8 +812,9 @@ const styles = StyleSheet.create({
     },
     menuContent: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 12,
+        borderRadius: 16,
         marginTop: 8,
+        paddingVertical: 4,
     },
     menuItemActiveText: {
         color: colors.primary,

@@ -217,6 +217,29 @@ export const SearchScreen = () => {
   };
   const activeFiltersCount = getActiveFiltersCount();
 
+  const getCategoryLabel = useCallback(
+    (categoryName?: string) => {
+      if (!categoryName) return t('home.allCategories');
+
+      const normalized = categoryName.trim().toLowerCase();
+      const keyByName: Record<string, string> = {
+        electronics: 'home.category.electronics',
+        tools: 'home.category.tools',
+        fashion: 'home.category.fashion',
+        sports: 'home.category.sports',
+        vehicles: 'home.category.vehicles',
+        home: 'home.category.home',
+        books: 'home.category.books',
+        music: 'home.category.music',
+        photography: 'home.category.photography',
+        other: 'home.category.other',
+      };
+
+      return keyByName[normalized] ? t(keyByName[normalized]) : categoryName;
+    },
+    [t],
+  );
+
   const renderHeader = () => (
     <View style={styles.searchHeader}>
       <View style={styles.headerTitleRow}>
@@ -287,7 +310,7 @@ export const SearchScreen = () => {
             onPress={() => setIsCategoryMenuVisible(true)}
           >
             <Text style={styles.dropdownText}>
-              {activeFilter.category || t('home.allCategories')}
+              {getCategoryLabel(activeFilter.category)}
             </Text>
             <MaterialCommunityIcons name="chevron-down" size={20} color="#6B7280" />
           </TouchableOpacity>
@@ -303,7 +326,7 @@ export const SearchScreen = () => {
           {categories.map((c) => (
             <Menu.Item
               key={c.id}
-              title={c.name}
+              title={getCategoryLabel(c.name)}
               leadingIcon={c.icon as any}
               onPress={() => handleSelectCategory(c.name)}
               titleStyle={activeFilter.category === c.name ? styles.menuItemActiveText : undefined}

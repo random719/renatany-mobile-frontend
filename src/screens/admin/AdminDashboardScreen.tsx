@@ -65,6 +65,329 @@ const MetricCard = ({ metric }: { metric: AdminMetric }) => (
   </View>
 );
 
+const localizeMetric = (
+  metric: AdminMetric,
+  dashboardData: AdminDashboardData,
+  t: (key: string, params?: Record<string, any>) => string
+): AdminMetric => {
+  switch (metric.id) {
+    case "users":
+      return {
+        ...metric,
+        label: t("adminDashboard.totalUsers"),
+        subtitle: t("adminDashboard.verifiedCount", { count: dashboardData.verifiedUsers }),
+        changeText: t("adminDashboard.liveData"),
+      };
+    case "items":
+      return {
+        ...metric,
+        label: t("adminDashboard.totalItems"),
+        subtitle: t("adminDashboard.activeCount", { count: dashboardData.activeItems }),
+        changeText: t("adminDashboard.liveData"),
+      };
+    case "rentals":
+      return {
+        ...metric,
+        label: t("adminDashboard.rentalRequests"),
+        subtitle: t("adminDashboard.pendingCount", { count: dashboardData.pendingRequestsCount }),
+        changeText: t("adminDashboard.liveData"),
+      };
+    case "disputes":
+      return {
+        ...metric,
+        label: t("adminDashboard.openDisputes"),
+        subtitle: t("adminDashboard.totalCount", { count: dashboardData.openDisputesCount }),
+        changeText: t("adminDashboard.liveData"),
+      };
+    case "reports":
+      return {
+        ...metric,
+        label: t("adminDashboard.reports"),
+        subtitle: t("adminDashboard.listingAndUserCount", {
+          listing: dashboardData.listingReportsCount || 0,
+          user: dashboardData.userReportsCount,
+        }),
+        changeText: t("adminDashboard.liveData"),
+      };
+    default:
+      return metric;
+  }
+};
+
+const getLocalizedPageName = (
+  page: string,
+  t: (key: string, params?: Record<string, any>) => string
+) => {
+  switch (page) {
+    case "Admin Dashboard":
+      return t("nav.adminDashboard");
+    case "My Conversations":
+      return t("nav.conversations");
+    case "Home Page":
+      return t("nav.home");
+    case "Profile Page":
+      return t("nav.profile");
+    case "Item Details":
+      return t("rentalDetail.itemDetails");
+    default:
+      return page;
+  }
+};
+
+const getLocalizedSlowRecommendation = (
+  recommendation: string,
+  t: (key: string, params?: Record<string, any>) => string
+) => {
+  switch (recommendation) {
+    case "Load data progressively instead of all at once":
+      return t("adminDashboard.recommendationProgressiveLoad");
+    case "Add delays between API calls (500-1000ms)":
+      return t("adminDashboard.recommendationApiDelays");
+    case "Implement caching for frequently accessed data":
+      return t("adminDashboard.recommendationCaching");
+    case "Use pagination for large datasets":
+      return t("adminDashboard.recommendationPagination");
+    default:
+      return recommendation;
+  }
+};
+
+const getLocalizedOptimizedItem = (
+  item: { title: string; description: string },
+  t: (key: string, params?: Record<string, any>) => string
+) => {
+  switch (item.title) {
+    case "Infinite Scroll":
+      return {
+        title: t("adminDashboard.optimized.infiniteScrollTitle"),
+        description: t("adminDashboard.optimized.infiniteScrollDesc"),
+      };
+    case "Smart Conversations":
+      return {
+        title: t("adminDashboard.optimized.smartConversationsTitle"),
+        description: t("adminDashboard.optimized.smartConversationsDesc"),
+      };
+    case "Image Compression":
+      return {
+        title: t("adminDashboard.optimized.imageCompressionTitle"),
+        description: t("adminDashboard.optimized.imageCompressionDesc"),
+      };
+    case "Lazy Background Loading":
+      return {
+        title: t("adminDashboard.optimized.lazyBackgroundLoadingTitle"),
+        description: t("adminDashboard.optimized.lazyBackgroundLoadingDesc"),
+      };
+    case "Rate Limit Protection":
+      return {
+        title: t("adminDashboard.optimized.rateLimitProtectionTitle"),
+        description: t("adminDashboard.optimized.rateLimitProtectionDesc"),
+      };
+    default:
+      return item;
+  }
+};
+
+const getLocalizedImprovement = (
+  item: AdminDashboardData["recommendedImprovements"][number],
+  t: (key: string, params?: Record<string, any>) => string
+) => {
+  switch (item.id) {
+    case "caching":
+      return {
+        ...item,
+        title: t("adminDashboard.improvements.cachingTitle"),
+        impactLabel: t("adminDashboard.improvements.highImpact"),
+        speedIncrease: t("adminDashboard.improvements.cachingSpeed"),
+        description: t("adminDashboard.improvements.cachingDesc"),
+        actionButtonText: t("adminDashboard.improvements.cachingAction"),
+      };
+    case "pagination":
+      return {
+        ...item,
+        title: t("adminDashboard.improvements.paginationTitle"),
+        impactLabel: t("adminDashboard.improvements.mediumImpact"),
+        speedIncrease: t("adminDashboard.improvements.paginationSpeed"),
+        description: t("adminDashboard.improvements.paginationDesc"),
+        comparisonBox: item.comparisonBox
+          ? {
+              ...item.comparisonBox,
+              currentLabel: t("adminDashboard.improvements.currentLabel"),
+              currentDesc: t("adminDashboard.improvements.paginationCurrentDesc"),
+              recommendedLabel: t("adminDashboard.improvements.recommendedLabel"),
+              recommendedDesc: t("adminDashboard.improvements.paginationRecommendedDesc"),
+            }
+          : item.comparisonBox,
+        actionButtonText: t("adminDashboard.improvements.paginationAction"),
+      };
+    case "images":
+      return {
+        ...item,
+        title: t("adminDashboard.improvements.imagesTitle"),
+        impactLabel: t("adminDashboard.improvements.quickWin"),
+        speedIncrease: t("adminDashboard.improvements.imagesSpeed"),
+        description: t("adminDashboard.improvements.imagesDesc"),
+        comparisonBox: item.comparisonBox
+          ? {
+              ...item.comparisonBox,
+              currentLabel: t("adminDashboard.improvements.currentLabel"),
+              recommendedLabel: t("adminDashboard.improvements.optimizedLabel"),
+            }
+          : item.comparisonBox,
+        actionButtonText: t("adminDashboard.improvements.imagesAction"),
+      };
+    case "debounce":
+      return {
+        ...item,
+        title: t("adminDashboard.improvements.debounceTitle"),
+        impactLabel: t("adminDashboard.improvements.bestPractice"),
+        speedIncrease: t("adminDashboard.improvements.debounceSpeed"),
+        description: t("adminDashboard.improvements.debounceDesc"),
+        actionButtonText: t("adminDashboard.improvements.debounceAction"),
+      };
+    default:
+      return item;
+  }
+};
+
+const getLocalizedGoldenRule = (
+  rule: { title: string; description: string; type: "do" | "dont" },
+  t: (key: string, params?: Record<string, any>) => string
+) => {
+  switch (rule.title) {
+    case "DO: Load Essential Data First":
+      return {
+        ...rule,
+        title: t("adminDashboard.goldenRules.loadEssentialTitle"),
+        description: t("adminDashboard.goldenRules.loadEssentialDesc"),
+      };
+    case "DO: Add 1-2 Second Delays Between API Calls":
+      return {
+        ...rule,
+        title: t("adminDashboard.goldenRules.apiDelaysTitle"),
+        description: t("adminDashboard.goldenRules.apiDelaysDesc"),
+      };
+    case "DO: Use Pagination/Infinite Scroll":
+      return {
+        ...rule,
+        title: t("adminDashboard.goldenRules.paginationTitle"),
+        description: t("adminDashboard.goldenRules.paginationDesc"),
+      };
+    case "DO: Compress Images Before Upload":
+      return {
+        ...rule,
+        title: t("adminDashboard.goldenRules.compressImagesTitle"),
+        description: t("adminDashboard.goldenRules.compressImagesDesc"),
+      };
+    case "DON'T: Make Multiple API Calls Simultaneously":
+      return {
+        ...rule,
+        title: t("adminDashboard.goldenRules.noParallelCallsTitle"),
+        description: t("adminDashboard.goldenRules.noParallelCallsDesc"),
+      };
+    case "DON'T: Auto-Refresh Every Few Seconds":
+      return {
+        ...rule,
+        title: t("adminDashboard.goldenRules.noFrequentRefreshTitle"),
+        description: t("adminDashboard.goldenRules.noFrequentRefreshDesc"),
+      };
+    case "DON'T: Load Data Users Don't See":
+      return {
+        ...rule,
+        title: t("adminDashboard.goldenRules.noHiddenDataTitle"),
+        description: t("adminDashboard.goldenRules.noHiddenDataDesc"),
+      };
+    default:
+      return rule;
+  }
+};
+
+const getLocalizedMonitoringStep = (
+  step: { id: number; title: string; description: string },
+  t: (key: string, params?: Record<string, any>) => string
+) => {
+  const key = `adminDashboard.monitoring.step${step.id}`;
+  return {
+    ...step,
+    title: t(`${key}Title`),
+    description: t(`${key}Desc`),
+  };
+};
+
+const getLocalizedQuickReferenceItem = (
+  section: "pageLoadTimes" | "imageSizes" | "apiBestPractices" | "dataLoading",
+  item: string,
+  t: (key: string, params?: Record<string, any>) => string
+) => {
+  const map: Record<string, Record<string, string>> = {
+    pageLoadTimes: {
+      "< 2s = Excellent 🎉": "excellent",
+      "2-5s = Good ✅": "good",
+      "5-10s = Slow ⚠️": "slow",
+      "> 10s = Critical 🔴": "critical",
+    },
+    imageSizes: {
+      "Thumbnails: < 100KB": "thumbnails",
+      "Full images: < 500KB": "fullImages",
+      "Max resolution: 1920x1920": "maxResolution",
+      "Format: JPEG/WebP": "format",
+    },
+    apiBestPractices: {
+      "Delay between calls: 1-2s": "delayBetweenCalls",
+      "Max items per page: 20-50": "maxItemsPerPage",
+      "Cache duration: 2-5 min": "cacheDuration",
+      "Auto-refresh: 2+ minutes": "autoRefresh",
+    },
+    dataLoading: {
+      "Critical data: < 1s": "criticalData",
+      "Secondary data: < 3s": "secondaryData",
+      "Background data: < 10s": "backgroundData",
+      "Show UI ASAP": "showUiAsap",
+    },
+  };
+  const itemKey = map[section][item];
+  return itemKey ? t(`adminDashboard.quickReference.${section}.${itemKey}`) : item;
+};
+
+const getLocalizedCommonIssue = (
+  issue: AdminDashboardData["commonIssues"][number],
+  t: (key: string, params?: Record<string, any>) => string
+) => {
+  const base = `adminDashboard.commonIssuesMap.${issue.id}`;
+  return {
+    ...issue,
+    title: t(`${base}.title`),
+    description: t(`${base}.description`),
+    solutions: issue.solutions.map((_, idx) => t(`${base}.solution${idx + 1}`)),
+  };
+};
+
+const getLocalizedBestPractice = (
+  type: "do" | "dont",
+  practice: string,
+  t: (key: string, params?: Record<string, any>) => string
+) => {
+  const map: Record<"do" | "dont", Record<string, string>> = {
+    do: {
+      "Load critical data first": "loadCriticalDataFirst",
+      "Add delays between API calls (500ms+)": "addApiDelays",
+      "Compress images before upload": "compressImagesBeforeUpload",
+      "Use pagination/infinite scroll": "usePagination",
+      "Show loading states to users": "showLoadingStates",
+      "Handle errors gracefully": "handleErrorsGracefully",
+    },
+    dont: {
+      "Load all data at once": "loadAllDataAtOnce",
+      "Make multiple API calls simultaneously": "multipleApiCalls",
+      "Upload large files without compression": "largeFilesWithoutCompression",
+      "Poll data every few seconds": "pollEveryFewSeconds",
+      "Load data users don't need": "loadUnneededData",
+      "Ignore rate limit warnings": "ignoreRateLimits",
+    },
+  };
+  const key = map[type][practice];
+  return key ? t(`adminDashboard.bestPracticesMap.${type}.${key}`) : practice;
+};
+
 const UsersMetricCard = ({
   title,
   value,
@@ -613,7 +936,10 @@ export const AdminDashboardScreen = () => {
     loadDashboard();
   }, [loadDashboard]);
 
-  const metrics = useMemo(() => dashboardData?.metrics || [], [dashboardData]);
+  const metrics = useMemo(() => {
+    if (!dashboardData) return [];
+    return (dashboardData.metrics || []).map((metric) => localizeMetric(metric, dashboardData, t));
+  }, [dashboardData, t]);
 
   const renderTabContent = () => {
     if (!dashboardData) {
@@ -659,32 +985,32 @@ export const AdminDashboardScreen = () => {
         <>
           <View style={styles.metricsGrid}>
             <UsersMetricCard
-              title="Total Users"
+              title={t("adminDashboard.totalUsers")}
               value={metrics.find((m) => m.id === "users")?.value || "0"}
-              subtitle={`${dashboardData.usersJoinedThisWeek} joined this week`}
+              subtitle={t("adminDashboard.joinedThisWeek", { count: dashboardData.usersJoinedThisWeek })}
               color="#2563EB"
             />
             <UsersMetricCard
-              title="Verified Users"
+              title={t("adminDashboard.verifiedUsersTitle")}
               value={String(dashboardData.verifiedUsers)}
-              subtitle={`${verifiedPct.toFixed(1)}% verified`}
+              subtitle={t("adminDashboard.percentVerified", { percent: verifiedPct.toFixed(1) })}
               color="#16A34A"
             />
             <UsersMetricCard
-              title="New This Month"
+              title={t("adminDashboard.newThisMonth")}
               value={String(dashboardData.usersJoinedThisMonth)}
-              subtitle="User growth"
-              change={`${dashboardData.userGrowthPct.toFixed(0)}% vs last month`}
+              subtitle={t("adminDashboard.userGrowth")}
+              change={t("adminDashboard.growthVsLastMonth", { percent: dashboardData.userGrowthPct.toFixed(0) })}
               color="#9333EA"
             />
           </View>
           <View style={styles.userManagementCard}>
-            <Text style={styles.cardTitle}>User Management</Text>
+            <Text style={styles.cardTitle}>{t("adminDashboard.userManagement")}</Text>
             <View style={styles.userActionRow}>
               <TouchableOpacity style={styles.userActionBtn}>
                 <MaterialCommunityIcons name="alert-outline" size={iconSize.md} color="#111827" />
                 <Text style={styles.userActionText}>
-                  User Reports ({dashboardData.userReportsCount})
+                  {t("adminDashboard.userReportsTitle", { count: dashboardData.userReportsCount })}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.userActionBtn}>
@@ -694,7 +1020,7 @@ export const AdminDashboardScreen = () => {
                   color="#111827"
                 />
                 <Text style={styles.userActionText}>
-                  Listing Reports ({dashboardData.listingReportsCount || 0})
+                  {t("adminDashboard.listingReportsTitle", { count: dashboardData.listingReportsCount || 0 })}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -900,7 +1226,7 @@ export const AdminDashboardScreen = () => {
                        size={iconSize.md} 
                        color="#64748B" 
                      />
-                     <Text style={styles.pageLoadName}>{item.page}</Text>
+                     <Text style={styles.pageLoadName}>{getLocalizedPageName(item.page, t)}</Text>
                    </View>
                    <View style={styles.pageLoadRight}>
                      {item.loadTime === null ? (
@@ -946,7 +1272,7 @@ export const AdminDashboardScreen = () => {
           </View>
           {dashboardData.slowPages.map((page, idx) => (
             <View key={idx} style={styles.slowPageCard}>
-              <Text style={styles.slowPageName}>{page.page}</Text>
+              <Text style={styles.slowPageName}>{getLocalizedPageName(page.page, t)}</Text>
               <View style={styles.slowPageTimePill}>
                 <Text style={styles.slowPageTimeText}>{page.time}s</Text>
               </View>
@@ -958,7 +1284,7 @@ export const AdminDashboardScreen = () => {
               <Text style={styles.recommendationsTitle}>{t("adminDashboard.recommendations")}</Text>
             </View>
             {dashboardData.slowPageRecommendations.map((rec, idx) => (
-              <Text key={idx} style={styles.recommendationItem}>• {rec}</Text>
+              <Text key={idx} style={styles.recommendationItem}>• {getLocalizedSlowRecommendation(rec, t)}</Text>
             ))}
           </View>
         </View>
@@ -980,12 +1306,12 @@ export const AdminDashboardScreen = () => {
         <View style={styles.singlePaneCard}>
           <View style={styles.sectionHeaderRow}>
              <MaterialCommunityIcons name="lightning-bolt" size={iconSize.lg} color="#D97706" />
-             <Text style={styles.cardTitle}>Performance Optimization Guide</Text>
+             <Text style={styles.cardTitle}>{t("adminDashboard.performanceGuideTitle")}</Text>
           </View>
           
           <View style={styles.performanceScoreBox}>
             <View style={styles.scoreRow}>
-              <Text style={styles.scoreTitle}>Current Performance{"\n"}Score</Text>
+              <Text style={styles.scoreTitle}>{t("adminDashboard.currentPerformanceScore")}</Text>
               <Text style={styles.scoreValueBig}>
                 <Text style={styles.scoreValueCurrent}>{dashboardData.performanceScore}</Text>
                 <Text style={styles.scoreValueTotal}> /100</Text>
@@ -997,7 +1323,7 @@ export const AdminDashboardScreen = () => {
                 backgroundColor: dashboardData.performanceScore >= 80 ? '#22C55E' : dashboardData.performanceScore >= 60 ? '#EAB308' : '#EF4444',
               }]} />
             </View>
-            <Text style={styles.scoreSubtitle}>Based on load times, API efficiency, and user experience metrics</Text>
+            <Text style={styles.scoreSubtitle}>{t("adminDashboard.performanceScoreSubtitle")}</Text>
           </View>
 
           <View style={styles.alreadyOptimizedBox}>
@@ -1005,28 +1331,33 @@ export const AdminDashboardScreen = () => {
               <MaterialCommunityIcons name="check-circle-outline" size={24} color="#16A34A" />
               <View style={styles.alreadyOptimizedCheckWrap}>
                 <MaterialCommunityIcons name="checkbox-marked" size={20} color="#16A34A" />
-                <Text style={styles.alreadyOptimizedTitle}>Already Optimized</Text>
+                <Text style={styles.alreadyOptimizedTitle}>{t("adminDashboard.alreadyOptimized")}</Text>
               </View>
             </View>
-            <Text style={styles.alreadyOptimizedDesc}>Great news! Your app already has these performance features:</Text>
+            <Text style={styles.alreadyOptimizedDesc}>{t("adminDashboard.alreadyOptimizedDesc")}</Text>
             <View style={styles.alreadyOptimizedList}>
-              {dashboardData.alreadyOptimized.map((item, idx) => (
-                <Text key={idx} style={styles.alreadyItemText}>
-                  <Text style={styles.alreadyItemTitle}>• {item.title}</Text> - {item.description}
-                </Text>
-              ))}
+              {dashboardData.alreadyOptimized.map((item, idx) => {
+                const localizedItem = getLocalizedOptimizedItem(item, t);
+                return (
+                  <Text key={idx} style={styles.alreadyItemText}>
+                    <Text style={styles.alreadyItemTitle}>• {localizedItem.title}</Text> - {localizedItem.description}
+                  </Text>
+                );
+              })}
             </View>
           </View>
 
           <View style={styles.recommendedGuideBox}>
             <View style={styles.recommendedHeaderRow}>
               <MaterialCommunityIcons name="rocket-launch-outline" size={22} color="#2563EB" />
-              <Text style={styles.recommendedGuideTitle}>Recommended{"\n"}Improvements</Text>
+              <Text style={styles.recommendedGuideTitle}>{t("adminDashboard.recommendedImprovementsTitle")}</Text>
             </View>
-            <Text style={styles.recommendedGuideDesc}>Implement these to make your app even faster:</Text>
+            <Text style={styles.recommendedGuideDesc}>{t("adminDashboard.recommendedImprovementsDesc")}</Text>
             
             <View style={styles.improvementsList}>
-              {dashboardData.recommendedImprovements.map((item) => (
+              {dashboardData.recommendedImprovements.map((rawItem) => {
+                const item = getLocalizedImprovement(rawItem, t);
+                return (
                 <View key={item.id} style={styles.improvementCard}>
                   <View style={styles.improvementCardHeader}>
                     <View style={[styles.impactBadge, { backgroundColor: item.impactColor }]}>
@@ -1085,7 +1416,7 @@ export const AdminDashboardScreen = () => {
                       {implementingOptimization === item.id ? (
                         <>
                           <ActivityIndicator size="small" color="#FFFFFF" />
-                          <Text style={styles.actionBtnText}>Implementing...</Text>
+                          <Text style={styles.actionBtnText}>{t("adminDashboard.implementing")}</Text>
                         </>
                       ) : (
                         <>
@@ -1096,7 +1427,7 @@ export const AdminDashboardScreen = () => {
                     </TouchableOpacity>
                   )}
                 </View>
-              ))}
+              )})}
             </View>
           </View>
         </View>
@@ -1108,7 +1439,9 @@ export const AdminDashboardScreen = () => {
              <Text style={styles.cardTitle}>{t("adminDashboard.goldenRulesTitle")}</Text>
           </View>
           <View style={styles.goldenRulesList}>
-            {dashboardData.goldenRules.map((rule, idx) => (
+            {dashboardData.goldenRules.map((rawRule, idx) => {
+              const rule = getLocalizedGoldenRule(rawRule, t);
+              return (
               <View 
                 key={idx} 
                 style={[
@@ -1142,7 +1475,7 @@ export const AdminDashboardScreen = () => {
                   </Text>
                 </View>
               </View>
-            ))}
+            )})}
           </View>
         </View>
 
@@ -1153,7 +1486,9 @@ export const AdminDashboardScreen = () => {
              <Text style={[styles.cardTitle, { color: "#6B21A8" }]}>{t("adminDashboard.monitorPerformanceTitle")}</Text>
           </View>
           <View style={styles.monitorList}>
-            {dashboardData.monitoringSteps.map((step) => (
+            {dashboardData.monitoringSteps.map((rawStep) => {
+              const step = getLocalizedMonitoringStep(rawStep, t);
+              return (
               <View key={step.id} style={styles.monitorRow}>
                 <Text style={styles.monitorStepId}>{step.id}.</Text>
                 <Text style={styles.monitorStepText}>
@@ -1161,7 +1496,7 @@ export const AdminDashboardScreen = () => {
                   {step.description}
                 </Text>
               </View>
-            ))}
+            )})}
           </View>
         </View>
 
@@ -1174,22 +1509,22 @@ export const AdminDashboardScreen = () => {
           
           <Text style={styles.quickRefSectionTitle}>{t("adminDashboard.pageLoadTimesSection")}</Text>
           {dashboardData.quickReference.pageLoadTimes.map((item, idx) => (
-            <Text key={`plt-${idx}`} style={styles.quickRefText}>{item}</Text>
+            <Text key={`plt-${idx}`} style={styles.quickRefText}>{getLocalizedQuickReferenceItem("pageLoadTimes", item, t)}</Text>
           ))}
 
           <Text style={styles.quickRefSectionTitle}>{t("adminDashboard.imageSizesSection")}</Text>
           {dashboardData.quickReference.imageSizes.map((item, idx) => (
-            <Text key={`is-${idx}`} style={styles.quickRefText}>{item}</Text>
+            <Text key={`is-${idx}`} style={styles.quickRefText}>{getLocalizedQuickReferenceItem("imageSizes", item, t)}</Text>
           ))}
 
           <Text style={styles.quickRefSectionTitle}>{t("adminDashboard.apiBestPracticesSection")}</Text>
           {dashboardData.quickReference.apiBestPractices.map((item, idx) => (
-            <Text key={`abp-${idx}`} style={styles.quickRefText}>{item}</Text>
+            <Text key={`abp-${idx}`} style={styles.quickRefText}>{getLocalizedQuickReferenceItem("apiBestPractices", item, t)}</Text>
           ))}
 
           <Text style={styles.quickRefSectionTitle}>{t("adminDashboard.dataLoadingSection")}</Text>
           {dashboardData.quickReference.dataLoading.map((item, idx) => (
-            <Text key={`dl-${idx}`} style={styles.quickRefText}>{item}</Text>
+            <Text key={`dl-${idx}`} style={styles.quickRefText}>{getLocalizedQuickReferenceItem("dataLoading", item, t)}</Text>
           ))}
         </View>
 
@@ -1200,7 +1535,9 @@ export const AdminDashboardScreen = () => {
              <Text style={styles.cardTitle}>{t("adminDashboard.commonIssuesTitle")}</Text>
           </View>
           <View style={styles.issuesList}>
-            {dashboardData.commonIssues.map((issue) => (
+            {dashboardData.commonIssues.map((rawIssue) => {
+              const issue = getLocalizedCommonIssue(rawIssue, t);
+              return (
               <View key={issue.id} style={styles.issueCard}>
                 <View style={styles.issueHeaderRow}>
                   <View style={[styles.issueIconWrap, { backgroundColor: issue.iconBg }]}>
@@ -1219,7 +1556,7 @@ export const AdminDashboardScreen = () => {
                   ))}
                 </View>
               </View>
-            ))}
+            )})}
           </View>
         </View>
 
@@ -1239,7 +1576,7 @@ export const AdminDashboardScreen = () => {
                 <View style={styles.bestPracticeIconWrap}>
                    <MaterialCommunityIcons name="checkbox-marked" size={20} color="#16A34A" />
                 </View>
-                <Text style={styles.bestPracticeText}>{practice}</Text>
+                <Text style={styles.bestPracticeText}>{getLocalizedBestPractice("do", practice, t)}</Text>
               </View>
             ))}
           </View>
@@ -1254,7 +1591,7 @@ export const AdminDashboardScreen = () => {
                 <View style={styles.bestPracticeIconWrap}>
                    <MaterialCommunityIcons name="close" size={20} color="#DC2626" />
                 </View>
-                <Text style={styles.bestPracticeText}>{practice}</Text>
+                <Text style={styles.bestPracticeText}>{getLocalizedBestPractice("dont", practice, t)}</Text>
               </View>
             ))}
           </View>

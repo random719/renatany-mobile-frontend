@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Platform,
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
@@ -13,7 +14,8 @@ import {
 } from 'react-native';
 import { Menu, Text, TextInput } from 'react-native-paper';
 import { useAuth, useUser } from '@clerk/expo';
-import { File, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
+import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { AppBottomNavBar } from '../../components/common/AppBottomNavBar';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
@@ -84,7 +86,7 @@ export const RentalHistoryScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<FilterKey>('all');
   const [isFilterMenuVisible, setIsFilterMenuVisible] = useState(false);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [receiptActionState, setReceiptActionState] = useState<{ id: string; action: 'download' | 'share' } | null>(null);
 
   const load = useCallback(async (quiet = false) => {
     if (!userEmail) {
@@ -146,27 +148,88 @@ export const RentalHistoryScreen = () => {
     load();
   }, [load]);
 
-  const handleDownloadReceipt = async (rentalId: string) => {
-    setDownloadingId(rentalId);
-    try {
-      const baseUrl = api.defaults.baseURL || '';
-      // Get a fresh Clerk session token
-      const token = await getToken();
-      if (!token) {
-        toast.error(t('rentalHistory.sessionExpired'));
-        setDownloadingId(null);
-        return;
-      }
-      const receiptUrl = `${baseUrl}/receipts?rental_request_id=${encodeURIComponent(rentalId)}`;
+  const getReceiptRequest = async (rentalId: string) => {
+    const baseUrl = api.defaults.baseURL || '';
+    const token = await getToken();
+    if (!token) {
+      toast.error(t('rentalHistory.sessionExpired'));
+      return null;
+    }
+    const receiptUrl = `${baseUrl}/receipts?rental_request_id=${encodeURIComponent(rentalId)}&lang=${encodeURIComponent(language)}`;
+    return { receiptUrl, token };
+  };
 
-      const destination = new File(Paths.cache, `receipt-${rentalId}.pdf`);
-      const downloaded = await File.downloadFileAsync(receiptUrl, destination, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/pdf',
-        },
-        idempotent: true,
-      });
+  const downloadReceiptFile = async (rentalId: string) => {
+    const request = await getReceiptRequest(rentalId);
+    if (!request) return null;
+    const destination = new File(Paths.cache, `receipt-${rentalId}.pdf`);
+    return File.downloadFileAsync(request.receiptUrl, destination, {
+      headers: {
+        Authorization: `Bearer ${request.token}`,
+        Accept: 'application/pdf',
+      },
+      idempotent: true,
+    });
+  };
+
+  const handleDownloadReceipt = async (rentalId: string) => {
+    setReceiptActionState({ id: rentalId, action: 'download' });
+    try {
+      const request = await getReceiptRequest(rentalId);
+      if (!request) return;
+
+      if (Platform.OS === 'web') {
+        const downloaded = await downloadReceiptFile(rentalId);
+        if (!downloaded) return;
+      } else if (Platform.OS === 'android') {
+        const downloaded = await downloadReceiptFile(rentalId);
+        if (!downloaded) return;
+
+        const permissions = await LegacyFileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (!permissions.granted) return;
+
+        const base64 = await downloaded.base64();
+        const fileUri = await LegacyFileSystem.StorageAccessFramework.createFileAsync(
+          permissions.directoryUri,
+          `receipt-${rentalId}-${Date.now()}`,
+          'application/pdf',
+        );
+        await LegacyFileSystem.writeAsStringAsync(fileUri, base64, {
+          encoding: LegacyFileSystem.EncodingType.Base64,
+        });
+      } else {
+        const targetDirectory = await Directory.pickDirectoryAsync();
+        const targetFile = targetDirectory.createFile(`receipt-${rentalId}-${Date.now()}.pdf`, 'application/pdf');
+        await File.downloadFileAsync(request.receiptUrl, targetFile, {
+          headers: {
+            Authorization: `Bearer ${request.token}`,
+            Accept: 'application/pdf',
+          },
+          idempotent: true,
+        });
+      }
+      toast.success(t('rentalHistory.receiptDownloaded'));
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.toLowerCase().includes('cancel')) {
+        return;
+      } else if (msg.includes('401') || msg.includes('Unauthorized')) {
+        toast.error(t('rentalHistory.sessionExpiredReceipt'));
+      } else if (msg.includes('400') || msg.includes('only available')) {
+        toast.warning(t('rentalHistory.receiptUnavailable'));
+      } else {
+        toast.error(t('rentalHistory.receiptFailed'));
+      }
+    } finally {
+      setReceiptActionState(null);
+    }
+  };
+
+  const handleShareReceipt = async (rentalId: string) => {
+    setReceiptActionState({ id: rentalId, action: 'share' });
+    try {
+      const downloaded = await downloadReceiptFile(rentalId);
+      if (!downloaded) return;
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(downloaded.uri, {
@@ -186,7 +249,7 @@ export const RentalHistoryScreen = () => {
         toast.error(t('rentalHistory.receiptFailed'));
       }
     } finally {
-      setDownloadingId(null);
+      setReceiptActionState(null);
     }
   };
 
@@ -235,7 +298,9 @@ export const RentalHistoryScreen = () => {
     const totalPaid = typeof rental.total_paid === 'number' ? rental.total_paid : rentalCost + platformFee + securityDeposit;
 
     const accent = STATUS_COLORS[rental.status] ?? '#64748B';
-    const isDownloading = downloadingId === rental.id;
+    const isDownloading = receiptActionState?.id === rental.id && receiptActionState.action === 'download';
+    const isSharing = receiptActionState?.id === rental.id && receiptActionState.action === 'share';
+    const isBusy = receiptActionState?.id === rental.id;
 
     return (
       <TouchableOpacity
@@ -291,24 +356,44 @@ export const RentalHistoryScreen = () => {
           </View>
         </View>
 
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => handleDownloadReceipt(rental.id)}
-          disabled={isDownloading}
-          style={[styles.receiptButton, isDownloading && { opacity: 0.6 }]}
-        >
-          {isDownloading ? (
-            <>
-              <ActivityIndicator size="small" color="#111827" />
-              <Text style={styles.receiptButtonText}>{t('rentalHistory.downloading')}</Text>
-            </>
-          ) : (
-            <>
-              <MaterialCommunityIcons name="download" size={18} color="#111827" />
-              <Text style={styles.receiptButtonText}>{t('rentalHistory.receipt')}</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <View style={styles.receiptActionsRow}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => handleDownloadReceipt(rental.id)}
+            disabled={!!isBusy}
+            style={[styles.receiptButton, isBusy && { opacity: 0.6 }]}
+          >
+            {isDownloading ? (
+              <>
+                <ActivityIndicator size="small" color="#111827" />
+                <Text style={styles.receiptButtonText}>{t('rentalHistory.downloading')}</Text>
+              </>
+            ) : (
+              <>
+                <MaterialCommunityIcons name="download" size={18} color="#111827" />
+                <Text style={styles.receiptButtonText}>{t('rentalHistory.downloadReceipt')}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => handleShareReceipt(rental.id)}
+            disabled={!!isBusy}
+            style={[styles.receiptButton, isBusy && { opacity: 0.6 }]}
+          >
+            {isSharing ? (
+              <>
+                <ActivityIndicator size="small" color="#111827" />
+                <Text style={styles.receiptButtonText}>{t('rentalHistory.downloading')}</Text>
+              </>
+            ) : (
+              <>
+                <MaterialCommunityIcons name="share-variant-outline" size={18} color="#111827" />
+                <Text style={styles.receiptButtonText}>{t('rentalHistory.shareReceipt')}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -381,6 +466,8 @@ export const RentalHistoryScreen = () => {
                       setIsFilterMenuVisible(false);
                     }}
                     title={filter.label}
+                    leadingIcon={selectedFilter === filter.key ? 'check' : undefined}
+                    titleStyle={selectedFilter === filter.key ? styles.menuItemActiveText : undefined}
                   />
                 ))}
               </Menu>
@@ -454,11 +541,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 14,
     height: 48,
     marginBottom: 16,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    elevation: 2,
   },
   filterButtonText: {
     fontSize: typography.label,
@@ -466,7 +558,12 @@ const styles = StyleSheet.create({
   },
   menuContent: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
+    paddingVertical: 4,
+  },
+  menuItemActiveText: {
+    color: colors.primary,
+    fontWeight: '700',
   },
   loadingWrap: {
     paddingVertical: 36,
@@ -568,8 +665,13 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: '#94A3B8',
   },
+  receiptActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   receiptButton: {
     minHeight: 42,
+    flex: 1,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
