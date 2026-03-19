@@ -55,7 +55,7 @@ const REPORT_REASON_VALUES = [
 const isVideoUrl = (url: string): boolean => /\.(mp4|mov|webm)$/i.test(url);
 
 export const ListingDetailScreen = () => {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const route = useRoute<Route>();
   const navigation = useNavigation();
   const { listingId } = route.params;
@@ -115,6 +115,7 @@ export const ListingDetailScreen = () => {
     value,
     label: t(`listingDetail.reportReasons.${value}`),
   }));
+  const locale = language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -331,13 +332,13 @@ export const ListingDetailScreen = () => {
   }, [monthOffset]);
 
   const currentCalendarLabel = useMemo(
-    () => currentCalendarDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-    [currentCalendarDate]
+    () => currentCalendarDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' }),
+    [currentCalendarDate, locale]
   );
 
   const nextCalendarLabel = useMemo(
-    () => nextCalendarDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-    [nextCalendarDate]
+    () => nextCalendarDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' }),
+    [nextCalendarDate, locale]
   );
 
   // Calendar: handle day tap for range selection
@@ -471,11 +472,14 @@ export const ListingDetailScreen = () => {
     if (selectedDates.length === 0) return '';
     const sorted = [...selectedDates].sort();
     return sorted.length === 1
-      ? new Date(sorted[0]).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-      : `${sorted.length} dates: ${sorted
-          .map((date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
-          .join(', ')}`;
-  }, [selectedDates]);
+      ? new Date(sorted[0]).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })
+      : t('listingDetail.selectedDatesSummary', {
+          count: sorted.length,
+          dates: sorted
+            .map((date) => new Date(date).toLocaleDateString(locale, { month: 'short', day: 'numeric' }))
+            .join(', '),
+        });
+  }, [locale, selectedDates, t]);
 
   // Submit rental request inline
   const handleSubmitRental = async () => {
@@ -1189,9 +1193,9 @@ export const ListingDetailScreen = () => {
           <View style={styles.noticeBox}>
             <MaterialCommunityIcons name="information-outline" size={16} color="#1D4ED8" />
             <View style={{ flex: 1 }}>
-              <Text style={styles.noticeText}>
+                <Text style={styles.noticeText}>
                 <Text style={styles.noticeBold}>{t('listingDetail.earliestPickup')}</Text>
-                {earliestAvailableDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                {earliestAvailableDate.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
               </Text>
               {noticePeriodHours > 0 && (
                 <Text style={styles.noticeSubtext}>

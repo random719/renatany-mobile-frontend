@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { ActivityIndicator, Text } from "react-native-paper";
 import { GlobalHeader } from "../../components/common/GlobalHeader";
+import { useI18n } from "../../i18n";
 import {
   getDisputes,
   updateDispute,
@@ -29,18 +30,11 @@ import { RootStackParamList } from "../../types/navigation";
 
 type Nav = StackNavigationProp<RootStackParamList>;
 
-const STATUS_CONFIG: Record<string, { bg: string; text: string; icon: string; label: string }> = {
-  open: { bg: "#FEE2E2", text: "#DC2626", icon: "alert-circle-outline", label: "Open" },
-  under_review: { bg: "#FEF3C7", text: "#D97706", icon: "clock-outline", label: "Under Review" },
-  resolved: { bg: "#ECFDF5", text: "#10B981", icon: "check-circle-outline", label: "Resolved" },
-  closed: { bg: "#F3F4F6", text: "#6B7280", icon: "close-circle-outline", label: "Closed" },
-};
-
 const TABS = [
-  { key: "open", label: "Open" },
-  { key: "under_review", label: "Under Review" },
-  { key: "resolved", label: "Resolved" },
-  { key: "closed", label: "Closed" },
+  { key: "open" },
+  { key: "under_review" },
+  { key: "resolved" },
+  { key: "closed" },
 ] as const;
 
 interface RentalInfo {
@@ -61,6 +55,7 @@ interface ItemInfo {
 
 export const AdminDisputesScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { t } = useI18n();
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [rentals, setRentals] = useState<Record<string, RentalInfo>>({});
   const [items, setItems] = useState<Record<string, ItemInfo>>({});
@@ -153,7 +148,7 @@ export const AdminDisputesScreen = () => {
       await updateDispute(disputeId, { status: newStatus });
       await loadData();
     } catch (e: any) {
-      const msg = e?.response?.data?.error || e?.message || "Failed to update status.";
+      const msg = e?.response?.data?.error || e?.message || t('adminDisputes.updateStatusFailed');
       toast.error(msg);
     }
   };
@@ -169,13 +164,13 @@ export const AdminDisputesScreen = () => {
     setDecision(d);
     switch (d) {
       case "favor_renter":
-        setResolution("After reviewing the evidence, we've decided in favor of the renter. The full amount will be refunded.");
+        setResolution(t('adminDisputes.quickResolutionFavorRenter'));
         break;
       case "favor_owner":
-        setResolution("After reviewing the evidence, we've decided in favor of the owner. The rental amount will be released.");
+        setResolution(t('adminDisputes.quickResolutionFavorOwner'));
         break;
       case "split":
-        setResolution("After reviewing the evidence, we've decided on a split resolution.");
+        setResolution(t('adminDisputes.quickResolutionSplit'));
         break;
     }
   };
@@ -183,11 +178,11 @@ export const AdminDisputesScreen = () => {
   const handleResolve = async () => {
     if (!selectedDispute) return;
     if (!decision) {
-      toast.warning("Please select a decision (Favor Renter, Favor Owner, or Split).");
+      toast.warning(t('adminDisputes.selectDecision'));
       return;
     }
     if (!resolution.trim()) {
-      toast.warning("Please provide a resolution message.");
+      toast.warning(t('adminDisputes.provideResolution'));
       return;
     }
 
@@ -205,31 +200,31 @@ export const AdminDisputesScreen = () => {
       try {
         const rental = rentals[selectedDispute.rental_request_id];
         const item = rental ? items[rental.item_id] : null;
-        const itemTitle = item?.title || "your rental";
+        const itemTitle = item?.title || t('adminDisputes.yourRental');
 
         await api.post("/notifications", {
           user_email: selectedDispute.filed_by_email,
           type: "dispute",
-          title: "Your Dispute Has Been Resolved",
-          message: `The dispute regarding "${itemTitle}" has been resolved. Decision: ${decision.replace(/_/g, " ")}. ${resolution}`,
+          title: t("adminDisputes.notificationResolvedForFilerTitle"),
+          message: t("adminDisputes.notificationResolvedBody", { itemTitle, decision: decision.replace(/_/g, " "), resolution }),
           related_id: selectedDispute.id,
         });
         await api.post("/notifications", {
           user_email: selectedDispute.against_email,
           type: "dispute",
-          title: "A Dispute Has Been Resolved",
-          message: `The dispute regarding "${itemTitle}" has been resolved. Decision: ${decision.replace(/_/g, " ")}. ${resolution}`,
+          title: t("adminDisputes.notificationResolvedForOtherTitle"),
+          message: t("adminDisputes.notificationResolvedBody", { itemTitle, decision: decision.replace(/_/g, " "), resolution }),
           related_id: selectedDispute.id,
         });
       } catch {
         // Notifications are best-effort
       }
 
-      toast.success("Dispute resolved successfully! Both parties have been notified.");
+      toast.success(t('adminDisputes.resolveSuccess'));
       setSelectedDispute(null);
       await loadData();
     } catch (e: any) {
-      const msg = e?.response?.data?.error || e?.message || "Failed to resolve dispute. Please try again.";
+      const msg = e?.response?.data?.error || e?.message || t('adminDisputes.resolveFailed');
       toast.error(msg);
     } finally {
       setIsUpdating(false);
@@ -239,7 +234,13 @@ export const AdminDisputesScreen = () => {
   const renderDispute = ({ item: dispute }: { item: Dispute }) => {
     const rental = rentals[dispute.rental_request_id];
     const item = rental ? items[rental.item_id] : null;
-    const sc = STATUS_CONFIG[dispute.status] || STATUS_CONFIG.open;
+    const sc = dispute.status === "under_review"
+      ? { bg: "#FEF3C7", text: "#D97706", icon: "clock-outline" }
+      : dispute.status === "resolved"
+      ? { bg: "#ECFDF5", text: "#10B981", icon: "check-circle-outline" }
+      : dispute.status === "closed"
+      ? { bg: "#F3F4F6", text: "#6B7280", icon: "close-circle-outline" }
+      : { bg: "#FEE2E2", text: "#DC2626", icon: "alert-circle-outline" };
 
     return (
       <View style={styles.card}>
@@ -249,12 +250,12 @@ export const AdminDisputesScreen = () => {
             <View style={styles.cardTitleRow}>
               <MaterialCommunityIcons name="alert-circle" size={18} color="#DC2626" />
               <Text style={styles.cardTitle} numberOfLines={1}>
-                {item?.title || "Item not found"}
+                {item?.title || t('disputes.itemNotFound')}
               </Text>
             </View>
             <View style={styles.cardMeta}>
               <MaterialCommunityIcons name="calendar" size={14} color="#94A3B8" />
-              <Text style={styles.cardMetaText}>Filed {formatDate(dispute.created_date)}</Text>
+              <Text style={styles.cardMetaText}>{t('disputes.filedOn', { date: formatDate(dispute.created_date) })}</Text>
               {rental && (
                 <>
                   <MaterialCommunityIcons name="currency-usd" size={14} color="#94A3B8" style={{ marginLeft: 12 }} />
@@ -265,7 +266,7 @@ export const AdminDisputesScreen = () => {
           </View>
           <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
             <MaterialCommunityIcons name={sc.icon as any} size={14} color={sc.text} />
-            <Text style={[styles.statusText, { color: sc.text }]}>{sc.label}</Text>
+            <Text style={[styles.statusText, { color: sc.text }]}>{t(`disputes.status.${dispute.status}`)}</Text>
           </View>
         </View>
 
@@ -273,18 +274,18 @@ export const AdminDisputesScreen = () => {
         <View style={styles.cardBody}>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="account-arrow-right" size={16} color="#64748B" />
-            <Text style={styles.infoLabel}>Filed by:</Text>
+            <Text style={styles.infoLabel}>{t('disputeDetail.filedBy')}:</Text>
             <Text style={styles.infoValue} numberOfLines={1}>{dispute.filed_by_email}</Text>
           </View>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="account-alert" size={16} color="#64748B" />
-            <Text style={styles.infoLabel}>Against:</Text>
+            <Text style={styles.infoLabel}>{t('disputeDetail.against')}:</Text>
             <Text style={styles.infoValue} numberOfLines={1}>{dispute.against_email}</Text>
           </View>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="tag-outline" size={16} color="#64748B" />
-            <Text style={styles.infoLabel}>Reason:</Text>
-            <Text style={styles.infoValue}>{dispute.reason}</Text>
+            <Text style={styles.infoLabel}>{t('disputeDetail.reason')}:</Text>
+            <Text style={styles.infoValue}>{dispute.reason.replace(/_/g, " ")}</Text>
           </View>
           {dispute.description && (
             <View style={styles.descriptionBox}>
@@ -310,20 +311,20 @@ export const AdminDisputesScreen = () => {
               onPress={() => handleChangeStatus(dispute.id, "under_review")}
             >
               <MaterialCommunityIcons name="eye-outline" size={16} color="#D97706" />
-              <Text style={[styles.statusChangeBtnText, { color: "#D97706" }]}>Start Review</Text>
+              <Text style={[styles.statusChangeBtnText, { color: "#D97706" }]}>{t('adminDisputes.startReview')}</Text>
             </TouchableOpacity>
           )}
           {(dispute.status === "open" || dispute.status === "under_review") && (
             <TouchableOpacity style={styles.resolveActionBtn} onPress={() => openDetail(dispute)}>
               <MaterialCommunityIcons name="gavel" size={16} color="#FFFFFF" />
-              <Text style={styles.resolveActionBtnText}>Review & Resolve</Text>
+              <Text style={styles.resolveActionBtnText}>{t('adminDisputes.reviewResolve')}</Text>
             </TouchableOpacity>
           )}
           {dispute.status === "resolved" && dispute.decision && (
             <View style={styles.resolutionSummary}>
               <MaterialCommunityIcons name="check-decagram" size={16} color="#10B981" />
               <Text style={styles.resolutionSummaryText}>
-                Decision: {dispute.decision.replace(/_/g, " ")}
+                {t('adminDisputes.decisionSummary', { decision: dispute.decision.replace(/_/g, " ") })}
               </Text>
             </View>
           )}
@@ -349,7 +350,7 @@ export const AdminDisputesScreen = () => {
               </TouchableOpacity>
               <View style={styles.headerTitleContainer}>
                 <MaterialCommunityIcons name="alert-outline" size={24} color="#DC2626" />
-                <Text style={styles.headerTitle}>Disputes</Text>
+                <Text style={styles.headerTitle}>{t('nav.disputes')}</Text>
               </View>
               <TouchableOpacity style={styles.refreshBtn} onPress={loadData} disabled={isLoading}>
                 <MaterialCommunityIcons name="refresh" size={20} color={colors.textPrimary} />
@@ -369,7 +370,7 @@ export const AdminDisputesScreen = () => {
                       onPress={() => setActiveTab(tab.key)}
                     >
                       <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-                        {tab.label} ({count})
+                        {t('adminUserReports.tabLabel', { label: t(`disputes.status.${tab.key}`), count })}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -384,9 +385,9 @@ export const AdminDisputesScreen = () => {
           ) : (
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="check-circle-outline" size={64} color="#16A34A" />
-              <Text style={styles.emptyTitle}>No Disputes</Text>
+              <Text style={styles.emptyTitle}>{t('adminDisputes.noDisputesTitle')}</Text>
               <Text style={styles.emptySubtitle}>
-                No {activeTab === "resolved" ? "resolved" : activeTab.replace("_", " ")} disputes at this time.
+                {t('adminDisputes.noDisputesAtStatus', { status: t(`disputes.status.${activeTab}`) })}
               </Text>
             </View>
           )
@@ -408,23 +409,23 @@ export const AdminDisputesScreen = () => {
           <View style={styles.modalContent}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.modalHandle} />
-              <Text style={styles.modalTitle}>Review & Resolve Dispute</Text>
+              <Text style={styles.modalTitle}>{t('adminDisputes.reviewResolveDispute')}</Text>
 
               {selectedDispute && (
                 <>
                   {/* Dispute info */}
                   <View style={styles.modalSection}>
-                    <Text style={styles.modalSectionTitle}>Dispute Details</Text>
+                    <Text style={styles.modalSectionTitle}>{t('disputeDetail.detailsTitle')}</Text>
                     <View style={styles.modalInfoRow}>
-                      <Text style={styles.modalInfoLabel}>Reason:</Text>
+                      <Text style={styles.modalInfoLabel}>{t('disputeDetail.reason')}:</Text>
                       <Text style={styles.modalInfoValue}>{selectedDispute.reason}</Text>
                     </View>
                     <View style={styles.modalInfoRow}>
-                      <Text style={styles.modalInfoLabel}>Filed by:</Text>
+                      <Text style={styles.modalInfoLabel}>{t('disputeDetail.filedBy')}:</Text>
                       <Text style={styles.modalInfoValue}>{selectedDispute.filed_by_email}</Text>
                     </View>
                     <View style={styles.modalInfoRow}>
-                      <Text style={styles.modalInfoLabel}>Against:</Text>
+                      <Text style={styles.modalInfoLabel}>{t('disputeDetail.against')}:</Text>
                       <Text style={styles.modalInfoValue}>{selectedDispute.against_email}</Text>
                     </View>
                     {selectedDispute.description && (
@@ -437,7 +438,7 @@ export const AdminDisputesScreen = () => {
                   {/* Evidence */}
                   {selectedDispute.evidence_urls && selectedDispute.evidence_urls.length > 0 && (
                     <View style={styles.modalSection}>
-                      <Text style={styles.modalSectionTitle}>Evidence ({selectedDispute.evidence_urls.length})</Text>
+                      <Text style={styles.modalSectionTitle}>{t('adminDisputes.evidenceLabel', { count: selectedDispute.evidence_urls.length })}</Text>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                         {selectedDispute.evidence_urls.map((url, i) => (
                           <Image key={i} source={{ uri: url }} style={styles.modalEvidence} />
@@ -450,7 +451,7 @@ export const AdminDisputesScreen = () => {
                   {conditionReports[selectedDispute.rental_request_id] && conditionReports[selectedDispute.rental_request_id].length > 0 && (
                     <View style={styles.modalSection}>
                       <Text style={styles.modalSectionTitle}>
-                        Condition Reports ({conditionReports[selectedDispute.rental_request_id].length})
+                        {t('adminDisputes.conditionReportsLabel', { count: conditionReports[selectedDispute.rental_request_id].length })}
                       </Text>
                       {conditionReports[selectedDispute.rental_request_id].map((cr: any, i: number) => (
                         <View key={i} style={styles.conditionReportCard}>
@@ -461,7 +462,7 @@ export const AdminDisputesScreen = () => {
                               color={cr.report_type === "pickup" ? "#2563EB" : "#7C3AED"}
                             />
                             <Text style={styles.conditionReportType}>
-                              {cr.report_type === "pickup" ? "Pickup Report" : "Return Report"}
+                              {cr.report_type === "pickup" ? t('chat.pickupReport') : t('chat.returnReport')}
                             </Text>
                             <Text style={styles.conditionReportDate}>
                               {new Date(cr.created_date || cr.created_at).toLocaleDateString()}
@@ -495,22 +496,22 @@ export const AdminDisputesScreen = () => {
                   {/* Rental info */}
                   {rentals[selectedDispute.rental_request_id] && (
                     <View style={styles.modalSection}>
-                      <Text style={styles.modalSectionTitle}>Rental Information</Text>
+                      <Text style={styles.modalSectionTitle}>{t('adminDisputes.rentalInformation')}</Text>
                       {(() => {
                         const r = rentals[selectedDispute.rental_request_id];
                         const it = items[r.item_id];
                         return (
                           <>
                             <View style={styles.modalInfoRow}>
-                              <Text style={styles.modalInfoLabel}>Item:</Text>
-                              <Text style={styles.modalInfoValue}>{it?.title || "Unknown"}</Text>
+                              <Text style={styles.modalInfoLabel}>{t('adminListingReports.item')}:</Text>
+                              <Text style={styles.modalInfoValue}>{it?.title || t('adminListingReports.unknownItem')}</Text>
                             </View>
                             <View style={styles.modalInfoRow}>
-                              <Text style={styles.modalInfoLabel}>Amount:</Text>
+                              <Text style={styles.modalInfoLabel}>{t('adminModeration.amount')}</Text>
                               <Text style={[styles.modalInfoValue, { fontWeight: "700" }]}>${r.total_amount?.toFixed(2)}</Text>
                             </View>
                             <View style={styles.modalInfoRow}>
-                              <Text style={styles.modalInfoLabel}>Dates:</Text>
+                              <Text style={styles.modalInfoLabel}>{t('adminModeration.dates')}</Text>
                               <Text style={styles.modalInfoValue}>{formatDate(r.start_date)} - {formatDate(r.end_date)}</Text>
                             </View>
                           </>
@@ -521,12 +522,12 @@ export const AdminDisputesScreen = () => {
 
                   {/* Quick Decision */}
                   <View style={styles.modalSection}>
-                    <Text style={styles.modalSectionTitle}>Decision</Text>
+                    <Text style={styles.modalSectionTitle}>{t('disputeDetail.decision')}</Text>
                     <View style={styles.decisionRow}>
                       {[
-                        { key: "favor_renter", label: "Favor Renter", icon: "account-check", color: "#2563EB" },
-                        { key: "favor_owner", label: "Favor Owner", icon: "account-star", color: "#7C3AED" },
-                        { key: "split", label: "Split", icon: "scale-balance", color: "#D97706" },
+                        { key: "favor_renter", label: t('adminDisputes.favorRenter'), icon: "account-check", color: "#2563EB" },
+                        { key: "favor_owner", label: t('adminDisputes.favorOwner'), icon: "account-star", color: "#7C3AED" },
+                        { key: "split", label: t('adminDisputes.split'), icon: "scale-balance", color: "#D97706" },
                       ].map((opt) => (
                         <TouchableOpacity
                           key={opt.key}
@@ -556,10 +557,10 @@ export const AdminDisputesScreen = () => {
 
                   {/* Resolution */}
                   <View style={styles.modalSection}>
-                    <Text style={styles.modalSectionTitle}>Resolution Message</Text>
+                    <Text style={styles.modalSectionTitle}>{t('adminDisputes.resolutionMessage')}</Text>
                     <TextInput
                       style={styles.modalTextInput}
-                      placeholder="Explain the resolution..."
+                      placeholder={t('adminDisputes.explainResolution')}
                       placeholderTextColor="#9CA3AF"
                       value={resolution}
                       onChangeText={setResolution}
@@ -570,10 +571,10 @@ export const AdminDisputesScreen = () => {
 
                   {/* Admin Notes */}
                   <View style={styles.modalSection}>
-                    <Text style={styles.modalSectionTitle}>Admin Notes (internal)</Text>
+                    <Text style={styles.modalSectionTitle}>{t('adminDisputes.adminNotesInternal')}</Text>
                     <TextInput
                       style={[styles.modalTextInput, { minHeight: 60 }]}
-                      placeholder="Internal notes..."
+                      placeholder={t('adminDisputes.internalNotes')}
                       placeholderTextColor="#9CA3AF"
                       value={adminNotes}
                       onChangeText={setAdminNotes}
@@ -589,7 +590,7 @@ export const AdminDisputesScreen = () => {
                       onPress={() => setSelectedDispute(null)}
                       disabled={isUpdating}
                     >
-                      <Text style={styles.cancelBtnText}>Cancel</Text>
+                      <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.submitResolveBtn, isUpdating && { opacity: 0.5 }]}
@@ -601,7 +602,7 @@ export const AdminDisputesScreen = () => {
                       ) : (
                         <>
                           <MaterialCommunityIcons name="check-circle" size={18} color="#FFFFFF" />
-                          <Text style={styles.submitResolveBtnText}>Resolve Dispute</Text>
+                          <Text style={styles.submitResolveBtnText}>{t('adminDisputes.resolveDispute')}</Text>
                         </>
                       )}
                     </TouchableOpacity>

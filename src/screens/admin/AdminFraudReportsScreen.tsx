@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { ActivityIndicator, Text } from "react-native-paper";
 import { GlobalHeader } from "../../components/common/GlobalHeader";
+import { useI18n } from "../../i18n";
 import {
   getFraudReports,
   updateFraudReportStatus,
@@ -22,6 +23,7 @@ import { colors, typography } from "../../theme";
 
 export const AdminFraudReportsScreen = () => {
   const navigation = useNavigation();
+  const { t } = useI18n();
   const [reports, setReports] = useState<FraudReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -47,15 +49,15 @@ export const AdminFraudReportsScreen = () => {
     reportId: string,
     action: "investigating" | "resolved"
   ) => {
-    const actionLabel = action === "investigating" ? "start investigation" : "resolve";
+    const actionKey = action === "investigating" ? "investigate" : "resolve";
 
     Alert.alert(
-      action === "investigating" ? "Investigate Alert" : "Resolve Alert",
-      `Are you sure you want to ${actionLabel} on this fraud alert?`,
+      t(`adminFraud.${actionKey}Title`),
+      t("adminFraud.actionPrompt", { action: t(`adminFraud.${actionKey}`).toLowerCase() }),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: action === "investigating" ? "Investigate" : "Resolve",
+          text: t(`adminFraud.${actionKey}`),
           style: action === "resolved" ? "default" : "destructive",
           onPress: async () => {
             setProcessingId(reportId);
@@ -69,7 +71,7 @@ export const AdminFraudReportsScreen = () => {
                 return updated;
               });
             } catch (e) {
-              toast.error(`Failed to ${actionLabel}. Please try again.`);
+              toast.error(t("adminFraud.actionFailed", { action: t(`adminFraud.${actionKey}`).toLowerCase() }));
             } finally {
               setProcessingId(null);
             }
@@ -118,19 +120,19 @@ export const AdminFraudReportsScreen = () => {
         <View style={styles.cardInfo}>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="information-outline" size={16} color="#64748B" />
-            <Text style={styles.infoLabel}>Details:</Text>
+            <Text style={styles.infoLabel}>{t("adminFraud.details")}</Text>
             <Text style={styles.infoValue}>{item.details}</Text>
           </View>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="clock-outline" size={16} color="#64748B" />
-            <Text style={styles.infoLabel}>Detected:</Text>
+            <Text style={styles.infoLabel}>{t("adminFraud.detected")}</Text>
             <Text style={styles.infoValue}>{formatDate(item.created_date || item.created_at)}</Text>
           </View>
         </View>
 
         <TextInput
           style={styles.noteInput}
-          placeholder="Admin note..."
+          placeholder={t("adminFraud.adminNotePlaceholder")}
           placeholderTextColor="#9CA3AF"
           value={notes[item.id] || ""}
           onChangeText={(text) =>
@@ -151,7 +153,7 @@ export const AdminFraudReportsScreen = () => {
             ) : (
               <>
                 <MaterialCommunityIcons name="magnify" size={18} color="#FFFFFF" />
-                <Text style={styles.actionBtnText}>Investigate</Text>
+                <Text style={styles.actionBtnText}>{t("adminFraud.investigate")}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -165,7 +167,7 @@ export const AdminFraudReportsScreen = () => {
             ) : (
               <>
                 <MaterialCommunityIcons name="check-circle-outline" size={18} color="#FFFFFF" />
-                <Text style={styles.actionBtnText}>Resolve</Text>
+                <Text style={styles.actionBtnText}>{t("adminFraud.resolve")}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -192,10 +194,10 @@ export const AdminFraudReportsScreen = () => {
             </TouchableOpacity>
             <View style={styles.headerTitleContainer}>
               <MaterialCommunityIcons name="shield-alert-outline" size={24} color="#A855F7" />
-              <Text style={styles.headerTitle}>Fraud Alerts</Text>
+              <Text style={styles.headerTitle}>{t("adminFraud.title")}</Text>
             </View>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{reports.length} Alerts</Text>
+              <Text style={styles.badgeText}>{t("adminFraud.alertsCount", { count: reports.length })}</Text>
             </View>
           </View>
         }
@@ -205,8 +207,8 @@ export const AdminFraudReportsScreen = () => {
           ) : (
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="shield-check-outline" size={64} color="#16A34A" />
-              <Text style={styles.emptyTitle}>Secure</Text>
-              <Text style={styles.emptySubtitle}>No fraud alerts detected at this time.</Text>
+              <Text style={styles.emptyTitle}>{t("adminFraud.emptyTitle")}</Text>
+              <Text style={styles.emptySubtitle}>{t("adminFraud.emptySubtitle")}</Text>
             </View>
           )
         }

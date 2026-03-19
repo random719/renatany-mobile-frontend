@@ -14,12 +14,14 @@ import { Listing } from '../../types/listing';
 import { RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
 
-const fmt = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const getLocale = (language: string) =>
+    language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
 
 export const ConversationsScreen = () => {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-    const { t } = useI18n();
+    const { language, t } = useI18n();
     const { user } = useUser();
+    const locale = getLocale(language);
     const userEmail = user?.emailAddresses?.[0]?.emailAddress;
     const [conversations, setConversations] = useState<RentalRequest[]>([]);
     const [itemsMap, setItemsMap] = useState<Record<string, Listing>>({});
@@ -137,7 +139,7 @@ export const ConversationsScreen = () => {
                                 <View style={styles.cardInfoRow}>
                                     <MaterialCommunityIcons name="calendar-outline" size={13} color="#64748B" />
                                     <Text style={styles.cardInfoText}>
-                                        {fmt(conv.start_date)} – {fmt(conv.end_date)}
+                                        {new Date(conv.start_date).toLocaleDateString(locale, { month: 'short', day: 'numeric' })} – {new Date(conv.end_date).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
                                     </Text>
                                 </View>
                                 <View style={styles.cardInfoRow}>
@@ -181,7 +183,7 @@ export const ConversationsScreen = () => {
 
                 {/* Submitted date */}
                 <Text style={styles.submittedDate}>
-                    {t('conversations.submitted', { date: new Date(conv.created_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) })}
+                    {t('conversations.submitted', { date: new Date(conv.created_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) })}
                 </Text>
             </View>
         );

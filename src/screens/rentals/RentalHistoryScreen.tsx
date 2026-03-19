@@ -48,16 +48,19 @@ const STATUS_COLORS: Record<string, string> = {
   declined: '#B91C1C',
 };
 
-const formatDateRange = (startDate: string, endDate: string) => {
+const getLocale = (language: string) =>
+  language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
+
+const formatDateRange = (startDate: string, endDate: string, locale: string) => {
   const start = new Date(startDate);
   const end = new Date(endDate);
   const sameYear = start.getFullYear() === end.getFullYear();
-  const startLabel = start.toLocaleDateString('en-US', {
+  const startLabel = start.toLocaleDateString(locale, {
     month: 'short',
     day: 'numeric',
     ...(sameYear ? {} : { year: 'numeric' }),
   });
-  const endLabel = end.toLocaleDateString('en-US', {
+  const endLabel = end.toLocaleDateString(locale, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -68,11 +71,12 @@ const formatDateRange = (startDate: string, endDate: string) => {
 
 export const RentalHistoryScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const { user: clerkUser } = useUser();
   const { getToken } = useAuth();
   const { user } = useAuthStore();
   const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress ?? user?.email;
+  const locale = getLocale(language);
   const [rentals, setRentals] = useState<RentalRequest[]>([]);
   const [items, setItems] = useState<Record<string, ItemInfo>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -269,7 +273,7 @@ export const RentalHistoryScreen = () => {
 
             <View style={styles.metaRow}>
               <MaterialCommunityIcons name="calendar-month-outline" size={14} color="#64748B" />
-              <Text style={styles.metaText}>{formatDateRange(rental.start_date, rental.end_date)}</Text>
+              <Text style={styles.metaText}>{formatDateRange(rental.start_date, rental.end_date, locale)}</Text>
             </View>
 
             <View style={styles.priceRow}>

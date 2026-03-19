@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { ActivityIndicator, Text, Portal, Modal, Button } from "react-native-paper";
 import { GlobalHeader } from "../../components/common/GlobalHeader";
+import { useI18n } from "../../i18n";
 import {
   getListingReports,
   updateListingReportStatus,
@@ -22,16 +23,6 @@ import {
 import { getListings } from "../../services/listingService";
 import { toast } from "../../store/toastStore";
 import { colors, typography } from "../../theme";
-
-const reasonLabels: Record<string, string> = {
-  fraud: 'Fraudulent Listing',
-  stolen_item: 'Suspected Stolen Item',
-  prohibited_item: 'Prohibited Item',
-  misleading: 'Misleading Description/Photos',
-  price_gouging: 'Price Gouging',
-  spam: 'Spam or Duplicate',
-  other: 'Other',
-};
 
 const reasonRiskLevel: Record<string, 'low' | 'medium' | 'high'> = {
   fraud: 'high',
@@ -43,16 +34,9 @@ const reasonRiskLevel: Record<string, 'low' | 'medium' | 'high'> = {
   other: 'medium',
 };
 
-const actionLabels: Record<string, string> = {
-  none: 'No action',
-  warning_sent: 'Warning Sent',
-  listing_removed: 'Listing Removed',
-  user_suspended: 'User Suspended',
-  user_banned: 'User Banned',
-};
-
 export const AdminListingReportsScreen = () => {
   const navigation = useNavigation();
+  const { t } = useI18n();
   const [reports, setReports] = useState<ListingReport[]>([]);
   const [items, setItems] = useState<Record<string, string>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -81,9 +65,9 @@ export const AdminListingReportsScreen = () => {
     } catch (e: any) {
       setReports([]);
       const status = e?.response?.status;
-      const message = e?.response?.data?.error || e?.message || 'Failed to load listing reports.';
+      const message = e?.response?.data?.error || e?.message || t('adminListingReports.loadFailed');
       if (status === 403) {
-        setLoadError('Admin access required on the backend for listing reports. This account can open the admin UI, but the API is rejecting the request.');
+        setLoadError(t('adminListingReports.backendAccessRequired'));
       } else {
         setLoadError(message);
       }
@@ -114,9 +98,9 @@ export const AdminListingReportsScreen = () => {
       setSelectedReport(null);
       setAdminNotes("");
       setActionTaken("none");
-      toast.success(`Report marked as ${newStatus}`);
+      toast.success(t('adminListingReports.reportMarked', { status: t(`listingReports.status.${newStatus}`) }));
     } catch (e) {
-      toast.error("Failed to update report status");
+      toast.error(t('adminListingReports.updateFailed'));
     } finally {
       setProcessingId(null);
     }
@@ -161,7 +145,7 @@ export const AdminListingReportsScreen = () => {
   const handleTakeAction = async () => {
     if (!selectedReport) return;
     if (actionTaken === 'none') {
-      toast.warning("Please select an action to take.");
+      toast.warning(t('adminListingReports.selectAction'));
       return;
     }
 
@@ -181,11 +165,11 @@ export const AdminListingReportsScreen = () => {
         )
       );
 
-      const actionLabel = actionLabels[actionTaken] || actionTaken;
+      const actionLabel = t(`adminListingReports.actions.${actionTaken}`);
       closeReview();
-      toast.success(`${actionLabel} applied and report resolved.`);
+      toast.success(t('adminListingReports.actionApplied', { action: actionLabel }));
     } catch (e) {
-      toast.error("Failed to take action on this report.");
+      toast.error(t('adminListingReports.actionFailed'));
     } finally {
       setProcessingId(null);
     }
@@ -208,33 +192,33 @@ export const AdminListingReportsScreen = () => {
       >
         <View style={styles.cardHeader}>
           <View style={[styles.statusBadge, { backgroundColor: statusColor + '15', borderColor: statusColor }]}>
-            <Text style={[styles.statusText, { color: statusColor }]}>{item.status.toUpperCase()}</Text>
+            <Text style={[styles.statusText, { color: statusColor }]}>{t(`listingReports.status.${item.status}`)}</Text>
           </View>
           <Text style={styles.itemTitle} numberOfLines={1}>
-            {items[item.item_id] || "Unknown Item"}
+            {items[item.item_id] || t('adminListingReports.unknownItem')}
           </Text>
         </View>
 
         <View style={styles.cardBody}>
           <View style={styles.metaRow}>
             <View style={[styles.riskBadge, { backgroundColor: riskColors.bg, borderColor: riskColors.border }]}>
-              <Text style={[styles.riskBadgeText, { color: riskColors.text }]}>{risk.toUpperCase()} RISK</Text>
+              <Text style={[styles.riskBadgeText, { color: riskColors.text }]}>{t(`adminListingReports.risk.${risk}`)}</Text>
             </View>
             {hasEvidence && (
               <View style={styles.evidenceBadge}>
                 <MaterialCommunityIcons name="camera-outline" size={12} color="#B45309" />
-                <Text style={styles.evidenceBadgeText}>{item.evidence_urls?.length} Evidence</Text>
+                <Text style={styles.evidenceBadgeText}>{t('adminListingReports.evidenceCount', { count: item.evidence_urls?.length || 0 })}</Text>
               </View>
             )}
           </View>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#64748B" />
-            <Text style={styles.infoLabel}>Reason:</Text>
-            <Text style={styles.infoValue}>{reasonLabels[item.reason] || item.reason}</Text>
+            <Text style={styles.infoLabel}>{t('adminListingReports.reasonLabel')}</Text>
+            <Text style={styles.infoValue}>{t(`listingReports.reasons.${item.reason}`)}</Text>
           </View>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="account-outline" size={16} color="#64748B" />
-            <Text style={styles.infoLabel}>Reporter:</Text>
+            <Text style={styles.infoLabel}>{t('adminListingReports.reporterLabel')}</Text>
             <Text style={styles.infoValue} numberOfLines={1}>{item.reporter_email}</Text>
           </View>
         </View>
@@ -269,20 +253,20 @@ export const AdminListingReportsScreen = () => {
               </TouchableOpacity>
               <View style={styles.headerTitleContainer}>
                 <MaterialCommunityIcons name="package-variant-closed" size={24} color="#DC2626" />
-                <Text style={styles.headerTitle}>Listing Reports</Text>
+                <Text style={styles.headerTitle}>{t('nav.listingReports')}</Text>
               </View>
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>{reports.length} Total</Text>
+                <Text style={styles.badgeText}>{t('adminListingReports.totalCount', { count: reports.length })}</Text>
               </View>
             </View>
 
-            <Text style={styles.headerSubtitle}>Review and take action on flagged listings</Text>
+            <Text style={styles.headerSubtitle}>{t('adminListingReports.subtitle')}</Text>
 
             <View style={styles.tabsRow}>
               {[
-                { key: 'pending', label: `Pending (${pendingReports.length})` },
-                { key: 'investigating', label: `Investigating (${investigatingReports.length})` },
-                { key: 'resolved', label: `Resolved (${resolvedReports.length})` },
+                { key: 'pending', label: t('adminListingReports.tabLabel', { label: t('listingReports.status.pending'), count: pendingReports.length }) },
+                { key: 'investigating', label: t('adminListingReports.tabLabel', { label: t('listingReports.status.investigating'), count: investigatingReports.length }) },
+                { key: 'resolved', label: t('adminListingReports.tabLabel', { label: t('listingReports.status.resolved'), count: resolvedReports.length }) },
               ].map((tab) => {
                 const isActive = activeTab === tab.key;
                 return (
@@ -304,15 +288,15 @@ export const AdminListingReportsScreen = () => {
           ) : loadError ? (
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="alert-circle-outline" size={64} color="#DC2626" />
-              <Text style={styles.emptyTitle}>Couldn&apos;t Load Reports</Text>
+              <Text style={styles.emptyTitle}>{t('adminListingReports.couldNotLoad')}</Text>
               <Text style={styles.emptySubtitle}>{loadError}</Text>
             </View>
           ) : (
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="shield-check-outline" size={64} color="#16A34A" />
-              <Text style={styles.emptyTitle}>All Clear!</Text>
+              <Text style={styles.emptyTitle}>{t('adminListingReports.allClear')}</Text>
               <Text style={styles.emptySubtitle}>
-                No {activeTab === 'pending' ? 'pending' : activeTab === 'investigating' ? 'investigating' : 'resolved'} listing reports to review.
+                {t('adminListingReports.noReportsToReview', { status: t(`listingReports.status.${activeTab}`) })}
               </Text>
             </View>
           )
@@ -327,48 +311,48 @@ export const AdminListingReportsScreen = () => {
         >
           {selectedReport && (
             <ScrollView style={styles.modalScroll}>
-              <Text style={styles.modalTitle}>Review Report</Text>
+              <Text style={styles.modalTitle}>{t('adminListingReports.reviewReport')}</Text>
 
               <View style={styles.summaryCard}>
                 <View style={styles.summaryHeader}>
                   <View style={styles.summaryTitleWrap}>
                     <MaterialCommunityIcons name="alert-outline" size={22} color="#DC2626" />
-                    <Text style={styles.summaryTitle}>{items[selectedReport.item_id] || "Unknown Item"}</Text>
+                    <Text style={styles.summaryTitle}>{items[selectedReport.item_id] || t('adminListingReports.unknownItem')}</Text>
                   </View>
                   {(() => {
                     const risk = reasonRiskLevel[selectedReport.reason] || 'medium';
                     const riskColors = getRiskColors(risk);
                     return (
                       <View style={[styles.riskBadge, { backgroundColor: riskColors.bg, borderColor: riskColors.border }]}>
-                        <Text style={[styles.riskBadgeText, { color: riskColors.text }]}>{risk.toUpperCase()} RISK</Text>
+                        <Text style={[styles.riskBadgeText, { color: riskColors.text }]}>{t(`adminListingReports.risk.${risk}`)}</Text>
                       </View>
                     );
                   })()}
                 </View>
-                <Text style={styles.summaryMeta}>Reporter: {selectedReport.reporter_email}</Text>
-                <Text style={styles.summaryMeta}>Reported: {new Date(selectedReport.created_date).toLocaleString()}</Text>
+                <Text style={styles.summaryMeta}>{t('adminListingReports.reporterSummary', { email: selectedReport.reporter_email })}</Text>
+                <Text style={styles.summaryMeta}>{t('adminListingReports.reportedSummary', { date: new Date(selectedReport.created_date).toLocaleString() })}</Text>
               </View>
               
               <View style={styles.modalSection}>
-                <Text style={styles.modalLabel}>Item</Text>
-                <Text style={styles.modalValue}>{items[selectedReport.item_id] || "Unknown Item"}</Text>
+                <Text style={styles.modalLabel}>{t('adminListingReports.item')}</Text>
+                <Text style={styles.modalValue}>{items[selectedReport.item_id] || t('adminListingReports.unknownItem')}</Text>
               </View>
 
               <View style={styles.modalSection}>
-                <Text style={styles.modalLabel}>Reason</Text>
+                <Text style={styles.modalLabel}>{t('adminListingReports.reason')}</Text>
                 <Text style={[styles.modalValue, { color: '#DC2626', fontWeight: '700' }]}>
-                  {reasonLabels[selectedReport.reason] || selectedReport.reason}
+                  {t(`listingReports.reasons.${selectedReport.reason}`)}
                 </Text>
               </View>
 
               <View style={styles.modalSection}>
-                <Text style={styles.modalLabel}>Description</Text>
+                <Text style={styles.modalLabel}>{t('disputeDetail.description')}</Text>
                 <Text style={styles.modalDescription}>{selectedReport.description}</Text>
               </View>
 
               {selectedReport.evidence_urls && selectedReport.evidence_urls.length > 0 && (
                 <View style={styles.modalSection}>
-                  <Text style={styles.modalLabel}>Evidence ({selectedReport.evidence_urls.length})</Text>
+                  <Text style={styles.modalLabel}>{t('adminListingReports.evidenceLabel', { count: selectedReport.evidence_urls.length })}</Text>
                   <View style={styles.evidenceGrid}>
                     {selectedReport.evidence_urls.map((url, idx) => (
                       <TouchableOpacity
@@ -385,10 +369,10 @@ export const AdminListingReportsScreen = () => {
               )}
 
               <View style={styles.modalSection}>
-                <Text style={styles.modalLabel}>Admin Notes</Text>
+                <Text style={styles.modalLabel}>{t('listingReports.adminNote')}</Text>
                 <TextInput
                   style={styles.modalInput}
-                  placeholder="Add notes..."
+                  placeholder={t('adminListingReports.addNotesPlaceholder')}
                   value={adminNotes}
                   onChangeText={setAdminNotes}
                   multiline
@@ -396,7 +380,7 @@ export const AdminListingReportsScreen = () => {
               </View>
 
               <View style={styles.modalSection}>
-                <Text style={styles.modalLabel}>Action to Take</Text>
+                <Text style={styles.modalLabel}>{t('adminListingReports.actionToTake')}</Text>
                 <View style={styles.actionList}>
                   {[
                     'none',
@@ -413,7 +397,7 @@ export const AdminListingReportsScreen = () => {
                         onPress={() => setActionTaken(action)}
                       >
                         <Text style={[styles.actionChipText, isActive && styles.actionChipTextActive]}>
-                          {actionLabels[action]}
+                          {t(`adminListingReports.actions.${action}`)}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -428,7 +412,7 @@ export const AdminListingReportsScreen = () => {
                   style={styles.modalBtn}
                   disabled={processingId === selectedReport.id}
                 >
-                  Investigate
+                  {t('listingReports.status.investigating')}
                 </Button>
                 <Button 
                   mode="contained" 
@@ -436,7 +420,7 @@ export const AdminListingReportsScreen = () => {
                   style={[styles.modalBtn, { backgroundColor: '#16A34A' }]}
                   disabled={processingId === selectedReport.id}
                 >
-                  Resolve
+                  {t('listingReports.status.resolved')}
                 </Button>
               </View>
 
@@ -446,7 +430,7 @@ export const AdminListingReportsScreen = () => {
                 style={[styles.modalBtn, styles.takeActionBtn]}
                 disabled={processingId === selectedReport.id}
               >
-                Take Action & Resolve
+                {t('adminListingReports.takeActionResolve')}
               </Button>
               
               <Button 
@@ -455,7 +439,7 @@ export const AdminListingReportsScreen = () => {
                 style={{ marginTop: 8 }}
                 disabled={processingId === selectedReport.id}
               >
-                Close
+                {t('disputeDetail.close')}
               </Button>
             </ScrollView>
           )}

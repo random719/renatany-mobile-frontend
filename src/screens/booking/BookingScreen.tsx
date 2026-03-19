@@ -5,6 +5,7 @@ import React, { useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Text, TextInput } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
+import { useI18n } from '../../i18n';
 import { calculatePricing } from '../../services/bookingService';
 import { colors, typography } from '../../theme';
 import { RootStackParamList } from '../../types/navigation';
@@ -19,6 +20,7 @@ const isValidDate = (s: string) => DATE_RE.test(s) && !isNaN(new Date(s).getTime
 export const BookingScreen = () => {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
+  const { t } = useI18n();
   const { listingId, listingTitle, pricePerDay, ownerEmail } = route.params;
 
   const [startDate, setStartDate] = useState('');
@@ -65,37 +67,37 @@ export const BookingScreen = () => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text variant="titleLarge" style={styles.headerTitle}>Request to Rent</Text>
+          <Text variant="titleLarge" style={styles.headerTitle}>{t('bookingScreen.title')}</Text>
         </View>
 
         <View style={styles.listingCard}>
           <MaterialCommunityIcons name="cube-outline" size={20} color={colors.accentBlue} />
           <View style={styles.listingInfo}>
             <Text style={styles.listingTitle} numberOfLines={2}>{listingTitle}</Text>
-            <Text style={styles.listingPrice}>${pricePerDay}/day</Text>
+            <Text style={styles.listingPrice}>{t('publicProfile.perDay', { price: pricePerDay })}</Text>
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Select Dates</Text>
+          <Text style={styles.sectionLabel}>{t('bookingScreen.selectDates')}</Text>
 
           <TextInput
-            label="Start Date (YYYY-MM-DD)"
+            label={t('bookingScreen.startDateLabel')}
             value={startDate}
             onChangeText={setStartDate}
             mode="outlined"
-            placeholder="2024-06-01"
+            placeholder={t('bookingScreen.startDatePlaceholder')}
             left={<TextInput.Icon icon="calendar-start" />}
             error={startDate.length > 0 && !isValidDate(startDate)}
             style={styles.dateInput}
           />
 
           <TextInput
-            label="End Date (YYYY-MM-DD)"
+            label={t('bookingScreen.endDateLabel')}
             value={endDate}
             onChangeText={setEndDate}
             mode="outlined"
-            placeholder="2024-06-05"
+            placeholder={t('bookingScreen.endDatePlaceholder')}
             left={<TextInput.Icon icon="calendar-end" />}
             error={endDate.length > 0 && !isValidDate(endDate)}
             style={styles.dateInput}
@@ -104,18 +106,20 @@ export const BookingScreen = () => {
           {totalDays > 0 && (
             <View style={styles.durationBadge}>
               <MaterialCommunityIcons name="clock-outline" size={16} color="#2563EB" />
-              <Text style={styles.durationText}>{totalDays} day{totalDays > 1 ? 's' : ''} selected</Text>
+              <Text style={styles.durationText}>
+                {t(totalDays > 1 ? 'bookingScreen.daysSelected_plural' : 'bookingScreen.daysSelected', { count: totalDays })}
+              </Text>
             </View>
           )}
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Message to Owner (optional)</Text>
+          <Text style={styles.sectionLabel}>{t('bookingScreen.messageToOwnerOptional')}</Text>
           <TextInput
             value={message}
             onChangeText={setMessage}
             mode="outlined"
-            placeholder="Tell the owner why you need this item..."
+            placeholder={t('bookingScreen.messagePlaceholder')}
             multiline
             numberOfLines={3}
             style={styles.messageInput}
@@ -124,22 +128,22 @@ export const BookingScreen = () => {
 
         {pricing && (
           <View style={styles.card}>
-            <Text style={styles.sectionLabel}>Pricing Breakdown</Text>
+            <Text style={styles.sectionLabel}>{t('bookingConfirm.pricing')}</Text>
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>${pricePerDay}/day × {totalDays} days</Text>
+              <Text style={styles.priceLabel}>{t('bookingScreen.dailyRateSummary', { price: pricePerDay, count: totalDays })}</Text>
               <Text style={styles.priceValue}>${pricing.dailyRate.toFixed(2)}</Text>
             </View>
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Platform fee (10%)</Text>
+              <Text style={styles.priceLabel}>{t('bookingConfirm.platformFee')}</Text>
               <Text style={styles.priceValue}>${pricing.platformFee.toFixed(2)}</Text>
             </View>
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Security deposit (20%)</Text>
+              <Text style={styles.priceLabel}>{t('bookingConfirm.securityDeposit')}</Text>
               <Text style={styles.priceValue}>${pricing.deposit.toFixed(2)}</Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.priceRow}>
-              <Text style={styles.totalLabel}>Total</Text>
+              <Text style={styles.totalLabel}>{t('bookingConfirm.total')}</Text>
               <Text style={styles.totalValue}>${pricing.totalAmount.toFixed(2)}</Text>
             </View>
           </View>
@@ -152,7 +156,7 @@ export const BookingScreen = () => {
           style={styles.continueBtn}
           contentStyle={styles.continueBtnContent}
         >
-          Continue to Confirm
+          {t('bookingScreen.continueToConfirm')}
         </Button>
       </ScrollView>
     </View>

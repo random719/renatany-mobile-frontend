@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
+import { useI18n } from '../../i18n';
 import { colors, typography } from '../../theme';
 
 interface HomeSearchFilterProps {
@@ -9,6 +10,7 @@ interface HomeSearchFilterProps {
 }
 
 export const HomeSearchFilter = ({ onSearch }: HomeSearchFilterProps) => {
+    const { t } = useI18n();
     const [query, setQuery] = useState('');
     const [location, setLocation] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
@@ -24,11 +26,11 @@ export const HomeSearchFilter = ({ onSearch }: HomeSearchFilterProps) => {
             {/* Title & Save Search Row */}
             <View style={styles.headerTitleRow}>
                 <Text variant="headlineSmall" style={styles.headerTitle}>
-                    Search & Filter
+                    {t('home.searchAndFilter')}
                 </Text>
                 <TouchableOpacity style={styles.saveBtn}>
                     <MaterialCommunityIcons name="bookmark-outline" size={18} color={colors.textPrimary} />
-                    <Text style={styles.saveBtnText}>Save Search</Text>
+                    <Text style={styles.saveBtnText}>{t('home.saveSearch')}</Text>
                 </TouchableOpacity>
             </View>
 
@@ -37,7 +39,7 @@ export const HomeSearchFilter = ({ onSearch }: HomeSearchFilterProps) => {
                 <MaterialCommunityIcons name="magnify" size={20} color="#9CA3AF" />
                 <TextInput
                     style={styles.input}
-                    placeholder="Search items..."
+                    placeholder={t('home.searchItemsPlaceholder')}
                     placeholderTextColor="#9CA3AF"
                     value={query}
                     onChangeText={setQuery}
@@ -49,7 +51,7 @@ export const HomeSearchFilter = ({ onSearch }: HomeSearchFilterProps) => {
                 <MaterialCommunityIcons name="map-marker-outline" size={20} color="#9CA3AF" />
                 <TextInput
                     style={styles.input}
-                    placeholder="Location..."
+                    placeholder={t('home.locationPlaceholder')}
                     placeholderTextColor="#9CA3AF"
                     value={location}
                     onChangeText={setLocation}
@@ -58,7 +60,7 @@ export const HomeSearchFilter = ({ onSearch }: HomeSearchFilterProps) => {
 
             {/* Categories Dropdown Fake Button */}
             <TouchableOpacity style={styles.dropdownBtn}>
-                <Text style={styles.dropdownText}>All Categories</Text>
+                <Text style={styles.dropdownText}>{t('home.allCategories')}</Text>
                 <MaterialCommunityIcons name="chevron-down" size={20} color="#6B7280" />
             </TouchableOpacity>
 
@@ -66,12 +68,12 @@ export const HomeSearchFilter = ({ onSearch }: HomeSearchFilterProps) => {
             <View style={styles.filtersRow}>
                 <TouchableOpacity style={styles.actionBtnRow}>
                     <MaterialCommunityIcons name="tune-variant" size={18} color={colors.textPrimary} />
-                    <Text style={styles.actionBtnText}>Advanced Filters</Text>
+                    <Text style={styles.actionBtnText}>{t('home.advancedFilters')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.actionBtnRow}>
                     <MaterialCommunityIcons name="swap-vertical" size={18} color={colors.textPrimary} />
-                    <Text style={styles.actionBtnText}>Relevance</Text>
+                    <Text style={styles.actionBtnText}>{t('home.sort.relevance')}</Text>
                     <MaterialCommunityIcons name="chevron-down" size={18} color="#6B7280" style={styles.chevronIcon} />
                 </TouchableOpacity>
             </View>

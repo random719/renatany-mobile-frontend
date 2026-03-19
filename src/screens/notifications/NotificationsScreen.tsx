@@ -38,7 +38,14 @@ const TYPE_COLOR: Record<AppNotification['type'], string> = {
   promotion: '#9333EA',
 };
 
-const relativeTime = (iso: string, t: (key: string, params?: Record<string, string | number>) => string) => {
+const getLocale = (language: string) =>
+  language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
+
+const relativeTime = (
+  iso: string,
+  language: string,
+  t: (key: string, params?: Record<string, string | number>) => string,
+) => {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return t('common.justNow');
@@ -47,7 +54,7 @@ const relativeTime = (iso: string, t: (key: string, params?: Record<string, stri
   if (hrs < 24) return t('notifications.hoursAgo', { count: hrs });
   const days = Math.floor(hrs / 24);
   if (days === 1) return t('common.yesterday');
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return new Date(iso).toLocaleDateString(getLocale(language), { month: 'short', day: 'numeric' });
 };
 
 const dayGroup = (iso: string, t: (key: string) => string) => {
@@ -72,7 +79,7 @@ const groupNotifications = (notifications: AppNotification[], t: (key: string) =
 
 export const NotificationsScreen = () => {
   const navigation = useNavigation();
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -133,7 +140,7 @@ export const NotificationsScreen = () => {
             {!item.is_read && <View style={styles.unreadDot} />}
           </View>
           <Text style={styles.notifBodyText} numberOfLines={2}>{item.body}</Text>
-          <Text style={styles.notifTime}>{relativeTime(item.created_date, t as any)}</Text>
+          <Text style={styles.notifTime}>{relativeTime(item.created_date, language, t as any)}</Text>
         </View>
         <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <MaterialCommunityIcons name="close" size={16} color="#94A3B8" />

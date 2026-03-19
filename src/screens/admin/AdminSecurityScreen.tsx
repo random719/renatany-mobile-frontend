@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { ActivityIndicator, Checkbox, Text } from "react-native-paper";
 import { GlobalHeader } from "../../components/common/GlobalHeader";
+import { useI18n } from "../../i18n";
 import {
   getSecurityItems,
   getSecuritySettings,
@@ -37,6 +38,7 @@ const CATEGORIES = [
 
 export const AdminSecurityScreen = () => {
   const navigation = useNavigation();
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'kyc' | 'overrides'>('kyc');
@@ -59,7 +61,7 @@ export const AdminSecurityScreen = () => {
     try {
       await loadSettings();
     } catch {
-      toast.error('Failed to load security settings.');
+      toast.error(t('adminSecurity.loadSettingsFailed'));
     } finally {
       setLoading(false);
     }
@@ -91,7 +93,7 @@ export const AdminSecurityScreen = () => {
   const handleSaveSettings = async () => {
     const threshold = parseInt(thresholdInput, 10);
     if (Number.isNaN(threshold) || threshold < 0) {
-      toast.warning('Please enter a valid threshold number greater than or equal to 0.');
+      toast.warning(t('adminSecurity.invalidThreshold'));
       return;
     }
 
@@ -103,9 +105,9 @@ export const AdminSecurityScreen = () => {
       });
       setThresholdInput(String(updated.kyc_amount_threshold));
       setSelectedCategories(updated.kyc_high_risk_categories || []);
-      toast.success('Security settings saved successfully.');
+      toast.success(t('adminSecurity.settingsSaved'));
     } catch {
-      toast.error('Failed to save security settings.');
+      toast.error(t('adminSecurity.settingsSaveFailed'));
     } finally {
       setSavingSettings(false);
     }
@@ -121,10 +123,10 @@ export const AdminSecurityScreen = () => {
       });
       setItems(data);
       if (data.length === 0) {
-        toast.info('No items found. Try a different search term.');
+        toast.info(t('adminSecurity.noItemsFound'));
       }
     } catch {
-      toast.error('Failed to load items.');
+      toast.error(t('adminSecurity.loadItemsFailed'));
       setItems([]);
     } finally {
       setSearchingItems(false);
@@ -137,7 +139,7 @@ export const AdminSecurityScreen = () => {
       const updated = await updateSecurityItemOverride(item.id, !item.high_risk_override);
       setItems((prev) => prev.map((entry) => (entry.id === item.id ? updated : entry)));
     } catch {
-      toast.error('Failed to update item override.');
+      toast.error(t('adminSecurity.updateOverrideFailed'));
     } finally {
       setTogglingId(null);
     }
@@ -162,7 +164,7 @@ export const AdminSecurityScreen = () => {
         )}
       </View>
       <Text style={styles.overrideHint}>
-        {item.high_risk_override ? 'Marked as high-risk override' : 'Not marked as high-risk override'}
+        {item.high_risk_override ? t('adminSecurity.markedHighRisk') : t('adminSecurity.notMarkedHighRisk')}
       </Text>
     </View>
   );
@@ -188,53 +190,53 @@ export const AdminSecurityScreen = () => {
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <MaterialCommunityIcons name="shield-check-outline" size={24} color="#475569" />
-            <Text style={styles.headerTitle}>Security & Risk</Text>
+            <Text style={styles.headerTitle}>{t('adminSecurity.title')}</Text>
           </View>
           <View style={styles.adminBadge}>
-            <Text style={styles.adminBadgeText}>Admin</Text>
+            <Text style={styles.adminBadgeText}>{t('nav.admin')}</Text>
           </View>
         </View>
 
-        <Text style={styles.headerSubtitle}>Configure KYC rules and high-risk item overrides.</Text>
+        <Text style={styles.headerSubtitle}>{t('adminSecurity.subtitle')}</Text>
 
         <View style={styles.tabsRow}>
           <TouchableOpacity
             style={[styles.tabBtn, activeTab === 'kyc' && styles.tabBtnActive]}
             onPress={() => setActiveTab('kyc')}
           >
-            <Text style={[styles.tabBtnText, activeTab === 'kyc' && styles.tabBtnTextActive]}>KYC & Rules</Text>
+            <Text style={[styles.tabBtnText, activeTab === 'kyc' && styles.tabBtnTextActive]}>{t('adminSecurity.kycRules')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tabBtn, activeTab === 'overrides' && styles.tabBtnActive]}
             onPress={() => setActiveTab('overrides')}
           >
             <Text style={[styles.tabBtnText, activeTab === 'overrides' && styles.tabBtnTextActive]}>
-              Item Overrides ({items.length})
+              {t('adminSecurity.itemOverrides', { count: items.length })}
             </Text>
           </TouchableOpacity>
         </View>
 
         {activeTab === 'kyc' ? (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>KYC & High-Risk Rules</Text>
+            <Text style={styles.sectionTitle}>{t('adminSecurity.kycHighRiskRules')}</Text>
             <Text style={styles.sectionSubtitle}>
-              Configure when identity verification is required and which categories are treated as high-risk.
+              {t('adminSecurity.kycHighRiskRulesSubtitle')}
             </Text>
 
-            <Text style={styles.fieldLabel}>KYC amount threshold</Text>
+            <Text style={styles.fieldLabel}>{t('adminSecurity.kycAmountThreshold')}</Text>
             <TextInput
               style={styles.input}
               keyboardType="numeric"
               value={thresholdInput}
               onChangeText={setThresholdInput}
-              placeholder="e.g. 500"
+              placeholder={t('adminSecurity.thresholdPlaceholder')}
               placeholderTextColor="#9CA3AF"
             />
             <Text style={styles.helperText}>
-              Rentals above this value may require identity verification.
+              {t('adminSecurity.thresholdHint')}
             </Text>
 
-            <Text style={styles.fieldLabel}>High-risk categories</Text>
+            <Text style={styles.fieldLabel}>{t('adminSecurity.highRiskCategories')}</Text>
             <View style={styles.categoryGrid}>
               {CATEGORIES.map((category) => {
                 const selected = selectedCategories.includes(category.value);
@@ -245,7 +247,7 @@ export const AdminSecurityScreen = () => {
                     onPress={() => toggleCategory(category.value)}
                   >
                     <Text style={[styles.categoryChipText, selected && styles.categoryChipTextSelected]}>
-                      {category.name}
+                      {t(`home.category.${category.value}`)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -260,15 +262,15 @@ export const AdminSecurityScreen = () => {
               {savingSettings ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Text style={styles.primaryBtnText}>Save Settings</Text>
+                <Text style={styles.primaryBtnText}>{t('adminSecurity.saveSettings')}</Text>
               )}
             </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>High-Risk Item Overrides</Text>
+            <Text style={styles.sectionTitle}>{t('adminSecurity.highRiskItemOverrides')}</Text>
             <Text style={styles.sectionSubtitle}>
-              Search items and mark them as high-risk. This overrides the category-based rule.
+              {t('adminSecurity.highRiskItemOverridesSubtitle')}
             </Text>
 
             <View style={styles.searchRow}>
@@ -276,7 +278,7 @@ export const AdminSecurityScreen = () => {
                 style={[styles.input, styles.searchInput]}
                 value={itemSearch}
                 onChangeText={setItemSearch}
-                placeholder="Search by item title..."
+                placeholder={t('adminSecurity.searchPlaceholder')}
                 placeholderTextColor="#9CA3AF"
               />
               <TouchableOpacity
@@ -303,9 +305,9 @@ export const AdminSecurityScreen = () => {
             ) : (
               <View style={styles.emptyState}>
                 <MaterialCommunityIcons name="check-circle-outline" size={56} color="#22C55E" />
-                <Text style={styles.emptyTitle}>No items to show</Text>
+                <Text style={styles.emptyTitle}>{t('adminSecurity.noItemsTitle')}</Text>
                 <Text style={styles.emptySubtitle}>
-                  Search by item title to find and manage high-risk overrides.
+                  {t('adminSecurity.noItemsSubtitle')}
                 </Text>
               </View>
             )}

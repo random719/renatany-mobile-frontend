@@ -3,6 +3,7 @@ import { Animated, Modal, Pressable, StyleSheet, TouchableOpacity, View } from '
 import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useI18n } from '../../i18n';
 import { useToastStore, ToastVariant } from '../../store/toastStore';
 
 const VARIANT_CONFIG: Record<
@@ -51,6 +52,7 @@ const VARIANT_CONFIG: Record<
 };
 
 export const Toast = () => {
+  const { t } = useI18n();
   const { visible, message, variant, hide } = useToastStore();
   const scale = useRef(new Animated.Value(0.8)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -93,6 +95,14 @@ export const Toast = () => {
   if (!visible) return null;
 
   const config = VARIANT_CONFIG[variant];
+  const title =
+    variant === 'success'
+      ? t('toast.successTitle')
+      : variant === 'error'
+      ? t('toast.errorTitle')
+      : variant === 'warning'
+      ? t('toast.warningTitle')
+      : t('toast.infoTitle');
 
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={hide} statusBarTranslucent>
@@ -119,7 +129,7 @@ export const Toast = () => {
 
             {/* Title */}
             <Text style={[styles.title, { color: config.titleColor }]}>
-              {config.title}
+              {title}
             </Text>
 
             {/* Divider */}
@@ -138,7 +148,7 @@ export const Toast = () => {
                 end={{ x: 1, y: 0 }}
                 style={styles.button}
               >
-                <Text style={styles.buttonText}>Got it</Text>
+                <Text style={styles.buttonText}>{t('toast.gotIt')}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </Pressable>

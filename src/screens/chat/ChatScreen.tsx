@@ -32,15 +32,18 @@ import { getConditionReportRules } from '../../utils/conditionReportRules';
 type Nav = StackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'Chat'>;
 
-const formatTimestamp = (iso: string) =>
-  new Date(iso).toLocaleString('en-US', {
+const getLocale = (language: string) =>
+  language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
+
+const formatTimestamp = (iso: string, locale: string) =>
+  new Date(iso).toLocaleString(locale, {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
   });
 
-const MessageBubble = ({ msg, isOwn }: { msg: Message; isOwn: boolean }) => {
+const MessageBubble = ({ msg, isOwn, locale }: { msg: Message; isOwn: boolean; locale: string }) => {
   if (msg.message_type === 'system') {
     return (
       <View style={bubbleStyles.systemRow}>
@@ -56,7 +59,7 @@ const MessageBubble = ({ msg, isOwn }: { msg: Message; isOwn: boolean }) => {
       <View style={[bubbleStyles.bubble, isOwn ? bubbleStyles.ownBubble : bubbleStyles.otherBubble]}>
         <Text style={isOwn ? bubbleStyles.ownText : bubbleStyles.otherText}>{msg.content}</Text>
         <Text style={[bubbleStyles.time, isOwn ? bubbleStyles.ownTime : bubbleStyles.otherTime]}>
-          {formatTimestamp(msg.created_date)}
+          {formatTimestamp(msg.created_date, locale)}
         </Text>
       </View>
     </View>
@@ -101,8 +104,9 @@ const bubbleStyles = StyleSheet.create({
 export const ChatScreen = () => {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const { rentalRequestId, otherUserEmail } = route.params;
+  const locale = getLocale(language);
 
   const { user: clerkUser } = useUser();
   const { user: storeUser } = useAuthStore();
@@ -216,9 +220,9 @@ export const ChatScreen = () => {
   ) => {
     if (!rental) return;
     Alert.alert(options.title, options.message, [
-      { text: 'No', style: 'cancel' },
+      { text: t('chat.no'), style: 'cancel' },
       {
-        text: 'Yes',
+        text: t('chat.yes'),
         onPress: async () => {
           setIsUpdatingStatus(true);
           try {
@@ -233,7 +237,7 @@ export const ChatScreen = () => {
         },
       },
     ]);
-  }, [loadChatData, rental, sendSystemNote]);
+  }, [loadChatData, rental, sendSystemNote, t]);
 
   const handleCheckout = useCallback(async () => {
     if (!rental) return;
@@ -371,14 +375,18 @@ export const ChatScreen = () => {
             </Text>
           </View>
           <Text style={styles.summaryDates}>
-            {new Date(rental.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            {new Date(rental.start_date).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
             {' - '}
-            {new Date(rental.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            {new Date(rental.end_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}
           </Text>
         </View>
         <Text style={styles.summaryAmount}>${totalPaid.toFixed(2)}</Text>
         <Text style={styles.summaryBreakdown}>
-          Rental ${rentalCost.toFixed(2)} · Fee ${platformFee.toFixed(2)} · Deposit ${securityDeposit.toFixed(2)}
+          {t('chat.paymentBreakdown', {
+            rental: rentalCost.toFixed(2),
+            fee: platformFee.toFixed(2),
+            deposit: securityDeposit.toFixed(2),
+          })}
         </Text>
         {canApproveDecline || canPay || canCancel || canCompleteRental ? (
           <View style={styles.actionRow}>
@@ -529,6 +537,7 @@ export const ChatScreen = () => {
     isProcessingPayment,
     isRenter,
     isUpdatingStatus,
+    locale,
     navigation,
     platformFee,
     rental,
@@ -580,7 +589,7 @@ export const ChatScreen = () => {
               data={messages}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <MessageBubble msg={item} isOwn={item.sender_email === userEmail} />
+                <MessageBubble msg={item} isOwn={item.sender_email === userEmail} locale={locale} />
               )}
               style={styles.messageListView}
               contentContainerStyle={styles.messageList}

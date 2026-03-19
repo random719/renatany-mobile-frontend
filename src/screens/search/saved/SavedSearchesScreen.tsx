@@ -12,7 +12,7 @@ import { SavedSearch } from '../../../types/listing';
 
 export const SavedSearchesScreen = () => {
     const navigation = useNavigation();
-    const { t } = useI18n();
+    const { language, t } = useI18n();
     const {
         savedSearches,
         isSavedSearchesLoading,
@@ -91,7 +91,8 @@ export const SavedSearchesScreen = () => {
 
     const formatDate = (dateStr: string) => {
         const date = new Date(dateStr);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const locale = language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
+        return date.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
     };
 
     const renderSearchCard = (search: SavedSearch) => {

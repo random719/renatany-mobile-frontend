@@ -54,13 +54,14 @@ const InfoRow = ({ label, value }: { label: string; value: string }) => (
 
 export const RentalDetailScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const route = useRoute<Route>();
   const { rentalId } = route.params;
   const { user: clerkUser } = useUser();
   const { getToken } = useAuth();
   const { user } = useAuthStore();
   const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress ?? user?.email;
+  const locale = language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
 
   const [rental, setRental] = useState<RentalRequest | null>(null);
   const [itemInfo, setItemInfo] = useState<ItemInfo | null>(null);
@@ -168,13 +169,13 @@ export const RentalDetailScreen = () => {
 
   const isRenter = rental.renter_email === userEmail;
   const statusColor = STATUS_COLOR[rental.status] ?? '#6B7280';
-  const startDate = new Date(rental.start_date).toLocaleDateString('en-US', {
+  const startDate = new Date(rental.start_date).toLocaleDateString(locale, {
     month: 'long', day: 'numeric', year: 'numeric',
   });
-  const endDate = new Date(rental.end_date).toLocaleDateString('en-US', {
+  const endDate = new Date(rental.end_date).toLocaleDateString(locale, {
     month: 'long', day: 'numeric', year: 'numeric',
   });
-  const createdDate = new Date(rental.created_date).toLocaleDateString('en-US', {
+  const createdDate = new Date(rental.created_date).toLocaleDateString(locale, {
     month: 'short', day: 'numeric', year: 'numeric',
   });
 
@@ -219,7 +220,7 @@ export const RentalDetailScreen = () => {
           <View style={styles.statusRow}>
             <View style={[styles.statusBadge, { backgroundColor: statusColor + '18' }]}>
               <Text style={[styles.statusText, { color: statusColor }]}>
-                {rental.status.replace('_', ' ').toUpperCase()}
+                {t(`rentalHistory.status.${rental.status}`).toUpperCase()}
               </Text>
             </View>
             <Text style={styles.dateText}>{t('rentalDetail.filed', { date: createdDate })}</Text>
@@ -231,10 +232,10 @@ export const RentalDetailScreen = () => {
         {itemInfo && (
           <View style={styles.card}>
             <Text style={styles.sectionLabel}>{t('rentalDetail.itemDetails')}</Text>
-            <InfoRow label="Title" value={itemInfo.title} />
-            {itemInfo.category && <InfoRow label="Category" value={itemInfo.category} />}
-            {itemInfo.condition && <InfoRow label="Condition" value={itemInfo.condition} />}
-            {locationStr && <InfoRow label="Location" value={locationStr} />}
+            <InfoRow label={t('rentalDetail.titleLabel')} value={itemInfo.title} />
+            {itemInfo.category && <InfoRow label={t('rentalDetail.categoryLabel')} value={itemInfo.category} />}
+            {itemInfo.condition && <InfoRow label={t('rentalDetail.conditionLabel')} value={itemInfo.condition} />}
+            {locationStr && <InfoRow label={t('rentalDetail.locationLabel')} value={locationStr} />}
             {itemInfo.description && (
               <Text style={styles.descriptionText} numberOfLines={3}>{itemInfo.description}</Text>
             )}
@@ -246,12 +247,12 @@ export const RentalDetailScreen = () => {
           <Text style={styles.sectionLabel}>{t('rentalDetail.rentalPeriod')}</Text>
           <View style={styles.datesRow}>
             <View style={styles.dateBlock}>
-              <Text style={styles.dateBlockLabel}>Start</Text>
+              <Text style={styles.dateBlockLabel}>{t('rentalDetail.start')}</Text>
               <Text style={styles.dateBlockValue}>{startDate}</Text>
             </View>
             <MaterialCommunityIcons name="arrow-right" size={20} color="#CBD5E1" />
             <View style={[styles.dateBlock, { alignItems: 'flex-end' }]}>
-              <Text style={styles.dateBlockLabel}>End</Text>
+              <Text style={styles.dateBlockLabel}>{t('rentalDetail.end')}</Text>
               <Text style={styles.dateBlockValue}>{endDate}</Text>
             </View>
           </View>
@@ -261,8 +262,8 @@ export const RentalDetailScreen = () => {
         {/* People */}
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>{t('rentalDetail.parties')}</Text>
-          <InfoRow label="Renter" value={rental.renter_email} />
-          <InfoRow label="Owner" value={rental.owner_email} />
+          <InfoRow label={t('rentalDetail.renter')} value={rental.renter_email} />
+          <InfoRow label={t('rentalDetail.owner')} value={rental.owner_email} />
         </View>
 
         {/* Financials */}

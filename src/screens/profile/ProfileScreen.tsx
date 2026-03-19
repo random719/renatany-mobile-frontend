@@ -83,6 +83,7 @@ export const ProfileScreen = () => {
   const { logout } = useAuthStore();
   const navigation = useNavigation<any>();
   const { language, setLanguage, t } = useI18n();
+  const locale = language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
   const { userItems, fetchUserItems, isLoading: itemsLoading, toggleLike } = useListingStore();
 
   const [backendUser, setBackendUser] = useState<BackendUser | null>(null);
@@ -380,7 +381,7 @@ export const ProfileScreen = () => {
 
       // Check file size (50MB max per backend)
       if (file.size && file.size > 50 * 1024 * 1024) {
-        toast.warning('Maximum file size is 50MB.');
+        toast.warning(t('profile.maxFileSize'));
         return;
       }
 
@@ -426,10 +427,10 @@ export const ProfileScreen = () => {
       await api.put('/users/me', { documents: [...currentDocs, fileUrl] });
       await loadProfile();
 
-      toast.success('Document uploaded successfully.');
+      toast.success(t('profile.documentUploaded'));
     } catch (err: any) {
       console.error('Document upload failed:', err);
-      toast.error(err?.message || 'Could not upload document. Please try again.');
+      toast.error(err?.message || t('profile.documentUploadFailed'));
     } finally {
       setIsUploading(false);
     }
@@ -437,10 +438,10 @@ export const ProfileScreen = () => {
 
   const handleDeleteDocument = async (docId: string) => {
     if (!backendUser) return;
-    Alert.alert('Delete Document', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('profile.deleteDocumentTitle'), t('profile.deleteDocumentPrompt'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -449,7 +450,7 @@ export const ProfileScreen = () => {
             await api.put('/users/me', { documents: updated });
             await loadProfile();
           } catch {
-            toast.error('Failed to delete document.');
+            toast.error(t('profile.documentDeleteFailed'));
           }
         },
       },
@@ -458,12 +459,12 @@ export const ProfileScreen = () => {
 
   const TABS: { key: TabKey; label: string; icon: string }[] = [
     { key: 'items', label: t('profile.items'), icon: 'package-variant-closed' },
-    { key: 'wallet', label: 'Wallet', icon: 'wallet-outline' },
-    { key: 'reviews', label: 'Reviews', icon: 'star-outline' },
-    { key: 'rentals', label: 'Rentals', icon: 'calendar-outline' },
-    { key: 'disputes', label: 'Disputes', icon: 'alert-outline' },
-    { key: 'documents', label: 'Docs', icon: 'file-document-outline' },
-    { key: 'settings', label: 'Settings', icon: 'cog-outline' },
+    { key: 'wallet', label: t('profile.wallet'), icon: 'wallet-outline' },
+    { key: 'reviews', label: t('profile.reviews'), icon: 'star-outline' },
+    { key: 'rentals', label: t('profile.rentals'), icon: 'calendar-outline' },
+    { key: 'disputes', label: t('profile.disputes'), icon: 'alert-outline' },
+    { key: 'documents', label: t('profile.documents'), icon: 'file-document-outline' },
+    { key: 'settings', label: t('profile.settings'), icon: 'cog-outline' },
   ];
 
   const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://172.28.145.1:5000/api').replace(/\/api$/, '');
@@ -491,7 +492,7 @@ export const ProfileScreen = () => {
       await WebBrowser.openAuthSessionAsync(url, nativeCardCallback);
       await refreshPaymentStatus();
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Failed to start card setup.');
+      toast.error(err?.response?.data?.error || t('profile.cardSetupFailed'));
     }
   };
 
@@ -511,16 +512,16 @@ export const ProfileScreen = () => {
       const updatedUser = userRes?.data?.data || userRes?.data;
       if (updatedUser && !updatedUser.stripe_payment_method_id) {
         Alert.alert(
-          'Bank Connected!',
-          'Would you like to also connect a card for making rental payments?',
+          t('profile.bankConnectedTitle'),
+          t('profile.bankConnectedPrompt'),
           [
-            { text: 'Later', style: 'cancel' },
-            { text: 'Connect Card', onPress: () => handleAddPayment() },
+            { text: t('profile.later'), style: 'cancel' },
+            { text: t('profile.connectCard'), onPress: () => handleAddPayment() },
           ],
         );
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Failed to start bank setup.');
+      toast.error(err?.response?.data?.error || t('profile.bankSetupFailed'));
     }
   };
 
@@ -530,7 +531,7 @@ export const ProfileScreen = () => {
         <GlobalHeader />
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" />
-          <Text style={styles.loaderText}>Loading your profile...</Text>
+          <Text style={styles.loaderText}>{t('profile.loadingProfile')}</Text>
         </View>
       </View>
     );
@@ -784,29 +785,29 @@ export const ProfileScreen = () => {
               <View style={styles.summaryGrid}>
                 <Surface style={[styles.summaryCard, { backgroundColor: '#EFF6FF' }]} elevation={0}>
                   <Text style={[styles.summaryNumber, { color: '#1E3A8A' }]}>{activeRentals.length}</Text>
-                  <Text style={[styles.summaryLabel, { color: '#2563EB' }]}>Active</Text>
+                  <Text style={[styles.summaryLabel, { color: '#2563EB' }]}>{t('profile.activeLabel')}</Text>
                 </Surface>
                 <Surface style={[styles.summaryCard, { backgroundColor: '#F5F3FF' }]} elevation={0}>
                   <Text style={[styles.summaryNumber, { color: '#581C87' }]}>{upcomingRentals.length}</Text>
-                  <Text style={[styles.summaryLabel, { color: '#7C3AED' }]}>Upcoming</Text>
+                  <Text style={[styles.summaryLabel, { color: '#7C3AED' }]}>{t('profile.upcomingLabel')}</Text>
                 </Surface>
                 <Surface style={[styles.summaryCard, { backgroundColor: '#F0FDF4' }]} elevation={0}>
                   <Text style={[styles.summaryNumber, { color: '#14532D' }]}>{completedRentals.length}</Text>
-                  <Text style={[styles.summaryLabel, { color: '#16A34A' }]}>Completed</Text>
+                  <Text style={[styles.summaryLabel, { color: '#16A34A' }]}>{t('profile.completedLabel')}</Text>
                 </Surface>
                 <Surface style={[styles.summaryCard, { backgroundColor: '#F8FAFC' }]} elevation={0}>
                   <Text style={[styles.summaryNumber, { color: '#0F172A' }]}>{rentals.length}</Text>
-                  <Text style={[styles.summaryLabel, { color: '#64748B' }]}>Total</Text>
+                  <Text style={[styles.summaryLabel, { color: '#64748B' }]}>{t('profile.totalLabel')}</Text>
                 </Surface>
               </View>
 
               {/* Sub-tabs */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.subTabBar} contentContainerStyle={styles.subTabBarContent}>
                 {([
-                  { key: 'all' as RentalSubTab, label: `All (${rentals.length})` },
-                  { key: 'renter' as RentalSubTab, label: `As Renter (${asRenter.length})` },
-                  { key: 'owner' as RentalSubTab, label: `As Owner (${asOwner.length})` },
-                  { key: 'upcoming' as RentalSubTab, label: `Upcoming (${upcomingRentals.length})` },
+                  { key: 'all' as RentalSubTab, label: t('profile.allTab', { count: rentals.length }) },
+                  { key: 'renter' as RentalSubTab, label: t('profile.asRenterTab', { count: asRenter.length }) },
+                  { key: 'owner' as RentalSubTab, label: t('profile.asOwnerTab', { count: asOwner.length }) },
+                  { key: 'upcoming' as RentalSubTab, label: t('profile.upcomingTab', { count: upcomingRentals.length }) },
                 ]).map((tab) => (
                   <TouchableOpacity
                     key={tab.key}
@@ -838,11 +839,11 @@ export const ProfileScreen = () => {
                           <View style={styles.rentalHeader}>
                             <View style={{ flex: 1 }}>
                               <Text style={styles.rentalItemTitle} numberOfLines={1}>
-                                {item?.title || 'Item not found'}
+                                {item?.title || t('disputes.itemNotFound')}
                               </Text>
                               <View style={[styles.roleBadge, role === 'renter' ? styles.roleBadgeRenter : styles.roleBadgeOwner]}>
                                 <Text style={styles.roleBadgeText}>
-                                  {role === 'renter' ? 'You rented' : 'You rented out'}
+                                  {role === 'renter' ? t('rentalHistory.youRented') : t('rentalHistory.youRentedOut')}
                                 </Text>
                               </View>
                             </View>
@@ -857,15 +858,15 @@ export const ProfileScreen = () => {
                                 rental.status === 'cancelled' && styles.statusRejected,
                               ]}
                             >
-                              <Text style={styles.statusText}>{rental.status}</Text>
+                              <Text style={styles.statusText}>{t(`rentalHistory.status.${rental.status}`)}</Text>
                             </View>
                           </View>
                       {rental.start_date && rental.end_date && (
                         <View style={styles.rentalInfoRow}>
                           <MaterialCommunityIcons name="calendar-outline" size={14} color="#64748B" />
                           <Text style={styles.rentalDates}>
-                            {new Date(rental.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} -{' '}
-                            {new Date(rental.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {new Date(rental.start_date).toLocaleDateString(locale, { month: 'short', day: 'numeric' })} -{' '}
+                            {new Date(rental.end_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}
                           </Text>
                         </View>
                       )}
@@ -874,12 +875,16 @@ export const ProfileScreen = () => {
                         <Text style={styles.rentalAmountBold}>${totalPaid.toFixed(2)}</Text>
                       </View>
                       <Text style={styles.rentalBreakdown}>
-                        Rental ${rentalCost.toFixed(2)} · Fee ${platformFee.toFixed(2)} · Deposit ${securityDeposit.toFixed(2)}
+                        {t('rentalHistory.breakdown', {
+                          rental: rentalCost.toFixed(2),
+                          fee: platformFee.toFixed(2),
+                          deposit: securityDeposit.toFixed(2),
+                        })}
                       </Text>
                       <View style={styles.rentalInfoRow}>
                         <MaterialCommunityIcons name="clock-outline" size={14} color="#94A3B8" />
                         <Text style={styles.reviewDate}>
-                          Created {new Date(rental.created_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {t('profile.createdOn', { date: new Date(rental.created_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) })}
                         </Text>
                       </View>
                         </View>
@@ -890,8 +895,8 @@ export const ProfileScreen = () => {
               ) : (
                 <Surface style={styles.emptyCard} elevation={0}>
                   <MaterialCommunityIcons name="calendar-outline" size={48} color="#94A3B8" />
-                  <Text style={styles.emptyTitle}>No rental history</Text>
-                  <Text style={styles.emptySubtitle}>Your rental activity will appear here</Text>
+                  <Text style={styles.emptyTitle}>{t('profile.noRentalHistoryTitle')}</Text>
+                  <Text style={styles.emptySubtitle}>{t('profile.noRentalHistorySubtitle')}</Text>
                 </Surface>
               )}
             </View>
@@ -903,19 +908,19 @@ export const ProfileScreen = () => {
               <View style={styles.summaryGrid}>
                 <Surface style={[styles.summaryCard, { backgroundColor: '#FEF2F2' }]} elevation={0}>
                   <Text style={[styles.summaryNumber, { color: '#DC2626' }]}>{disputeCounts.open}</Text>
-                  <Text style={[styles.summaryLabel, { color: '#64748B' }]}>Open</Text>
+                  <Text style={[styles.summaryLabel, { color: '#64748B' }]}>{t('disputes.status.open')}</Text>
                 </Surface>
                 <Surface style={[styles.summaryCard, { backgroundColor: '#FEF3C7' }]} elevation={0}>
                   <Text style={[styles.summaryNumber, { color: '#D97706' }]}>{disputeCounts.under_review}</Text>
-                  <Text style={[styles.summaryLabel, { color: '#64748B' }]}>Under Review</Text>
+                  <Text style={[styles.summaryLabel, { color: '#64748B' }]}>{t('disputes.status.under_review')}</Text>
                 </Surface>
                 <Surface style={[styles.summaryCard, { backgroundColor: '#F0FDF4' }]} elevation={0}>
                   <Text style={[styles.summaryNumber, { color: '#16A34A' }]}>{disputeCounts.resolved}</Text>
-                  <Text style={[styles.summaryLabel, { color: '#64748B' }]}>Resolved</Text>
+                  <Text style={[styles.summaryLabel, { color: '#64748B' }]}>{t('disputes.status.resolved')}</Text>
                 </Surface>
                 <Surface style={[styles.summaryCard, { backgroundColor: '#F8FAFC' }]} elevation={0}>
                   <Text style={[styles.summaryNumber, { color: '#0F172A' }]}>{disputeCounts.total}</Text>
-                  <Text style={[styles.summaryLabel, { color: '#64748B' }]}>Total</Text>
+                  <Text style={[styles.summaryLabel, { color: '#64748B' }]}>{t('profile.totalLabel')}</Text>
                 </Surface>
               </View>
 
@@ -928,7 +933,7 @@ export const ProfileScreen = () => {
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
                           <MaterialCommunityIcons name="alert-circle" size={20} color="#DC2626" />
                           <Text style={styles.disputeFiledText}>
-                            {isFiled ? 'Filed by you' : 'Filed against you'}
+                            {isFiled ? t('profile.filedByYou') : t('profile.filedAgainstYou')}
                           </Text>
                         </View>
                         <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
@@ -941,7 +946,7 @@ export const ProfileScreen = () => {
                               dispute.status === 'closed' && styles.statusRejected,
                             ]}
                           >
-                            <Text style={styles.statusText}>{dispute.status.replace('_', ' ')}</Text>
+                            <Text style={styles.statusText}>{t(`disputes.status.${dispute.status}`)}</Text>
                           </View>
                           {dispute.decision && (
                             <View
@@ -952,7 +957,7 @@ export const ProfileScreen = () => {
                                 dispute.decision === 'split' && { backgroundColor: '#F3E8FF' },
                               ]}
                             >
-                              <Text style={styles.statusText}>{dispute.decision.replace('_', ' ')}</Text>
+                              <Text style={styles.statusText}>{t(`adminDisputes.${dispute.decision === 'favor_renter' ? 'favorRenter' : dispute.decision === 'favor_owner' ? 'favorOwner' : 'split'}`)}</Text>
                             </View>
                           )}
                         </View>
@@ -960,20 +965,20 @@ export const ProfileScreen = () => {
 
                       {/* Reason box */}
                       <View style={styles.disputeReasonBox}>
-                        <Text style={styles.disputeReasonTitle}>Reason: {dispute.reason.replace(/_/g, ' ')}</Text>
+                        <Text style={styles.disputeReasonTitle}>{t('profile.reason', { value: dispute.reason.replace(/_/g, ' ') })}</Text>
                         <Text numberOfLines={2} style={styles.disputeReasonDesc}>{dispute.description}</Text>
                       </View>
 
                       {/* Resolution */}
                       {dispute.resolution && (
                         <View style={styles.disputeResolutionBox}>
-                          <Text style={styles.disputeResolutionTitle}>Resolution:</Text>
+                          <Text style={styles.disputeResolutionTitle}>{t('profile.resolution')}</Text>
                           <Text numberOfLines={2} style={styles.disputeResolutionDesc}>{dispute.resolution}</Text>
                         </View>
                       )}
 
                       <Text style={styles.reviewDate}>
-                        Filed {new Date(dispute.created_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {t('profile.filed', { date: new Date(dispute.created_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) })}
                       </Text>
                     </Surface>
                   );
@@ -981,8 +986,8 @@ export const ProfileScreen = () => {
               ) : (
                 <Surface style={styles.emptyCard} elevation={0}>
                   <MaterialCommunityIcons name="alert-outline" size={48} color="#94A3B8" />
-                  <Text style={styles.emptyTitle}>No disputes</Text>
-                  <Text style={styles.emptySubtitle}>You haven't been involved in any disputes</Text>
+                  <Text style={styles.emptyTitle}>{t('profile.noDisputesTitle')}</Text>
+                  <Text style={styles.emptySubtitle}>{t('profile.noDisputesSubtitle')}</Text>
                 </Surface>
               )}
             </View>
@@ -996,11 +1001,11 @@ export const ProfileScreen = () => {
                 <Surface style={[styles.walletBalanceCard, { backgroundColor: '#F0FDF4' }]} elevation={0}>
                   <View style={styles.walletBalanceInner}>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.walletBalanceLabel, { color: '#16A34A' }]}>Available for Payout</Text>
+                      <Text style={[styles.walletBalanceLabel, { color: '#16A34A' }]}>{t('profile.availableForPayout')}</Text>
                       <Text style={[styles.walletBalanceBig, { color: '#15803D' }]}>
                         ${availableForPayout.toFixed(2)}
                       </Text>
-                      <Text style={[styles.walletBalanceSub, { color: '#16A34A' }]}>Ready to withdraw</Text>
+                      <Text style={[styles.walletBalanceSub, { color: '#16A34A' }]}>{t('profile.readyToWithdraw')}</Text>
                     </View>
                     <View style={[styles.walletBalanceIcon, { backgroundColor: '#DCFCE7' }]}>
                       <MaterialCommunityIcons name="cash-multiple" size={24} color="#16A34A" />
@@ -1010,11 +1015,11 @@ export const ProfileScreen = () => {
                 <Surface style={[styles.walletBalanceCard, { backgroundColor: '#EFF6FF' }]} elevation={0}>
                   <View style={styles.walletBalanceInner}>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.walletBalanceLabel, { color: '#2563EB' }]}>Lifetime Earnings</Text>
+                      <Text style={[styles.walletBalanceLabel, { color: '#2563EB' }]}>{t('profile.lifetimeEarnings')}</Text>
                       <Text style={[styles.walletBalanceBig, { color: '#1D4ED8' }]}>
                         ${walletData?.totalEarnings?.toFixed(2) || '0.00'}
                       </Text>
-                      <Text style={[styles.walletBalanceSub, { color: '#2563EB' }]}>After 15% platform fee</Text>
+                      <Text style={[styles.walletBalanceSub, { color: '#2563EB' }]}>{t('profile.afterPlatformFee')}</Text>
                     </View>
                     <View style={[styles.walletBalanceIcon, { backgroundColor: '#DBEAFE' }]}>
                       <MaterialCommunityIcons name="trending-up" size={24} color="#2563EB" />
@@ -1025,12 +1030,12 @@ export const ProfileScreen = () => {
 
               {/* Earnings Details Sub-tabs */}
               <Surface style={styles.walletDetailsCard} elevation={0}>
-                <Text style={styles.walletDetailsTitle}>Earnings Details</Text>
+                <Text style={styles.walletDetailsTitle}>{t('profile.earningsDetails')}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.subTabBar} contentContainerStyle={styles.subTabBarContent}>
                   {([
-                    { key: 'completed' as WalletSubTab, label: `Completed (${walletData?.completedTransactions?.length || 0})` },
-                    { key: 'held' as WalletSubTab, label: `Held (${walletData?.heldTransactions?.length || 0})` },
-                    { key: 'payouts' as WalletSubTab, label: `Payouts (${payouts.length})` },
+                    { key: 'completed' as WalletSubTab, label: t('profile.completedTab', { count: walletData?.completedTransactions?.length || 0 }) },
+                    { key: 'held' as WalletSubTab, label: t('profile.heldTab', { count: walletData?.heldTransactions?.length || 0 }) },
+                    { key: 'payouts' as WalletSubTab, label: t('profile.payoutsTab', { count: payouts.length }) },
                   ]).map((tab) => (
                     <TouchableOpacity
                       key={tab.key}
@@ -1054,25 +1059,25 @@ export const ProfileScreen = () => {
                             <Text style={styles.walletTxTitle} numberOfLines={1}>{tx.item_title}</Text>
                             {tx.rental_start && tx.rental_end && (
                               <Text style={styles.walletTxMeta}>
-                                {new Date(tx.rental_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} -{' '}
-                                {new Date(tx.rental_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                {tx.rental_days ? ` · ${tx.rental_days} day${tx.rental_days === 1 ? '' : 's'}` : ''}
+                                {new Date(tx.rental_start).toLocaleDateString(locale, { month: 'short', day: 'numeric' })} -{' '}
+                                {new Date(tx.rental_end).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
+                                {tx.rental_days ? ` · ${t(tx.rental_days === 1 ? 'rentalDetail.days' : 'rentalDetail.days_plural', { count: tx.rental_days })}` : ''}
                               </Text>
                             )}
                             <Text style={styles.walletTxDate}>
-                              Completed {new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              {t('profile.completedOn', { date: new Date(tx.date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) })}
                             </Text>
                           </View>
                           <View style={{ alignItems: 'flex-end' }}>
                             <Text style={[styles.walletTxAmount, { color: '#15803D' }]}>+${tx.amount.toFixed(2)}</Text>
-                            <View style={[styles.statusBadge, styles.statusCompleted]}><Text style={styles.statusText}>Earned</Text></View>
+                            <View style={[styles.statusBadge, styles.statusCompleted]}><Text style={styles.statusText}>{t('profile.earnedStatus')}</Text></View>
                           </View>
                         </View>
                       ))
                     ) : (
                       <View style={styles.walletTxEmpty}>
                         <MaterialCommunityIcons name="package-variant-closed" size={36} color="#94A3B8" />
-                        <Text style={styles.walletTxEmptyText}>No completed rentals yet</Text>
+                        <Text style={styles.walletTxEmptyText}>{t('profile.noCompletedRentals')}</Text>
                       </View>
                     )}
                   </>
@@ -1088,23 +1093,23 @@ export const ProfileScreen = () => {
                             <Text style={styles.walletTxTitle} numberOfLines={1}>{tx.item_title}</Text>
                             {tx.rental_start && tx.rental_end && (
                               <Text style={styles.walletTxMeta}>
-                                {new Date(tx.rental_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} -{' '}
-                                {new Date(tx.rental_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                {tx.rental_days ? ` · ${tx.rental_days} day${tx.rental_days === 1 ? '' : 's'}` : ''}
+                                {new Date(tx.rental_start).toLocaleDateString(locale, { month: 'short', day: 'numeric' })} -{' '}
+                                {new Date(tx.rental_end).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
+                                {tx.rental_days ? ` · ${t(tx.rental_days === 1 ? 'rentalDetail.days' : 'rentalDetail.days_plural', { count: tx.rental_days })}` : ''}
                               </Text>
                             )}
-                            <Text style={styles.walletTxDate}>Rental in progress</Text>
+                            <Text style={styles.walletTxDate}>{t('profile.rentalInProgress')}</Text>
                           </View>
                           <View style={{ alignItems: 'flex-end' }}>
                             <Text style={[styles.walletTxAmount, { color: '#D97706' }]}>${tx.amount.toFixed(2)}</Text>
-                            <View style={[styles.statusBadge, styles.statusPending]}><Text style={styles.statusText}>Held</Text></View>
+                            <View style={[styles.statusBadge, styles.statusPending]}><Text style={styles.statusText}>{t('profile.heldStatus')}</Text></View>
                           </View>
                         </View>
                       ))
                     ) : (
                       <View style={styles.walletTxEmpty}>
                         <MaterialCommunityIcons name="clock-outline" size={36} color="#94A3B8" />
-                        <Text style={styles.walletTxEmptyText}>No active rentals</Text>
+                        <Text style={styles.walletTxEmptyText}>{t('profile.noActiveRentals')}</Text>
                       </View>
                     )}
                   </>
@@ -1117,9 +1122,9 @@ export const ProfileScreen = () => {
                       payouts.map((payout) => (
                         <View key={payout.id} style={[styles.walletTxRow, { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
                           <View style={{ flex: 1 }}>
-                            <Text style={styles.walletTxTitle}>Withdrawal</Text>
+                            <Text style={styles.walletTxTitle}>{t('profile.withdrawal')}</Text>
                             <Text style={styles.walletTxDate}>
-                              {new Date(payout.created_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              {new Date(payout.created_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}
                             </Text>
                           </View>
                           <View style={{ alignItems: 'flex-end' }}>
@@ -1133,7 +1138,7 @@ export const ProfileScreen = () => {
                     ) : (
                       <View style={styles.walletTxEmpty}>
                         <MaterialCommunityIcons name="cash-multiple" size={36} color="#94A3B8" />
-                        <Text style={styles.walletTxEmptyText}>No payouts yet</Text>
+                        <Text style={styles.walletTxEmptyText}>{t('profile.noPayoutsYet')}</Text>
                       </View>
                     )}
                   </>
@@ -1152,9 +1157,9 @@ export const ProfileScreen = () => {
                     <MaterialCommunityIcons name="shield-check-outline" size={24} color="#2563EB" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.docVerificationTitle}>Document Verification</Text>
+                    <Text style={styles.docVerificationTitle}>{t('profile.documentVerification')}</Text>
                     <Text style={styles.docVerificationDesc}>
-                      Upload documents such as your driver's license or ID for verification purposes. All documents are stored securely and encrypted.
+                      {t('profile.documentVerificationDesc')}
                     </Text>
                   </View>
                 </View>
@@ -1168,20 +1173,20 @@ export const ProfileScreen = () => {
                 disabled={isUploading}
                 loading={isUploading}
               >
-                {isUploading ? 'Uploading...' : 'Upload Document'}
+                {isUploading ? t('profile.uploading') : t('profile.uploadDocument')}
               </Button>
-              <Text style={styles.helperText}>JPG, PNG - Max 50MB</Text>
+              <Text style={styles.helperText}>{t('profile.documentFormats')}</Text>
 
               {backendUser?.documents && backendUser.documents.length > 0 ? (
                 <Surface style={styles.docListCard} elevation={1}>
                   <View style={styles.docListHeader}>
-                    <Text style={styles.docListTitle}>My Documents</Text>
+                    <Text style={styles.docListTitle}>{t('profile.myDocuments')}</Text>
                     <View style={styles.docCountBadge}>
-                      <Text style={styles.docCountText}>{backendUser.documents.length} files</Text>
+                      <Text style={styles.docCountText}>{t('profile.filesCount', { count: backendUser.documents.length })}</Text>
                     </View>
                   </View>
                   {backendUser.documents.map((docUrl, index) => {
-                    const fileName = typeof docUrl === 'string' ? docUrl.split('/').pop() || 'Document' : 'Document';
+                    const fileName = typeof docUrl === 'string' ? docUrl.split('/').pop() || t('profile.documentFallback') : t('profile.documentFallback');
                     const isImage = typeof docUrl === 'string' && /\.(jpg|jpeg|png|gif|webp)$/i.test(docUrl);
                     return (
                       <View key={index} style={[styles.docItemRow, index > 0 && styles.docItemBorder]}>
@@ -1194,7 +1199,7 @@ export const ProfileScreen = () => {
                         )}
                         <View style={styles.docItemInfo}>
                           <Text style={styles.docItemName} numberOfLines={1}>{fileName}</Text>
-                          <Text style={styles.docItemDate}>Uploaded {new Date().toLocaleDateString()}</Text>
+                          <Text style={styles.docItemDate}>{t('profile.uploadedOn', { date: new Date().toLocaleDateString(locale) })}</Text>
                         </View>
                         <TouchableOpacity
                           style={styles.docActionBtn}
@@ -1215,8 +1220,8 @@ export const ProfileScreen = () => {
               ) : (
                 <Surface style={[styles.emptyCard, { marginTop: 16 }]} elevation={0}>
                   <MaterialCommunityIcons name="file-document-outline" size={48} color="#94A3B8" />
-                  <Text style={styles.emptyTitle}>No documents</Text>
-                  <Text style={styles.emptySubtitle}>Upload ID or other verification documents</Text>
+                  <Text style={styles.emptyTitle}>{t('profile.noDocuments')}</Text>
+                  <Text style={styles.emptySubtitle}>{t('profile.noDocumentsSubtitle')}</Text>
                 </Surface>
               )}
             </View>
@@ -1248,20 +1253,20 @@ export const ProfileScreen = () => {
 
               {/* Personal Information */}
               <Surface style={styles.settingsCard} elevation={0}>
-                <Text style={styles.settingsSectionTitle}>Personal Information</Text>
+                <Text style={styles.settingsSectionTitle}>{t('profile.personalInformation')}</Text>
 
-                <Text style={styles.settingsLabel}>Full Name</Text>
+                <Text style={styles.settingsLabel}>{t('profile.fullName')}</Text>
                 <View style={styles.settingsInput}>
                   <TextInput
                     style={styles.settingsTextInput}
                     value={settingsForm.full_name}
                     onChangeText={(t) => setSettingsForm((p) => ({ ...p, full_name: t }))}
-                    placeholder="Enter your full name"
+                    placeholder={t('profile.enterFullName')}
                     placeholderTextColor="#94A3B8"
                   />
                 </View>
 
-                <Text style={[styles.settingsLabel, { marginTop: 16 }]}>Email</Text>
+                <Text style={[styles.settingsLabel, { marginTop: 16 }]}>{t('profile.email')}</Text>
                 <View style={[styles.settingsInput, styles.settingsInputDisabled]}>
                   <TextInput
                     style={[styles.settingsTextInput, { color: '#94A3B8' }]}
@@ -1269,9 +1274,9 @@ export const ProfileScreen = () => {
                     editable={false}
                   />
                 </View>
-                <Text style={styles.settingsHint}>Email cannot be changed</Text>
+                <Text style={styles.settingsHint}>{t('profile.emailImmutable')}</Text>
 
-                <Text style={[styles.settingsLabel, { marginTop: 16 }]}>Username</Text>
+                <Text style={[styles.settingsLabel, { marginTop: 16 }]}>{t('profile.username')}</Text>
                 <View style={[styles.settingsInput, styles.settingsInputDisabled]}>
                   <TextInput
                     style={[styles.settingsTextInput, { color: '#94A3B8', fontFamily: 'monospace' }]}
@@ -1279,9 +1284,9 @@ export const ProfileScreen = () => {
                     editable={false}
                   />
                 </View>
-                <Text style={styles.settingsHint}>Username cannot be changed</Text>
+                <Text style={styles.settingsHint}>{t('profile.usernameImmutable')}</Text>
 
-                <Text style={[styles.settingsLabel, { marginTop: 16 }]}>Bio</Text>
+                <Text style={[styles.settingsLabel, { marginTop: 16 }]}>{t('profile.bio')}</Text>
                 <View style={[styles.settingsInput, { height: 100 }]}>
                   <TextInput
                     style={[styles.settingsTextInput, { height: 90, textAlignVertical: 'top' }]}
@@ -1289,14 +1294,14 @@ export const ProfileScreen = () => {
                     onChangeText={(t) => {
                       if (t.length <= 160) setSettingsForm((p) => ({ ...p, bio: t }));
                     }}
-                    placeholder="Tell us about yourself..."
+                    placeholder={t('profile.bioPlaceholder')}
                     placeholderTextColor="#94A3B8"
                     multiline
                     numberOfLines={4}
                     maxLength={160}
                   />
                 </View>
-                <Text style={styles.settingsHint}>{settingsForm.bio.length}/160 characters</Text>
+                <Text style={styles.settingsHint}>{t('profile.charactersCount', { count: settingsForm.bio.length, max: 160 })}</Text>
 
                 <Text style={[styles.settingsLabel, { marginTop: 16 }]}>{t('profile.preferredLanguage')}</Text>
                 <View style={styles.languageRow}>

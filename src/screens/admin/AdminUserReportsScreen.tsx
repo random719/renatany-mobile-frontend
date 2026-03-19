@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { ActivityIndicator, Text } from "react-native-paper";
 import { GlobalHeader } from "../../components/common/GlobalHeader";
+import { useI18n } from "../../i18n";
 import {
   getUserReports,
   updateUserReport,
@@ -30,33 +31,18 @@ import { RootStackParamList } from "../../types/navigation";
 
 type Nav = StackNavigationProp<RootStackParamList>;
 
-const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
-  pending: { bg: "#FEE2E2", text: "#DC2626", label: "PENDING" },
-  under_review: { bg: "#FEF3C7", text: "#D97706", label: "UNDER REVIEW" },
-  resolved: { bg: "#ECFDF5", text: "#10B981", label: "RESOLVED" },
-  dismissed: { bg: "#F3F4F6", text: "#6B7280", label: "DISMISSED" },
-};
-
-const REASON_LABELS: Record<string, string> = {
-  harassment: "Harassment or Bullying",
-  spam: "Spam or Scam",
-  fraud: "Fraudulent Activity",
-  inappropriate_content: "Inappropriate Content",
-  other: "Other",
-};
-
 const ACTION_OPTIONS = [
-  { key: "none", label: "No Action", icon: "minus-circle-outline", color: "#6B7280" },
-  { key: "warning_sent", label: "Send Warning", icon: "alert-outline", color: "#D97706" },
-  { key: "user_suspended", label: "Suspend User (7 days)", icon: "clock-outline", color: "#EA580C" },
-  { key: "user_banned", label: "Ban User Permanently", icon: "cancel", color: "#DC2626" },
+  { key: "none", icon: "minus-circle-outline", color: "#6B7280" },
+  { key: "warning_sent", icon: "alert-outline", color: "#D97706" },
+  { key: "user_suspended", icon: "clock-outline", color: "#EA580C" },
+  { key: "user_banned", icon: "cancel", color: "#DC2626" },
 ];
 
 const TABS = [
-  { key: "pending", label: "Pending" },
-  { key: "under_review", label: "Under Review" },
-  { key: "resolved", label: "Resolved" },
-  { key: "dismissed", label: "Dismissed" },
+  { key: "pending" },
+  { key: "under_review" },
+  { key: "resolved" },
+  { key: "dismissed" },
 ] as const;
 
 interface UserProfile {
@@ -68,6 +54,7 @@ interface UserProfile {
 
 export const AdminUserReportsScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { t } = useI18n();
   const [reports, setReports] = useState<UserReport[]>([]);
   const [usersMap, setUsersMap] = useState<Record<string, UserProfile>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -148,23 +135,23 @@ export const AdminUserReportsScreen = () => {
           await api.post("/notifications", {
             user_email: selectedReport.reported_email,
             type: "system",
-            title: "Report Dismissed",
-            message: "A report filed against you has been reviewed and dismissed. No action was taken on your account.",
+            title: t("adminUserReports.notificationDismissedTitle"),
+            message: t("adminUserReports.notificationDismissedBody"),
             related_id: selectedReport.id,
           });
           await api.post("/notifications", {
             user_email: selectedReport.reporter_email,
             type: "system",
-            title: "Report Update: Dismissed",
-            message: `Your report concerning ${reportedName} has been reviewed and dismissed. No action was taken. Thank you for your vigilance.`,
+            title: t("adminUserReports.notificationUpdateDismissedTitle"),
+            message: t("adminUserReports.notificationUpdateDismissedBody", { name: reportedName }),
             related_id: selectedReport.id,
           });
         } else if (status === "under_review") {
           await api.post("/notifications", {
             user_email: selectedReport.reporter_email,
             type: "system",
-            title: "Report Update: Under Review",
-            message: `Your report concerning ${reportedName} is now under review. We will notify you once a final decision has been made.`,
+            title: t("adminUserReports.notificationUnderReviewTitle"),
+            message: t("adminUserReports.notificationUnderReviewBody", { name: reportedName }),
             related_id: selectedReport.id,
           });
         }
@@ -172,11 +159,11 @@ export const AdminUserReportsScreen = () => {
         // Notifications best-effort
       }
 
-      toast.success(`Report ${status === "dismissed" ? "dismissed" : status === "under_review" ? "marked as under review" : "updated"} successfully.`);
+      toast.success(t('adminUserReports.reportUpdated', { status: t(`adminUserReports.statusLabel.${status}`) }));
       setSelectedReport(null);
       await loadData();
     } catch (e: any) {
-      const msg = e?.response?.data?.error || "Failed to update report.";
+      const msg = e?.response?.data?.error || t('adminUserReports.updateFailed');
       toast.error(msg);
     } finally {
       setIsUpdating(false);
@@ -185,7 +172,7 @@ export const AdminUserReportsScreen = () => {
 
   const handleTakeAction = async () => {
     if (!selectedReport || actionTaken === "none") {
-      toast.warning("Please select an action to take.");
+      toast.warning(t('adminUserReports.selectAction'));
       return;
     }
     setIsUpdating(true);
@@ -196,11 +183,11 @@ export const AdminUserReportsScreen = () => {
         action_taken: actionTaken,
       });
 
-      toast.success(`Action taken: ${actionTaken.replace(/_/g, " ")}. Parties have been notified.`);
+      toast.success(t('adminUserReports.actionTaken', { action: t(`adminUserReports.actions.${actionTaken}`) }));
       setSelectedReport(null);
       await loadData();
     } catch (e: any) {
-      const msg = e?.response?.data?.error || "Failed to take action.";
+      const msg = e?.response?.data?.error || t('adminUserReports.actionFailed');
       toast.error(msg);
     } finally {
       setIsUpdating(false);
@@ -208,7 +195,13 @@ export const AdminUserReportsScreen = () => {
   };
 
   const renderReport = ({ item: report }: { item: UserReport }) => {
-    const sc = STATUS_CONFIG[report.status] || STATUS_CONFIG.pending;
+    const sc = report.status === "under_review"
+      ? { bg: "#FEF3C7", text: "#D97706" }
+      : report.status === "resolved"
+      ? { bg: "#ECFDF5", text: "#10B981" }
+      : report.status === "dismissed"
+      ? { bg: "#F3F4F6", text: "#6B7280" }
+      : { bg: "#FEE2E2", text: "#DC2626" };
 
     return (
       <View style={styles.card}>
@@ -217,17 +210,17 @@ export const AdminUserReportsScreen = () => {
           <View style={{ flex: 1 }}>
             <View style={styles.cardTitleRow}>
               <MaterialCommunityIcons name="alert-circle" size={18} color="#DC2626" />
-              <Text style={styles.cardTitle}>{REASON_LABELS[report.reason] || report.reason}</Text>
+              <Text style={styles.cardTitle}>{t(`adminUserReports.reasons.${report.reason}`)}</Text>
             </View>
-            <Text style={styles.cardMeta}>Reported {formatDate(report.created_date || report.created_at)}</Text>
+            <Text style={styles.cardMeta}>{t('adminUserReports.reportedOn', { date: formatDate(report.created_date || report.created_at) })}</Text>
           </View>
           <View style={styles.cardHeaderRight}>
             <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
-              <Text style={[styles.statusText, { color: sc.text }]}>{sc.label}</Text>
+              <Text style={[styles.statusText, { color: sc.text }]}>{t(`adminUserReports.statusLabel.${report.status}`)}</Text>
             </View>
             <TouchableOpacity style={styles.reviewBtn} onPress={() => openDetail(report)}>
               <MaterialCommunityIcons name="eye-outline" size={16} color="#475569" />
-              <Text style={styles.reviewBtnText}>Review</Text>
+              <Text style={styles.reviewBtnText}>{t('adminUserReports.review')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -235,7 +228,7 @@ export const AdminUserReportsScreen = () => {
         {/* Users */}
         <View style={styles.usersRow}>
           <View style={styles.userBox}>
-            <Text style={styles.userBoxLabel}>Reported By:</Text>
+            <Text style={styles.userBoxLabel}>{t('adminUserReports.reportedBy')}</Text>
             <View style={styles.userInfo}>
               {usersMap[report.reporter_email]?.profile_picture ? (
                 <Image source={{ uri: usersMap[report.reporter_email].profile_picture }} style={styles.userAvatarImg} />
@@ -246,7 +239,7 @@ export const AdminUserReportsScreen = () => {
               )}
               <View style={{ flex: 1 }}>
                 <Text style={styles.userName} numberOfLines={1}>
-                  {usersMap[report.reporter_email]?.full_name || "User"}
+                  {usersMap[report.reporter_email]?.full_name || t('common.user')}
                 </Text>
                 {usersMap[report.reporter_email]?.username ? (
                   <TouchableOpacity onPress={() => (navigation as any).navigate("PublicProfile", { userEmail: report.reporter_email })}>
@@ -259,7 +252,7 @@ export const AdminUserReportsScreen = () => {
             </View>
           </View>
           <View style={styles.userBox}>
-            <Text style={styles.userBoxLabel}>Reported User:</Text>
+            <Text style={styles.userBoxLabel}>{t('adminUserReports.reportedUser')}</Text>
             <View style={styles.userInfo}>
               {usersMap[report.reported_email]?.profile_picture ? (
                 <Image source={{ uri: usersMap[report.reported_email].profile_picture }} style={styles.userAvatarImg} />
@@ -270,7 +263,7 @@ export const AdminUserReportsScreen = () => {
               )}
               <View style={{ flex: 1 }}>
                 <Text style={styles.userName} numberOfLines={1}>
-                  {usersMap[report.reported_email]?.full_name || "User"}
+                  {usersMap[report.reported_email]?.full_name || t('common.user')}
                 </Text>
                 {usersMap[report.reported_email]?.username ? (
                   <TouchableOpacity onPress={() => (navigation as any).navigate("PublicProfile", { userEmail: report.reported_email })}>
@@ -287,7 +280,7 @@ export const AdminUserReportsScreen = () => {
         {/* Description */}
         {report.description && (
           <View style={styles.descriptionBox}>
-            <Text style={styles.descriptionLabel}>Description:</Text>
+            <Text style={styles.descriptionLabel}>{t('disputeDetail.description')}:</Text>
             <Text style={styles.descriptionText} numberOfLines={3}>{report.description}</Text>
           </View>
         )}
@@ -312,13 +305,13 @@ export const AdminUserReportsScreen = () => {
               </TouchableOpacity>
               <View style={styles.headerTitleContainer}>
                 <MaterialCommunityIcons name="alert-outline" size={24} color="#DC2626" />
-                <Text style={styles.headerTitle}>User Reports</Text>
+                <Text style={styles.headerTitle}>{t('nav.userReports')}</Text>
               </View>
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>{reports.length} Total</Text>
+                <Text style={styles.badgeText}>{t('adminUserReports.totalCount', { count: reports.length })}</Text>
               </View>
             </View>
-            <Text style={styles.subtitle}>Review and take action on reported users</Text>
+            <Text style={styles.subtitle}>{t('adminUserReports.subtitle')}</Text>
 
             {/* Tabs */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll}>
@@ -333,7 +326,7 @@ export const AdminUserReportsScreen = () => {
                       onPress={() => setActiveTab(tab.key)}
                     >
                       <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-                        {tab.label} ({count})
+                        {t('adminUserReports.tabLabel', { label: t(`adminUserReports.statusLabel.${tab.key}`), count })}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -349,7 +342,7 @@ export const AdminUserReportsScreen = () => {
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="check-circle-outline" size={64} color="#16A34A" />
               <Text style={styles.emptyTitle}>
-                No {activeTab.replace("_", " ")} reports
+                {t('adminUserReports.noReports', { status: t(`adminUserReports.statusLabel.${activeTab}`) })}
               </Text>
             </View>
           )
@@ -373,7 +366,7 @@ export const AdminUserReportsScreen = () => {
               <View style={styles.modalHandle} />
               <View style={styles.modalTitleRow}>
                 <MaterialCommunityIcons name="alert-circle" size={22} color="#DC2626" />
-                <Text style={styles.modalTitle}>Review User Report</Text>
+                <Text style={styles.modalTitle}>{t('adminUserReports.reviewUserReport')}</Text>
               </View>
 
               {selectedReport && (
@@ -382,25 +375,25 @@ export const AdminUserReportsScreen = () => {
                   <View style={styles.modalSection}>
                     <View style={styles.modalDetailGrid}>
                       <View style={styles.modalDetailItem}>
-                        <Text style={styles.modalDetailLabel}>Reason</Text>
-                        <Text style={styles.modalDetailValue}>{REASON_LABELS[selectedReport.reason] || selectedReport.reason}</Text>
+                        <Text style={styles.modalDetailLabel}>{t('adminListingReports.reason')}</Text>
+                        <Text style={styles.modalDetailValue}>{t(`adminUserReports.reasons.${selectedReport.reason}`)}</Text>
                       </View>
                       <View style={styles.modalDetailItem}>
-                        <Text style={styles.modalDetailLabel}>Reported</Text>
+                        <Text style={styles.modalDetailLabel}>{t('adminUserReports.reported')}</Text>
                         <Text style={styles.modalDetailValue}>{formatDate(selectedReport.created_date || selectedReport.created_at)}</Text>
                       </View>
                     </View>
                     <View style={styles.modalDetailItem}>
-                      <Text style={styles.modalDetailLabel}>Reporter</Text>
+                      <Text style={styles.modalDetailLabel}>{t('adminListingReports.reporter')}</Text>
                       <Text style={styles.modalDetailValue}>{selectedReport.reporter_email}</Text>
                     </View>
                     <View style={styles.modalDetailItem}>
-                      <Text style={styles.modalDetailLabel}>Reported User</Text>
+                      <Text style={styles.modalDetailLabel}>{t('adminUserReports.reportedUserPlain')}</Text>
                       <Text style={styles.modalDetailValue}>{selectedReport.reported_email}</Text>
                     </View>
                     {selectedReport.description && (
                       <View style={styles.modalDescBox}>
-                        <Text style={styles.modalDescLabel}>Description</Text>
+                        <Text style={styles.modalDescLabel}>{t('disputeDetail.description')}</Text>
                         <Text style={styles.modalDescText}>{selectedReport.description}</Text>
                       </View>
                     )}
@@ -409,7 +402,7 @@ export const AdminUserReportsScreen = () => {
                   {/* Evidence */}
                   {selectedReport.evidence_urls && selectedReport.evidence_urls.length > 0 && (
                     <View style={styles.modalSection}>
-                      <Text style={styles.modalSectionTitle}>Evidence ({selectedReport.evidence_urls.length})</Text>
+                      <Text style={styles.modalSectionTitle}>{t('adminListingReports.evidenceLabel', { count: selectedReport.evidence_urls.length })}</Text>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                         {selectedReport.evidence_urls.map((url, i) => (
                           <Image key={i} source={{ uri: url }} style={styles.modalEvidence} />
@@ -420,9 +413,9 @@ export const AdminUserReportsScreen = () => {
 
                   {/* Admin Action */}
                   <View style={styles.modalSection}>
-                    <Text style={styles.modalSectionTitle}>Admin Action</Text>
+                    <Text style={styles.modalSectionTitle}>{t('adminUserReports.adminAction')}</Text>
 
-                    <Text style={styles.fieldLabel}>Action to Take</Text>
+                    <Text style={styles.fieldLabel}>{t('adminListingReports.actionToTake')}</Text>
                     <View style={styles.actionOptionsGrid}>
                       {ACTION_OPTIONS.map((opt) => (
                         <TouchableOpacity
@@ -439,16 +432,16 @@ export const AdminUserReportsScreen = () => {
                             color={actionTaken === opt.key ? opt.color : "#9CA3AF"}
                           />
                           <Text style={[styles.actionOptionText, actionTaken === opt.key && { color: opt.color, fontWeight: "700" }]}>
-                            {opt.label}
+                            {t(`adminUserReports.actions.${opt.key}`)}
                           </Text>
                         </TouchableOpacity>
                       ))}
                     </View>
 
-                    <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Admin Notes</Text>
+                    <Text style={[styles.fieldLabel, { marginTop: 16 }]}>{t('listingReports.adminNote')}</Text>
                     <TextInput
                       style={styles.modalTextInput}
-                      placeholder="Add notes about your investigation and decision..."
+                      placeholder={t('adminUserReports.adminNotesPlaceholder')}
                       placeholderTextColor="#9CA3AF"
                       value={adminNotes}
                       onChangeText={setAdminNotes}
@@ -460,7 +453,7 @@ export const AdminUserReportsScreen = () => {
                   {/* Footer Actions */}
                   <View style={styles.modalFooter}>
                     <TouchableOpacity style={styles.cancelBtn} onPress={() => setSelectedReport(null)} disabled={isUpdating}>
-                      <Text style={styles.cancelBtnText}>Cancel</Text>
+                      <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.underReviewBtn}
@@ -468,7 +461,7 @@ export const AdminUserReportsScreen = () => {
                       disabled={isUpdating}
                     >
                       <MaterialCommunityIcons name="clock-outline" size={16} color="#D97706" />
-                      <Text style={styles.underReviewBtnText}>Under Review</Text>
+                      <Text style={styles.underReviewBtnText}>{t('adminUserReports.statusLabel.under_review')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.dismissBtn}
@@ -476,7 +469,7 @@ export const AdminUserReportsScreen = () => {
                       disabled={isUpdating}
                     >
                       <MaterialCommunityIcons name="close-circle-outline" size={16} color="#6B7280" />
-                      <Text style={styles.dismissBtnText}>Dismiss</Text>
+                      <Text style={styles.dismissBtnText}>{t('adminUserReports.statusLabel.dismissed')}</Text>
                     </TouchableOpacity>
                   </View>
                   <TouchableOpacity
@@ -489,7 +482,7 @@ export const AdminUserReportsScreen = () => {
                     ) : (
                       <>
                         <MaterialCommunityIcons name="shield-account" size={18} color="#FFFFFF" />
-                        <Text style={styles.takeActionBtnText}>Take Action</Text>
+                        <Text style={styles.takeActionBtnText}>{t('adminUserReports.takeAction')}</Text>
                       </>
                     )}
                   </TouchableOpacity>

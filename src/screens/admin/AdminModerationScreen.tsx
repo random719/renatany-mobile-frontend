@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { ActivityIndicator, Text } from "react-native-paper";
 import { GlobalHeader } from "../../components/common/GlobalHeader";
+import { useI18n } from "../../i18n";
 import {
   getPendingRequests,
   RentalRequest,
@@ -27,6 +28,7 @@ type Nav = StackNavigationProp<RootStackParamList>;
 
 export const AdminModerationScreen = () => {
   const navigation = useNavigation<Nav>();
+  const { t } = useI18n();
   const [requests, setRequests] = useState<RentalRequest[]>([]);
   const [items, setItems] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -76,15 +78,15 @@ export const AdminModerationScreen = () => {
     requestId: string,
     action: "approved" | "rejected"
   ) => {
-    const actionLabel = action === "approved" ? "approve" : "reject";
+    const actionKey = action === "approved" ? "approve" : "reject";
 
     Alert.alert(
-      `${action === "approved" ? "Approve" : "Reject"} Request`,
-      `Are you sure you want to ${actionLabel} this rental request?`,
+      t(`adminModeration.${actionKey}Title`),
+      t("adminModeration.actionPrompt", { action: t(`adminModeration.${actionKey}`) }),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: action === "approved" ? "Approve" : "Reject",
+          text: t(`adminModeration.${actionKey}`),
           style: action === "rejected" ? "destructive" : "default",
           onPress: async () => {
             setProcessingId(requestId);
@@ -98,7 +100,7 @@ export const AdminModerationScreen = () => {
                 return updated;
               });
             } catch (e) {
-              toast.error(`Failed to ${actionLabel} request. Please try again.`);
+              toast.error(t("adminModeration.actionFailed", { action: t(`adminModeration.${actionKey}`).toLowerCase() }));
             } finally {
               setProcessingId(null);
             }
@@ -146,7 +148,7 @@ export const AdminModerationScreen = () => {
               size={16}
               color="#64748B"
             />
-            <Text style={styles.infoLabel}>Submitted by:</Text>
+            <Text style={styles.infoLabel}>{t("adminModeration.submittedBy")}</Text>
             <Text style={styles.infoValue}>{item.renter_email}</Text>
           </View>
           <View style={styles.infoRow}>
@@ -155,7 +157,7 @@ export const AdminModerationScreen = () => {
               size={16}
               color="#64748B"
             />
-            <Text style={styles.infoLabel}>Owner:</Text>
+            <Text style={styles.infoLabel}>{t("adminModeration.owner")}</Text>
             <Text style={styles.infoValue}>{item.owner_email}</Text>
           </View>
           <View style={styles.infoRow}>
@@ -164,9 +166,9 @@ export const AdminModerationScreen = () => {
               size={16}
               color="#64748B"
             />
-            <Text style={styles.infoLabel}>Item:</Text>
+            <Text style={styles.infoLabel}>{t("adminModeration.item")}</Text>
             <Text style={styles.infoValue}>
-              {items[item.item_id] || "Loading..."}
+              {items[item.item_id] || t("common.loading")}
             </Text>
           </View>
           <View style={styles.infoRow}>
@@ -175,7 +177,7 @@ export const AdminModerationScreen = () => {
               size={16}
               color="#64748B"
             />
-            <Text style={styles.infoLabel}>Dates:</Text>
+            <Text style={styles.infoLabel}>{t("adminModeration.dates")}</Text>
             <Text style={styles.infoValue}>
               {formatDate(item.start_date)} - {formatDate(item.end_date)}
             </Text>
@@ -186,7 +188,7 @@ export const AdminModerationScreen = () => {
               size={16}
               color="#64748B"
             />
-            <Text style={styles.infoLabel}>Amount:</Text>
+            <Text style={styles.infoLabel}>{t("adminModeration.amount")}</Text>
             <Text style={[styles.infoValue, { fontWeight: "700" }]}>
               ${item.total_amount?.toFixed(2) ?? "0.00"}
             </Text>
@@ -197,25 +199,25 @@ export const AdminModerationScreen = () => {
               size={16}
               color="#64748B"
             />
-            <Text style={styles.infoLabel}>Submitted:</Text>
+            <Text style={styles.infoLabel}>{t("adminModeration.submitted")}</Text>
             <Text style={styles.infoValue}>
               {formatDateTime(item.created_date)}
             </Text>
           </View>
           {item.message && (
             <View style={styles.messageBox}>
-              <Text style={styles.messageLabel}>Message:</Text>
+              <Text style={styles.messageLabel}>{t("adminModeration.message")}</Text>
               <Text style={styles.messageText}>{item.message}</Text>
             </View>
           )}
         </View>
 
         <Text style={styles.noteLabel}>
-          Optional Note (will be added to request):
+          {t("adminModeration.optionalNote")}
         </Text>
         <TextInput
           style={styles.noteInput}
-          placeholder="Add a note for this request..."
+          placeholder={t("adminModeration.addNotePlaceholder")}
           placeholderTextColor="#9CA3AF"
           value={notes[item.id] || ""}
           onChangeText={(text) =>
@@ -242,7 +244,7 @@ export const AdminModerationScreen = () => {
                   size={18}
                   color="#FFFFFF"
                 />
-                <Text style={styles.actionBtnText}>Approve</Text>
+                <Text style={styles.actionBtnText}>{t("adminModeration.approve")}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -260,7 +262,7 @@ export const AdminModerationScreen = () => {
                   size={18}
                   color="#FFFFFF"
                 />
-                <Text style={styles.actionBtnText}>Reject</Text>
+                <Text style={styles.actionBtnText}>{t("adminModeration.reject")}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -300,7 +302,7 @@ export const AdminModerationScreen = () => {
                   color="#2563EB"
                 />
                 <Text style={styles.headerTitle}>
-                  Pending Rental Requests
+                  {t("adminModeration.title")}
                 </Text>
               </View>
               <TouchableOpacity
@@ -321,12 +323,16 @@ export const AdminModerationScreen = () => {
               </TouchableOpacity>
             </View>
             <Text style={styles.headerSubtitle}>
-              Review and approve or reject rental requests
+              {t("adminModeration.subtitle")}
             </Text>
             <View style={styles.badge}>
               <Text style={styles.badgeText}>
-                {requests.length} Pending Request
-                {requests.length !== 1 ? "s" : ""}
+                {t(
+                  requests.length === 1
+                    ? "adminModeration.pendingCount"
+                    : "adminModeration.pendingCount_plural",
+                  { count: requests.length }
+                )}
               </Text>
             </View>
           </View>
@@ -345,9 +351,9 @@ export const AdminModerationScreen = () => {
                 size={64}
                 color="#16A34A"
               />
-              <Text style={styles.emptyTitle}>All Clear!</Text>
+              <Text style={styles.emptyTitle}>{t("adminModeration.emptyTitle")}</Text>
               <Text style={styles.emptySubtitle}>
-                No pending rental requests at this time.
+                {t("adminModeration.emptySubtitle")}
               </Text>
             </View>
           )
