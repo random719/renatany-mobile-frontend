@@ -29,6 +29,18 @@ interface ChatMessage {
   content: string;
 }
 
+const localizedKeywords = (
+  t: (key: string, params?: Record<string, string | number>) => string,
+  key: string,
+) =>
+  t(key)
+    .split('|')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+const includesKeyword = (question: string, keywords: string[]) =>
+  keywords.some((keyword) => question.includes(keyword));
+
 /**
  * Generate an answer based on item data on the client side.
  * No backend AI endpoint required.
@@ -42,6 +54,16 @@ const generateAnswer = (
   if (!item) return t('aiAssistant.unavailable');
 
   const q = question.toLowerCase().trim();
+  const priceKeywords = localizedKeywords(t, 'aiAssistant.keywords.price');
+  const conditionKeywords = localizedKeywords(t, 'aiAssistant.keywords.condition');
+  const availabilityKeywords = localizedKeywords(t, 'aiAssistant.keywords.availability');
+  const deliveryKeywords = localizedKeywords(t, 'aiAssistant.keywords.delivery');
+  const locationKeywords = localizedKeywords(t, 'aiAssistant.keywords.location');
+  const reviewKeywords = localizedKeywords(t, 'aiAssistant.keywords.reviews');
+  const beginnerKeywords = localizedKeywords(t, 'aiAssistant.keywords.beginner');
+  const includedKeywords = localizedKeywords(t, 'aiAssistant.keywords.included');
+  const depositKeywords = localizedKeywords(t, 'aiAssistant.keywords.deposit');
+  const categoryKeywords = localizedKeywords(t, 'aiAssistant.keywords.category');
   const title = item.title || '';
   const description = item.description || '';
   const category = item.category || '';
@@ -63,10 +85,12 @@ const generateAnswer = (
     : null;
 
   // Price
-  if (q.includes('price') || q.includes('cost') || q.includes('rate') || q.includes('how much') || q.includes('expensive') || q.includes('cheap') || q.includes('afford')) {
+  if (includesKeyword(q, priceKeywords)) {
     let ans = t('aiAssistant.answers.priceBase', { price: dailyRate });
     if (pricingTiers.length > 0) {
-      const info = pricingTiers.map(t => `${t.days}+ days: $${t.price}/day`).join(', ');
+      const info = pricingTiers
+        .map((tier) => t('aiAssistant.answers.pricingTier', { days: tier.days, price: tier.price }))
+        .join(', ');
       ans += t('aiAssistant.answers.bulkPricing', { info });
     }
     if (deposit > 0) ans += t('aiAssistant.answers.securityDeposit', { deposit });
@@ -74,7 +98,7 @@ const generateAnswer = (
   }
 
   // Condition
-  if (q.includes('condition') || q.includes('quality') || q.includes('wear') || q.includes('damage') || q.includes('scratch')) {
+  if (includesKeyword(q, conditionKeywords)) {
     let ans = condition ? t('aiAssistant.answers.conditionKnown', { condition }) : t('aiAssistant.answers.conditionUnknown');
     if (description) ans += t('aiAssistant.answers.descriptionPrefix', { value: `${description.substring(0, 150)}${description.length > 150 ? '...' : ''}` });
     ans += t('aiAssistant.answers.contactOwner');
@@ -82,7 +106,7 @@ const generateAnswer = (
   }
 
   // Availability / booking
-  if (q.includes('available') || q.includes('book') || q.includes('reserve') || q.includes('when can')) {
+  if (includesKeyword(q, availabilityKeywords)) {
     let ans = t('aiAssistant.answers.rentalPeriod', { min: minDays, max: maxDays });
     if (instantBooking) ans += t('aiAssistant.answers.instantBooking');
     if (sameDayPickup) ans += t('aiAssistant.answers.sameDayPickup');
@@ -91,7 +115,7 @@ const generateAnswer = (
   }
 
   // Delivery / pickup
-  if (q.includes('deliver') || q.includes('pickup') || q.includes('pick up') || q.includes('shipping') || q.includes('collect')) {
+  if (includesKeyword(q, deliveryKeywords)) {
     if (deliveryOptions.length > 0) {
       let ans = t('aiAssistant.answers.deliveryOptions', { value: deliveryOptions.join(', ') });
       if (deliveryFee > 0) ans += t('aiAssistant.answers.deliveryFee', { fee: deliveryFee });
@@ -101,14 +125,14 @@ const generateAnswer = (
   }
 
   // Location
-  if (q.includes('location') || q.includes('where') || q.includes('address') || q.includes('area') || q.includes('near')) {
+  if (includesKeyword(q, locationKeywords)) {
     return location
       ? t('aiAssistant.answers.locationKnown', { value: typeof location === 'string' ? location : JSON.stringify(location) })
       : t('aiAssistant.answers.locationUnknown');
   }
 
   // Reviews / rating
-  if (q.includes('review') || q.includes('rating') || q.includes('recommend') || q.includes('experience') || q.includes('worth')) {
+  if (includesKeyword(q, reviewKeywords)) {
     if (reviews.length > 0) {
       let ans = t('aiAssistant.answers.reviewsKnown', { count: reviews.length, rating: avgRating || 0 });
       const withComment = reviews.find(r => r.comment);
@@ -121,7 +145,7 @@ const generateAnswer = (
   }
 
   // Beginner / suitable
-  if (q.includes('beginner') || q.includes('suitable') || q.includes('easy') || q.includes('first time') || q.includes('new to')) {
+  if (includesKeyword(q, beginnerKeywords)) {
     let ans = t('aiAssistant.answers.beginner', { category, title });
     if (description) ans += ` ${description.substring(0, 200)}${description.length > 200 ? '...' : ''}`;
     ans += t('aiAssistant.answers.suitability');
@@ -129,21 +153,21 @@ const generateAnswer = (
   }
 
   // What's included
-  if (q.includes('include') || q.includes('comes with') || q.includes('accessories') || q.includes('what do i get')) {
+  if (includesKeyword(q, includedKeywords)) {
     return description
       ? t('aiAssistant.answers.includedKnown', { value: `${description.substring(0, 250)}${description.length > 250 ? '...' : ''}` })
       : t('aiAssistant.answers.includedUnknown');
   }
 
   // Deposit / insurance
-  if (q.includes('deposit') || q.includes('insurance') || q.includes('protect') || q.includes('secure')) {
+  if (includesKeyword(q, depositKeywords)) {
     return deposit > 0
       ? t('aiAssistant.answers.depositRequired', { deposit })
       : t('aiAssistant.answers.depositNotRequired');
   }
 
   // Category
-  if (q.includes('category') || q.includes('type') || q.includes('kind')) {
+  if (includesKeyword(q, categoryKeywords)) {
     return t('aiAssistant.answers.category', { category, title });
   }
 
