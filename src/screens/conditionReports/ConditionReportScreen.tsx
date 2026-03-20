@@ -5,7 +5,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
   Image,
   Modal,
   Platform,
@@ -19,11 +18,11 @@ import {
 import { ActivityIndicator, Button, Text } from 'react-native-paper';
 import { ScreenLayout } from '../../components/common/ScreenLayout';
 import { useI18n } from '../../i18n';
-import { api } from '../../services/api';
 import {
   getConditionReports,
   createConditionReport,
 } from '../../services/conditionReportService';
+import { uploadFile } from '../../services/listingService';
 import { getRentalRequestById } from '../../services/rentalService';
 import { toast } from '../../store/toastStore';
 import { colors } from '../../theme';
@@ -47,6 +46,7 @@ export const ConditionReportScreen = () => {
   const { rentalRequestId, reportType } = route.params;
   const { user: clerkUser } = useUser();
   const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress;
+  const normalizedUserEmail = userEmail?.toLowerCase();
 
   const [existingReports, setExistingReports] = useState<ConditionReport[]>([]);
   const [rental, setRental] = useState<RentalRequest | null>(null);
@@ -62,7 +62,10 @@ export const ConditionReportScreen = () => {
   const [showAddDamage, setShowAddDamage] = useState(false);
   const [newDamageSeverity, setNewDamageSeverity] = useState<'minor' | 'moderate' | 'severe'>('minor');
   const [newDamageDescription, setNewDamageDescription] = useState('');
+  const [signature, setSignature] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const loadReports = useCallback(async () => {
     try {
@@ -82,7 +85,9 @@ export const ConditionReportScreen = () => {
     loadReports().finally(() => setIsLoading(false));
   }, [loadReports]);
 
-  const existingReport = existingReports.find((r) => r.report_type === reportType);
+  const existingReport = existingReports.find(
+    (r) => r.report_type === reportType && r.reported_by_email?.toLowerCase() === normalizedUserEmail,
+  );
   const hasExistingReport = !!existingReport;
   const rules = rental ? getConditionReportRules(rental, existingReports, userEmail) : null;
   const canCreateReport = reportType === 'pickup'
@@ -101,24 +106,18 @@ export const ConditionReportScreen = () => {
 
     if (!result.canceled && result.assets.length > 0) {
       setIsUploading(true);
+      setUploadError(null);
+      setUploadStatus(t('conditionReport.uploading'));
       try {
-        const uploadedUrls: string[] = [];
-        for (const asset of result.assets) {
-          const formData = new FormData();
-          formData.append('file', {
-            uri: asset.uri,
-            name: asset.fileName || 'photo.jpg',
-            type: asset.mimeType || 'image/jpeg',
-          } as any);
-          const res = await api.post('/file/upload', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          });
-          const url = res.data?.file_url || res.data?.data?.file_url;
-          if (url) uploadedUrls.push(url);
-        }
+        const uploadedUrls = await Promise.all(
+          result.assets.map((asset) => uploadFile(asset.uri, 'image'))
+        );
         setPhotos((prev) => [...prev, ...uploadedUrls]);
-      } catch (error) {
-        toast.error(t('conditionReport.uploadPhotosFailed'));
+        setUploadStatus(null);
+      } catch (error: any) {
+        setUploadStatus(null);
+        setUploadError(error?.message || t('conditionReport.uploadPhotosFailed'));
+        toast.error(error?.message || t('conditionReport.uploadPhotosFailed'));
       } finally {
         setIsUploading(false);
       }
@@ -138,21 +137,17 @@ export const ConditionReportScreen = () => {
 
     if (!result.canceled && result.assets.length > 0) {
       setIsUploading(true);
+      setUploadError(null);
+      setUploadStatus(t('conditionReport.uploading'));
       try {
         const asset = result.assets[0];
-        const formData = new FormData();
-        formData.append('file', {
-          uri: asset.uri,
-          name: asset.fileName || 'photo.jpg',
-          type: asset.mimeType || 'image/jpeg',
-        } as any);
-        const res = await api.post('/file/upload', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-        const url = res.data?.file_url || res.data?.data?.file_url;
-        if (url) setPhotos((prev) => [...prev, url]);
-      } catch (error) {
-        toast.error(t('conditionReport.uploadPhotoFailed'));
+        const url = await uploadFile(asset.uri, 'image');
+        setPhotos((prev) => [...prev, url]);
+        setUploadStatus(null);
+      } catch (error: any) {
+        setUploadStatus(null);
+        setUploadError(error?.message || t('conditionReport.uploadPhotoFailed'));
+        toast.error(error?.message || t('conditionReport.uploadPhotoFailed'));
       } finally {
         setIsUploading(false);
       }
@@ -189,6 +184,11 @@ export const ConditionReportScreen = () => {
       return;
     }
 
+    if (!signature.trim()) {
+      toast.warning(t('conditionReport.signatureRequired'));
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await createConditionReport({
@@ -198,6 +198,7 @@ export const ConditionReportScreen = () => {
         condition_photos: photos,
         notes: notes.trim() || undefined,
         damages_reported: damages.length > 0 ? damages : undefined,
+        signature: signature.trim(),
       });
 
       toast.success(t('conditionReport.reportSubmitted', { type: reportType }), () => navigation.goBack());
@@ -274,6 +275,13 @@ export const ConditionReportScreen = () => {
                 <Text style={styles.notesText}>{existingReport.notes}</Text>
               </View>
             )}
+
+            {existingReport.signature ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>{t('conditionReport.signatureLabel')}</Text>
+                <Text style={styles.notesText}>{existingReport.signature}</Text>
+              </View>
+            ) : null}
 
             {existingReport.damages_reported.length > 0 && (
               <View style={styles.section}>
@@ -354,6 +362,26 @@ export const ConditionReportScreen = () => {
               : t('conditionReport.returnSubtitle')}
           </Text>
 
+          {uploadError ? (
+            <View style={styles.errorCard}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={22} color="#B91C1C" />
+              <View style={styles.errorCardBody}>
+                <Text style={styles.errorCardTitle}>{t('conditionReport.uploadErrorTitle')}</Text>
+                <Text style={styles.errorCardText}>{uploadError}</Text>
+              </View>
+            </View>
+          ) : null}
+
+          {uploadStatus ? (
+            <View style={styles.infoCard}>
+              <MaterialCommunityIcons name="loading" size={22} color="#2563EB" />
+              <View style={styles.infoCardBody}>
+                <Text style={styles.infoCardTitle}>{t('conditionReport.uploading')}</Text>
+                <Text style={styles.infoCardText}>{uploadStatus}</Text>
+              </View>
+            </View>
+          ) : null}
+
           {/* Photos Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
@@ -377,12 +405,12 @@ export const ConditionReportScreen = () => {
                 </View>
               )}
 
-              <TouchableOpacity style={styles.addPhotoBtn} onPress={pickImages}>
+              <TouchableOpacity style={[styles.addPhotoBtn, isUploading && styles.addPhotoBtnDisabled]} onPress={pickImages} disabled={isUploading}>
                 <MaterialCommunityIcons name="image-plus" size={28} color="#6B7280" />
                 <Text style={styles.addPhotoText}>{t('conditionReport.gallery')}</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.addPhotoBtn} onPress={takePhoto}>
+              <TouchableOpacity style={[styles.addPhotoBtn, isUploading && styles.addPhotoBtnDisabled]} onPress={takePhoto} disabled={isUploading}>
                 <MaterialCommunityIcons name="camera" size={28} color="#6B7280" />
                 <Text style={styles.addPhotoText}>{t('conditionReport.camera')}</Text>
               </TouchableOpacity>
@@ -402,6 +430,22 @@ export const ConditionReportScreen = () => {
               numberOfLines={4}
               textAlignVertical="top"
             />
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {t('conditionReport.signatureLabel')} <Text style={styles.required}>*</Text>
+            </Text>
+            <TextInput
+              style={styles.signatureInput}
+              placeholder={t('conditionReport.signaturePlaceholder')}
+              placeholderTextColor="#9CA3AF"
+              value={signature}
+              onChangeText={setSignature}
+              autoCapitalize="words"
+              autoCorrect={false}
+            />
+            <Text style={styles.sectionHint}>{t('conditionReport.signatureHint')}</Text>
           </View>
 
           {/* Damages Section */}
@@ -442,9 +486,9 @@ export const ConditionReportScreen = () => {
 
           {/* Submit */}
           <TouchableOpacity
-            style={[styles.submitBtn, (isSubmitting || photos.length === 0) && styles.submitBtnDisabled]}
+            style={[styles.submitBtn, (isSubmitting || photos.length === 0 || !signature.trim()) && styles.submitBtnDisabled]}
             onPress={handleSubmit}
-            disabled={isSubmitting || photos.length === 0}
+            disabled={isSubmitting || photos.length === 0 || !signature.trim()}
           >
             {isSubmitting ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
@@ -533,8 +577,10 @@ const styles = StyleSheet.create({
   removePhotoBtn: { position: 'absolute', top: -6, right: -6, backgroundColor: '#FFFFFF', borderRadius: 12 },
   uploadingPlaceholder: { backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
   addPhotoBtn: { width: 100, height: 100, borderRadius: 10, borderWidth: 2, borderColor: '#E5E7EB', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  addPhotoBtnDisabled: { opacity: 0.5 },
   addPhotoText: { fontSize: 11, color: '#6B7280', marginTop: 4 },
   textInput: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, padding: 14, fontSize: 14, color: '#0F172A', minHeight: 100 },
+  signatureInput: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#0F172A' },
   addDamageBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, gap: 4 },
   addDamageBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
   noDamagesText: { fontSize: 14, color: '#9CA3AF', fontStyle: 'italic', paddingVertical: 12 },
@@ -563,6 +609,20 @@ const styles = StyleSheet.create({
   infoCardBody: { flex: 1 },
   infoCardTitle: { fontSize: 15, fontWeight: '700', color: '#1E3A8A', marginBottom: 4 },
   infoCardText: { fontSize: 14, color: '#1D4ED8', lineHeight: 20 },
+  errorCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+  },
+  errorCardBody: { flex: 1 },
+  errorCardTitle: { fontSize: 15, fontWeight: '700', color: '#991B1B', marginBottom: 4 },
+  errorCardText: { fontSize: 14, color: '#B91C1C', lineHeight: 20 },
   metaCard: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,

@@ -1,5 +1,6 @@
 import { mockCategories } from '../data/categories';
 import { mockListings } from '../data/listings';
+import { useAuthStore } from '../store/authStore';
 import { Category, Listing, ListingFilter, CreateListingFormData, SavedSearch } from '../types/listing';
 import { api } from './api';
 
@@ -316,10 +317,36 @@ export const uploadFile = async (uri: string, type: string = 'image'): Promise<s
     type: mimeType,
   } as any);
 
-  const response = await api.post('/file/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+  const token = useAuthStore.getState().token;
+  const baseUrl = api.defaults.baseURL || '';
+  const response = await fetch(`${baseUrl}/file/upload`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
   });
-  return response.data.data.file_url;
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    let errorMessage = `Upload failed with status ${response.status}`;
+    try {
+      const errorData = JSON.parse(errorText);
+      errorMessage = errorData.error || errorData.message || errorMessage;
+    } catch {
+      if (errorText) errorMessage = errorText;
+    }
+    throw new Error(errorMessage);
+  }
+
+  const result = await response.json();
+  const data = result.data || result;
+  if (!data?.file_url) {
+    throw new Error('Upload succeeded but no file URL was returned');
+  }
+
+  return data.file_url;
 };
 
 export const trackViewedItem = async (userEmail: string, itemId: string): Promise<void> => {

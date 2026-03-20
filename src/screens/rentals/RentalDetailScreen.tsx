@@ -20,6 +20,7 @@ import { colors, typography } from '../../theme';
 import { ConditionReport, RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
 import { getConditionReportRules } from '../../utils/conditionReportRules';
+import { parseRentalBoundaryDate } from '../../utils/rentalDates';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'RentalDetail'>;
@@ -234,10 +235,12 @@ export const RentalDetailScreen = () => {
 
   const isRenter = rental.renter_email === userEmail;
   const statusColor = STATUS_COLOR[rental.status] ?? '#6B7280';
-  const startDate = new Date(rental.start_date).toLocaleDateString(locale, {
+  const rentalStartDate = parseRentalBoundaryDate(rental.start_date);
+  const rentalEndDate = parseRentalBoundaryDate(rental.end_date);
+  const startDate = rentalStartDate.toLocaleDateString(locale, {
     month: 'long', day: 'numeric', year: 'numeric',
   });
-  const endDate = new Date(rental.end_date).toLocaleDateString(locale, {
+  const endDate = rentalEndDate.toLocaleDateString(locale, {
     month: 'long', day: 'numeric', year: 'numeric',
   });
   const createdDate = new Date(rental.created_date).toLocaleDateString(locale, {
@@ -246,7 +249,7 @@ export const RentalDetailScreen = () => {
 
   const totalDays = Math.max(
     1,
-    Math.ceil((new Date(rental.end_date).getTime() - new Date(rental.start_date).getTime()) / 86400000),
+    Math.ceil((rentalEndDate.getTime() - rentalStartDate.getTime()) / 86400000),
   );
 
   const rentalCost = rental.total_amount ?? 0;

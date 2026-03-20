@@ -17,24 +17,44 @@ import { toast } from '../../store/toastStore';
 import { useI18n } from '../../i18n';
 
 const CATEGORIES = [
-    { value: 'electronics', label: 'Electronics', icon: 'laptop' },
-    { value: 'tools', label: 'Tools', icon: 'hammer' },
-    { value: 'fashion', label: 'Fashion', icon: 'tshirt-crew' },
-    { value: 'sports', label: 'Sports', icon: 'soccer' },
-    { value: 'vehicles', label: 'Vehicles', icon: 'car' },
-    { value: 'home', label: 'Home', icon: 'home' },
-    { value: 'books', label: 'Books', icon: 'book' },
-    { value: 'music', label: 'Music', icon: 'music' },
-    { value: 'photography', label: 'Photography', icon: 'camera' },
-    { value: 'other', label: 'Other', icon: 'dots-horizontal' },
-];
+    { value: 'electronics', icon: 'laptop' },
+    { value: 'tools', icon: 'hammer' },
+    { value: 'fashion', icon: 'tshirt-crew' },
+    { value: 'sports', icon: 'soccer' },
+    { value: 'vehicles', icon: 'car' },
+    { value: 'home', icon: 'home' },
+    { value: 'books', icon: 'book' },
+    { value: 'music', icon: 'music' },
+    { value: 'photography', icon: 'camera' },
+    { value: 'other', icon: 'dots-horizontal' },
+] as const;
 
 const CONDITIONS = [
-    { value: 'excellent', label: 'Excellent' },
-    { value: 'good', label: 'Good' },
-    { value: 'fair', label: 'Fair' },
-    { value: 'poor', label: 'Poor' },
-];
+    { value: 'excellent' },
+    { value: 'good' },
+    { value: 'fair' },
+    { value: 'poor' },
+] as const;
+
+const LEGACY_CATEGORY_LABELS: Record<string, string> = {
+    electronics: 'electronics',
+    tools: 'tools',
+    fashion: 'fashion',
+    sports: 'sports',
+    vehicles: 'vehicles',
+    home: 'home',
+    books: 'books',
+    music: 'music',
+    photography: 'photography',
+    other: 'other',
+};
+
+const LEGACY_CONDITION_LABELS: Record<string, string> = {
+    excellent: 'excellent',
+    good: 'good',
+    fair: 'fair',
+    poor: 'poor',
+};
 
 const INITIAL_FORM_DATA: CreateListingFormData = {
     title: '',
@@ -306,10 +326,24 @@ export const CreateListingScreen = () => {
         }
     }, [formData, uploadedImages, uploadedVideos, createItem, updateItem, navigation, isStepValid, isEditMode, itemId, t]);
 
-    const categoryLabel = categories.find(c => c.name === formData.category)?.name ||
-                        (formData.category ? t(`createListing.categories.${formData.category.toLowerCase()}`) : '') ||
-                        (formData.category ? t(`createListing.categories.${CATEGORIES.find(c => c.label === formData.category)?.value || ''}`) : '') || '';
-    const conditionLabel = formData.condition ? t(`createListing.conditions.${formData.condition}`) : t('createListing.conditions.good');
+    const normalizedCategoryValue = (() => {
+        const raw = String(formData.category || '').trim();
+        if (!raw) return '';
+        const lowered = raw.toLowerCase();
+        const matchingCategory = categories.find((category) => category.name.toLowerCase() === lowered);
+        if (matchingCategory) return matchingCategory.name.toLowerCase();
+        return LEGACY_CATEGORY_LABELS[lowered] || lowered;
+    })();
+
+    const normalizedConditionValue = (() => {
+        const raw = String(formData.condition || '').trim().toLowerCase();
+        return LEGACY_CONDITION_LABELS[raw] || 'good';
+    })();
+
+    const categoryLabel = normalizedCategoryValue
+        ? t(`createListing.categories.${normalizedCategoryValue}`)
+        : '';
+    const conditionLabel = t(`createListing.conditions.${normalizedConditionValue}`);
     React.useEffect(() => {
         fetchCategories();
     }, [fetchCategories]);

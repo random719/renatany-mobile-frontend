@@ -30,6 +30,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useListingStore } from '../../store/listingStore';
 import { toast } from '../../store/toastStore';
 import { Dispute, RentalRequest } from '../../types/models';
+import { parseRentalBoundaryDate } from '../../utils/rentalDates';
 
 interface BackendUser {
   id: string;
@@ -857,8 +858,8 @@ export const ProfileScreen = () => {
                         <View style={styles.rentalInfoRow}>
                           <MaterialCommunityIcons name="calendar-outline" size={14} color="#64748B" />
                           <Text style={styles.rentalDates}>
-                            {new Date(rental.start_date).toLocaleDateString(locale, { month: 'short', day: 'numeric' })} -{' '}
-                            {new Date(rental.end_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {parseRentalBoundaryDate(rental.start_date).toLocaleDateString(locale, { month: 'short', day: 'numeric' })} -{' '}
+                            {parseRentalBoundaryDate(rental.end_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}
                           </Text>
                         </View>
                       )}

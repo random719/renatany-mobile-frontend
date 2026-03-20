@@ -28,6 +28,7 @@ import { colors, typography } from '../../theme';
 import { ConditionReport, Message, RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
 import { getConditionReportRules } from '../../utils/conditionReportRules';
+import { parseRentalBoundaryDate } from '../../utils/rentalDates';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'Chat'>;
@@ -365,6 +366,8 @@ export const ChatScreen = () => {
 
   const renderSummaryCard = useCallback(() => {
     if (!rental) return null;
+    const rentalStartDate = parseRentalBoundaryDate(rental.start_date);
+    const rentalEndDate = parseRentalBoundaryDate(rental.end_date);
 
     return (
       <View style={styles.summaryCard}>
@@ -375,9 +378,9 @@ export const ChatScreen = () => {
             </Text>
           </View>
           <Text style={styles.summaryDates}>
-            {new Date(rental.start_date).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
+            {rentalStartDate.toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
             {' - '}
-            {new Date(rental.end_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}
+            {rentalEndDate.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}
           </Text>
         </View>
         <Text style={styles.summaryAmount}>${totalPaid.toFixed(2)}</Text>

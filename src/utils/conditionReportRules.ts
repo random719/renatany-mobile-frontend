@@ -1,5 +1,6 @@
 import { tNow } from '../i18n';
 import { ConditionReport, RentalRequest } from '../types/models';
+import { parseRentalBoundaryDate } from './rentalDates';
 
 const PICKUP_REPORT_START_HOURS_BEFORE = 2;
 const PICKUP_REPORT_END_HOURS_AFTER = 2;
@@ -40,8 +41,8 @@ export const getConditionReportRules = (
     (report) => report.reported_by_email?.toLowerCase() === normalizedEmail,
   );
 
-  const startDate = new Date(rental.start_date);
-  const endDate = new Date(rental.end_date);
+  const startDate = parseRentalBoundaryDate(rental.start_date);
+  const endDate = parseRentalBoundaryDate(rental.end_date);
   const hoursSinceStart = (now.getTime() - startDate.getTime()) / (1000 * 60 * 60);
   const hoursSinceEnd = (now.getTime() - endDate.getTime()) / (1000 * 60 * 60);
 

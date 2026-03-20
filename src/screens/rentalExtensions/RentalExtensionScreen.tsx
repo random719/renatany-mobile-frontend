@@ -23,6 +23,7 @@ import { toast } from '../../store/toastStore';
 import { colors } from '../../theme';
 import { RentalExtension } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
+import { parseRentalBoundaryDate } from '../../utils/rentalDates';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'RentalExtension'>;
@@ -67,7 +68,7 @@ export const RentalExtensionScreen = () => {
 
   const calculateNewEndDate = (): string => {
     const days = parseInt(extraDays) || 0;
-    const endDate = new Date(currentEndDate);
+    const endDate = parseRentalBoundaryDate(currentEndDate);
     endDate.setDate(endDate.getDate() + days);
     return endDate.toISOString();
   };
@@ -137,7 +138,7 @@ export const RentalExtensionScreen = () => {
 
           <Text style={styles.title}>{t('rentalExtension.title')}</Text>
           <Text style={styles.subtitle}>
-            {t('rentalExtension.currentEndDate', { date: new Date(currentEndDate).toLocaleDateString() })}
+            {t('rentalExtension.currentEndDate', { date: parseRentalBoundaryDate(currentEndDate).toLocaleDateString() })}
           </Text>
 
           {/* Existing Extensions */}
@@ -150,7 +151,7 @@ export const RentalExtensionScreen = () => {
                   <View key={ext.id} style={styles.extensionCard}>
                     <View style={styles.extensionCardHeader}>
                       <Text style={styles.extensionDate}>
-                        {t('rentalExtension.newEnd', { date: new Date(ext.new_end_date).toLocaleDateString() })}
+                        {t('rentalExtension.newEnd', { date: parseRentalBoundaryDate(ext.new_end_date).toLocaleDateString() })}
                       </Text>
                       <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
                         <Text style={[styles.statusText, { color: sc.text }]}>
@@ -212,7 +213,7 @@ export const RentalExtensionScreen = () => {
                 <View style={styles.costPreview}>
                   <View style={styles.costRow}>
                     <Text style={styles.costLabel}>{t('rentalExtension.newEndDate')}</Text>
-                    <Text style={styles.costValue}>{new Date(calculateNewEndDate()).toLocaleDateString()}</Text>
+                    <Text style={styles.costValue}>{parseRentalBoundaryDate(calculateNewEndDate()).toLocaleDateString()}</Text>
                   </View>
                   <View style={styles.costRow}>
                     <Text style={styles.costLabel}>{t('rentalExtension.additionalCost', { days: extraDays, rate: dailyRate })}</Text>
