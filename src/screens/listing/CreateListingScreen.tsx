@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Button, Checkbox, Menu, Text, TextInput, Surface } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
@@ -56,6 +56,18 @@ const LEGACY_CONDITION_LABELS: Record<string, string> = {
     poor: 'poor',
 };
 
+const formatSuspensionUntil = (iso: string, locale: string) => {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString(locale, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    });
+};
+
 const INITIAL_FORM_DATA: CreateListingFormData = {
     title: '',
     description: '',
@@ -80,11 +92,12 @@ const INITIAL_FORM_DATA: CreateListingFormData = {
 };
 
 export const CreateListingScreen = () => {
-    const { t } = useI18n();
+    const { t, language } = useI18n();
     const navigation = useNavigation();
     const route = useRoute<RouteProp<RootStackParamList, 'EditItem'>>();
     const itemId = (route.params as any)?.itemId as string | undefined;
     const isEditMode = !!itemId;
+    const scrollViewRef = useRef<ScrollView>(null);
 
     const { createItem, updateItem, isSubmitting, categories, fetchCategories, selectedListing, fetchListingById } = useListingStore();
     const { user } = useAuthStore();
@@ -320,11 +333,36 @@ export const CreateListingScreen = () => {
                 await createItem(payload);
                 toast.success(t('createListing.listedSuccess'), () => navigation.goBack());
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving item:', error);
-            toast.error(t('createListing.saveFailed'));
+            const status = error?.response?.status;
+            const action = error?.response?.data?.action;
+            const suspendedUntil = error?.response?.data?.suspended_until;
+            const reason = error?.response?.data?.reason;
+            const backendMessage = error?.response?.data?.error || error?.message;
+
+            if (status === 403 && action === 'suspended') {
+                const dateLabel = suspendedUntil ? formatSuspensionUntil(suspendedUntil, language) : '';
+                toast.error(
+                    dateLabel
+                        ? t('createListing.saveBlockedSuspendedUntil', { date: dateLabel })
+                        : backendMessage || t('createListing.saveBlockedSuspended')
+                );
+                return;
+            }
+
+            if (status === 403 && action === 'banned') {
+                toast.error(
+                    reason
+                        ? t('createListing.saveBlockedBannedReason', { reason })
+                        : backendMessage || t('createListing.saveBlockedBanned')
+                );
+                return;
+            }
+
+            toast.error(backendMessage || t('createListing.saveFailed'));
         }
-    }, [formData, uploadedImages, uploadedVideos, createItem, updateItem, navigation, isStepValid, isEditMode, itemId, t]);
+    }, [formData, uploadedImages, uploadedVideos, createItem, updateItem, navigation, isStepValid, isEditMode, itemId, t, language]);
 
     const normalizedCategoryValue = (() => {
         const raw = String(formData.category || '').trim();
@@ -348,13 +386,23 @@ export const CreateListingScreen = () => {
         fetchCategories();
     }, [fetchCategories]);
 
+    useEffect(() => {
+        requestAnimationFrame(() => {
+            scrollViewRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+        });
+    }, [step]);
+
     const dailyRate = parseFloat(formData.daily_rate) || 0;
     const depositAmount = parseFloat(formData.deposit) || 0;
 
     return (
         <View style={styles.mainContainer}>
             <GlobalHeader />
-            <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
+            <ScrollView
+                ref={scrollViewRef}
+                style={styles.scrollContainer}
+                contentContainerStyle={styles.scrollContent}
+            >
                 <View style={styles.contentWrapper}>
                     {/* Header */}
                     <View style={styles.headerContainer}>

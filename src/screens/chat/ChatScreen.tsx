@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -28,6 +29,7 @@ import { colors, typography } from '../../theme';
 import { ConditionReport, Message, RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
 import { getConditionReportRules } from '../../utils/conditionReportRules';
+import { sortMessagesChronologically } from '../../utils/messageOrdering';
 import { parseRentalBoundaryDate } from '../../utils/rentalDates';
 
 type Nav = StackNavigationProp<RootStackParamList>;
@@ -43,6 +45,25 @@ const formatTimestamp = (iso: string, locale: string) =>
     hour: 'numeric',
     minute: '2-digit',
   });
+
+const CONDITION_REPORT_THEME = {
+  pickup: {
+    cardBg: '#EFF6FF',
+    cardBorder: '#BFDBFE',
+    icon: '#2563EB',
+    badgeBg: '#DBEAFE',
+    badgeText: '#1D4ED8',
+    title: 'Pre-Rental Report',
+  },
+  return: {
+    cardBg: '#F5F3FF',
+    cardBorder: '#DDD6FE',
+    icon: '#7C3AED',
+    badgeBg: '#EDE9FE',
+    badgeText: '#6D28D9',
+    title: 'Return Report',
+  },
+} as const;
 
 const MessageBubble = ({ msg, isOwn, locale }: { msg: Message; isOwn: boolean; locale: string }) => {
   if (msg.message_type === 'system') {
@@ -63,6 +84,71 @@ const MessageBubble = ({ msg, isOwn, locale }: { msg: Message; isOwn: boolean; l
           {formatTimestamp(msg.created_date, locale)}
         </Text>
       </View>
+    </View>
+  );
+};
+
+const ConditionReportCard = ({
+  report,
+  locale,
+  t,
+}: {
+  report: ConditionReport;
+  locale: string;
+  t: (key: string, params?: Record<string, any>) => string;
+}) => {
+  const theme = CONDITION_REPORT_THEME[report.report_type];
+
+  return (
+    <View style={[styles.conditionReportCard, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
+      <View style={styles.conditionReportHeader}>
+        <View style={styles.conditionReportHeaderMeta}>
+          <MaterialCommunityIcons name="camera-outline" size={18} color={theme.icon} />
+          <View style={styles.conditionReportHeaderText}>
+            <Text style={styles.conditionReportTitle}>{theme.title}</Text>
+            <Text style={styles.conditionReportMeta}>Submitted by {report.reported_by_email}</Text>
+          </View>
+        </View>
+        <View style={[styles.conditionReportDateBadge, { backgroundColor: theme.badgeBg }]}>
+          <Text style={[styles.conditionReportDateText, { color: theme.badgeText }]}>
+            {formatTimestamp(report.created_date, locale)}
+          </Text>
+        </View>
+      </View>
+
+      {report.notes ? <Text style={styles.conditionReportNotes}>{report.notes}</Text> : null}
+
+      {report.damages_reported?.length ? (
+        <View style={styles.conditionReportDamageBox}>
+          <View style={styles.conditionReportDamageHeader}>
+            <MaterialCommunityIcons name="alert-outline" size={16} color="#EA580C" />
+            <Text style={styles.conditionReportDamageTitle}>Damages Reported</Text>
+          </View>
+          {report.damages_reported.map((damage, index) => (
+            <Text key={`${report.id}-damage-${index}`} style={styles.conditionReportDamageText}>
+              <Text style={styles.conditionReportDamageSeverity}>
+                {t(`conditionReport.severity.${damage.severity}`)}:
+              </Text>{' '}
+              {damage.description}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+
+      {report.condition_photos?.length ? (
+        <View style={styles.conditionReportPhotosBlock}>
+          <Text style={styles.conditionReportBlockLabel}>{t('conditionReport.photos')}</Text>
+          <View style={styles.conditionReportPhotoGrid}>
+            {report.condition_photos.map((photo, index) => (
+              <Image
+                key={`${report.id}-photo-${index}`}
+                source={{ uri: photo }}
+                style={styles.conditionReportPhoto}
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 };
@@ -130,9 +216,7 @@ export const ChatScreen = () => {
     if (!quiet) setIsLoading(true);
     try {
       const data = await getMessages(rentalRequestId);
-      setMessages(data.sort((a, b) =>
-        new Date(a.created_date).getTime() - new Date(b.created_date).getTime()
-      ));
+      setMessages(sortMessagesChronologically(data));
     } catch {
       // silently fail
     } finally {
@@ -193,7 +277,7 @@ export const ChatScreen = () => {
         sender_email: userEmail,
         content,
       });
-      setMessages((prev) => [...prev, newMsg]);
+      setMessages((prev) => sortMessagesChronologically([...prev, newMsg]));
     } catch {
       setInputText(content);
     } finally {
@@ -525,6 +609,32 @@ export const ChatScreen = () => {
             {!reportRules?.canCreateReturnReport && !reportRules?.userReturnReport && reportRules?.returnStatusMessage ? (
               <Text style={styles.statusHint}>{reportRules.returnStatusMessage}</Text>
             ) : null}
+            {reportRules?.pickupReports.length ? (
+              <View style={styles.reportSection}>
+                <View style={[styles.reportSectionBadge, styles.pickupReportSectionBadge]}>
+                  <MaterialCommunityIcons name="check-circle-outline" size={16} color="#1D4ED8" />
+                  <Text style={[styles.reportSectionBadgeText, styles.pickupReportSectionBadgeText]}>
+                    {`Pre-Rental Reports (${reportRules.pickupReports.length}/2)`}
+                  </Text>
+                </View>
+                {reportRules.pickupReports.map((report) => (
+                  <ConditionReportCard key={report.id} report={report} locale={locale} t={t} />
+                ))}
+              </View>
+            ) : null}
+            {reportRules?.returnReports.length ? (
+              <View style={styles.reportSection}>
+                <View style={[styles.reportSectionBadge, styles.returnReportSectionBadge]}>
+                  <MaterialCommunityIcons name="check-circle-outline" size={16} color="#6D28D9" />
+                  <Text style={[styles.reportSectionBadgeText, styles.returnReportSectionBadgeText]}>
+                    {`Return Reports (${reportRules.returnReports.length}/2)`}
+                  </Text>
+                </View>
+                {reportRules.returnReports.map((report) => (
+                  <ConditionReportCard key={report.id} report={report} locale={locale} t={t} />
+                ))}
+              </View>
+            ) : null}
           </>
         ) : null}
       </View>
@@ -784,6 +894,129 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     fontWeight: '700',
     fontSize: typography.small,
+  },
+  reportSection: {
+    marginTop: 8,
+    gap: 12,
+  },
+  reportSectionBadge: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  pickupReportSectionBadge: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+  },
+  returnReportSectionBadge: {
+    backgroundColor: '#F5F3FF',
+    borderColor: '#DDD6FE',
+  },
+  reportSectionBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  pickupReportSectionBadgeText: {
+    color: '#1D4ED8',
+  },
+  returnReportSectionBadgeText: {
+    color: '#6D28D9',
+  },
+  conditionReportCard: {
+    borderWidth: 2,
+    borderRadius: 16,
+    padding: 14,
+    gap: 12,
+  },
+  conditionReportHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  conditionReportHeaderMeta: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  conditionReportHeaderText: {
+    flex: 1,
+    gap: 2,
+  },
+  conditionReportTitle: {
+    color: '#0F172A',
+    fontSize: typography.body,
+    fontWeight: '700',
+  },
+  conditionReportMeta: {
+    color: '#64748B',
+    fontSize: typography.small,
+  },
+  conditionReportDateBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  conditionReportDateText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  conditionReportNotes: {
+    color: '#334155',
+    fontSize: typography.small,
+    lineHeight: 20,
+  },
+  conditionReportDamageBox: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  conditionReportDamageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  conditionReportDamageTitle: {
+    color: '#9A3412',
+    fontSize: typography.small,
+    fontWeight: '700',
+  },
+  conditionReportDamageText: {
+    color: '#334155',
+    fontSize: typography.small,
+    lineHeight: 18,
+  },
+  conditionReportDamageSeverity: {
+    color: '#C2410C',
+    fontWeight: '700',
+  },
+  conditionReportPhotosBlock: {
+    gap: 8,
+  },
+  conditionReportBlockLabel: {
+    color: '#334155',
+    fontSize: typography.small,
+    fontWeight: '700',
+  },
+  conditionReportPhotoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  conditionReportPhoto: {
+    width: 88,
+    height: 88,
+    borderRadius: 12,
+    backgroundColor: '#E2E8F0',
   },
   messageListView: { flex: 1 },
   messageList: { paddingBottom: 16, flexGrow: 1 },

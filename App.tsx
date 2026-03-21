@@ -4,38 +4,13 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { PaperProvider } from 'react-native-paper';
 import { ClerkProvider } from '@clerk/expo';
-import * as SecureStore from 'expo-secure-store';
+import { tokenCache } from '@clerk/expo/token-cache';
 import * as WebBrowser from 'expo-web-browser';
 import { lightTheme } from './src/theme';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { Toast } from './src/components/common/Toast';
 
 WebBrowser.maybeCompleteAuthSession();
-
-const tokenCache = {
-  async getToken(key: string) {
-    try {
-      const item = await SecureStore.getItemAsync(key);
-      if (item) {
-        console.log(`${key} was used 🔐 \n`);
-      } else {
-        console.log('No values stored under key: ' + key);
-      }
-      return item;
-    } catch (error) {
-      console.error('SecureStore get item error: ', error);
-      await SecureStore.deleteItemAsync(key);
-      return null;
-    }
-  },
-  async saveToken(key: string, value: string) {
-    try {
-      return SecureStore.setItemAsync(key, value);
-    } catch (err) {
-      return;
-    }
-  },
-};
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -82,7 +57,10 @@ export default function App() {
   }
 
   const content = (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+    <ClerkProvider
+      publishableKey={publishableKey}
+      tokenCache={Platform.OS === 'web' ? undefined : tokenCache}
+    >
       <SafeAreaProvider>
         <PaperProvider theme={lightTheme}>
           <StatusBar style="auto" />

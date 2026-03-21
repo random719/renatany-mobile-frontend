@@ -282,11 +282,11 @@ export const ProfileScreen = () => {
   const asRenter = useMemo(() => rentals.filter((r) => r.renter_email === userEmail), [rentals, userEmail]);
   const asOwner = useMemo(() => rentals.filter((r) => r.owner_email === userEmail), [rentals, userEmail]);
   const upcomingRentals = useMemo(
-    () => rentals.filter((r) => r.status === 'paid' && r.start_date && new Date(r.start_date) > new Date()),
+    () => rentals.filter((r) => r.status === 'paid' && r.start_date && parseRentalBoundaryDate(r.start_date) > new Date()),
     [rentals]
   );
   const activeRentals = useMemo(
-    () => rentals.filter((r) => r.status === 'paid' && r.start_date && new Date(r.start_date) <= new Date()),
+    () => rentals.filter((r) => r.status === 'paid' && r.start_date && parseRentalBoundaryDate(r.start_date) <= new Date()),
     [rentals]
   );
   const completedRentals = useMemo(() => rentals.filter((r) => r.status === 'completed'), [rentals]);
@@ -879,6 +879,31 @@ export const ProfileScreen = () => {
                         <Text style={styles.reviewDate}>
                           {t('profile.createdOn', { date: new Date(rental.created_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) })}
                         </Text>
+                      </View>
+                      <View style={styles.rentalActionRow}>
+                        <TouchableOpacity
+                          style={styles.rentalActionButton}
+                          onPress={() => navigation.navigate('Chat', {
+                            rentalRequestId: rental.id,
+                            otherUserEmail: role === 'renter' ? rental.owner_email : rental.renter_email,
+                            itemId: rental.item_id,
+                          })}
+                        >
+                          <MaterialCommunityIcons name="message-outline" size={16} color="#1D4ED8" />
+                          <Text style={styles.rentalActionText}>{t('rentalDetail.openChat')}</Text>
+                        </TouchableOpacity>
+                        {rental.status === 'paid' ? (
+                          <TouchableOpacity
+                            style={styles.rentalActionButton}
+                            onPress={() => navigation.navigate('ConditionReport', {
+                              rentalRequestId: rental.id,
+                              reportType: 'pickup',
+                            })}
+                          >
+                            <MaterialCommunityIcons name="clipboard-check-outline" size={16} color="#1D4ED8" />
+                            <Text style={styles.rentalActionText}>{t('chat.pickupReport')}</Text>
+                          </TouchableOpacity>
+                        ) : null}
                       </View>
                         </View>
                       </View>
@@ -1929,6 +1954,30 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     marginLeft: 20,
     marginBottom: 6,
+  },
+  rentalActionRow: {
+    marginTop: 8,
+    marginLeft: 20,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  rentalActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  rentalActionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1D4ED8',
   },
   roleBadge: {
     alignSelf: 'flex-start',

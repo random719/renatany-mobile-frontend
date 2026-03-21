@@ -2,25 +2,20 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
-import { Image, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { ActivityIndicator, Button, Text } from 'react-native-paper';
-import { useAuth, useUser } from '@clerk/expo';
-import { Directory, File, Paths } from 'expo-file-system';
-import * as LegacyFileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
-import { GlobalHeader } from '../../components/common/GlobalHeader';
-import { useI18n } from '../../i18n';
+import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Text } from 'react-native-paper';
+import { useUser } from '@clerk/expo';
 import { getConditionReports } from '../../services/conditionReportService';
-import { getRentalRequestById } from '../../services/rentalService';
 import { getListingById } from '../../services/listingService';
 import { api } from '../../services/api';
+import { getRentalRequestById } from '../../services/rentalService';
 import { useAuthStore } from '../../store/authStore';
 import { toast } from '../../store/toastStore';
 import { colors, typography } from '../../theme';
-import { ConditionReport, RentalRequest } from '../../types/models';
+import { ConditionReport, PublicUserProfile, RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
-import { getConditionReportRules } from '../../utils/conditionReportRules';
 import { parseRentalBoundaryDate } from '../../utils/rentalDates';
+import { useI18n } from '../../i18n';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'RentalDetail'>;
@@ -36,186 +31,227 @@ interface ItemInfo {
   location?: { address?: string; city?: string } | string;
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  pending: '#F59E0B',
-  approved: '#3B82F6',
-  rejected: '#EF4444',
-  paid: '#8B5CF6',
-  cancelled: '#6B7280',
-  completed: '#10B981',
-  inquiry: '#7C3AED',
-  declined: '#B91C1C',
+const STATUS_META: Record<string, { bg: string; text: string }> = {
+  pending: { bg: '#FEF3C7', text: '#92400E' },
+  approved: { bg: '#DBEAFE', text: '#1D4ED8' },
+  paid: { bg: '#F3E8FF', text: '#7C3AED' },
+  completed: { bg: '#DCFCE7', text: '#166534' },
+  cancelled: { bg: '#E2E8F0', text: '#475569' },
+  rejected: { bg: '#FEE2E2', text: '#B91C1C' },
+  declined: { bg: '#FEE2E2', text: '#B91C1C' },
+  inquiry: { bg: '#E0F2FE', text: '#075985' },
 };
 
-const InfoRow = ({ label, value }: { label: string; value: string }) => (
-  <View style={styles.infoRow}>
-    <Text style={styles.infoLabel}>{label}</Text>
-    <Text style={styles.infoValue} numberOfLines={2}>{value}</Text>
+const AGREEMENT_TERMS = [
+  'The renter agrees to return the item in the same condition as received, accounting for normal wear and tear.',
+  'Any damages beyond normal wear will be the responsibility of the renter and may result in charges.',
+  'The security deposit will be refunded within 7 days after successful return of the item.',
+  "Late returns may incur additional fees as per the platform's late return policy.",
+  "Both parties agree to resolve any disputes through Rentany's mediation process.",
+  'Payment is held securely until the rental is completed and both parties confirm satisfaction.',
+];
+
+const CONDITION_REPORT_META = {
+  pickup: {
+    cardBg: '#EFF6FF',
+    cardBorder: '#BFDBFE',
+    icon: '#2563EB',
+    badgeBg: '#DBEAFE',
+    badgeText: '#1D4ED8',
+    title: 'Pickup Inspection',
+  },
+  return: {
+    cardBg: '#F5F3FF',
+    cardBorder: '#DDD6FE',
+    icon: '#7C3AED',
+    badgeBg: '#EDE9FE',
+    badgeText: '#6D28D9',
+    title: 'Return Inspection',
+  },
+} as const;
+
+const SectionCard = ({
+  icon,
+  title,
+  children,
+}: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  title: string;
+  children: React.ReactNode;
+}) => (
+  <View style={styles.sectionCard}>
+    <View style={styles.sectionHeader}>
+      <MaterialCommunityIcons name={icon} size={20} color="#0F172A" />
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+    {children}
   </View>
 );
 
+const DetailRow = ({
+  label,
+  value,
+  emphasized = false,
+  valueColor,
+}: {
+  label: string;
+  value: string;
+  emphasized?: boolean;
+  valueColor?: string;
+}) => (
+  <View style={styles.detailRow}>
+    <Text style={[styles.detailLabel, emphasized && styles.detailLabelStrong]}>{label}</Text>
+    <Text
+      style={[
+        styles.detailValue,
+        emphasized && styles.detailValueStrong,
+        valueColor ? { color: valueColor } : null,
+      ]}
+    >
+      {value}
+    </Text>
+  </View>
+);
+
+const PartyCard = ({
+  title,
+  profile,
+  email,
+  navigation,
+}: {
+  title: string;
+  profile: PublicUserProfile | null;
+  email: string;
+  navigation: Nav;
+}) => {
+  const displayName = profile?.full_name || profile?.username || (title === 'Item Owner' ? 'Owner' : 'Renter');
+
+  return (
+    <TouchableOpacity
+      style={styles.partyCard}
+      activeOpacity={0.85}
+      onPress={() => navigation.navigate('PublicProfile', { userEmail: email })}
+    >
+      <Text style={styles.partyCardLabel}>{title}</Text>
+      <View style={styles.partyCardContent}>
+        <View style={styles.partyAvatarWrap}>
+          {profile?.profile_picture ? (
+            <Image source={{ uri: profile.profile_picture }} style={styles.partyAvatar} />
+          ) : (
+            <View style={[styles.partyAvatar, styles.partyAvatarPlaceholder]}>
+              <MaterialCommunityIcons name="account-outline" size={22} color="#475569" />
+            </View>
+          )}
+        </View>
+        <View style={styles.partyTextBlock}>
+          <Text style={styles.partyName} numberOfLines={1}>
+            {displayName}
+          </Text>
+          {profile?.username ? (
+            <Text style={styles.partyHandle} numberOfLines={1}>
+              @{profile.username}
+            </Text>
+          ) : null}
+          <Text style={styles.partyEmail} numberOfLines={1}>
+            {email}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`;
+
 export const RentalDetailScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { language, t } = useI18n();
   const route = useRoute<Route>();
   const { rentalId } = route.params;
+  const { language, t } = useI18n();
   const { user: clerkUser } = useUser();
-  const { getToken } = useAuth();
   const { user } = useAuthStore();
   const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress ?? user?.email;
   const locale = language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
 
   const [rental, setRental] = useState<RentalRequest | null>(null);
   const [itemInfo, setItemInfo] = useState<ItemInfo | null>(null);
+  const [renterProfile, setRenterProfile] = useState<PublicUserProfile | null>(null);
+  const [ownerProfile, setOwnerProfile] = useState<PublicUserProfile | null>(null);
   const [conditionReports, setConditionReports] = useState<ConditionReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [receiptActionLoading, setReceiptActionLoading] = useState<'download' | 'share' | null>(null);
 
   useEffect(() => {
-    (async () => {
+    let isCancelled = false;
+
+    const loadData = async () => {
       try {
-        const [data, reports] = await Promise.all([
+        const [requestData, reports] = await Promise.all([
           getRentalRequestById(rentalId),
           getConditionReports({ rental_request_id: rentalId }),
         ]);
-        setRental(data);
+
+        if (isCancelled) return;
+
+        setRental(requestData);
         setConditionReports(reports);
 
-        // Fetch item details
-        if (data?.item_id) {
-          try {
-            const result = await getListingById(data.item_id);
-            if (result) {
-              setItemInfo({
-                title: result.listing.title,
-                description: result.listing.description,
-                images: result.listing.images,
-                category: result.listing.category,
-                condition: result.listing.condition,
-                daily_rate: result.listing.pricePerDay,
-                deposit: result.listing.deposit,
-                location: result.listing.location,
-              });
-            }
-          } catch {
-            // Item may have been deleted
+        const [itemResult, renterResult, ownerResult] = await Promise.allSettled([
+          requestData?.item_id ? getListingById(requestData.item_id) : Promise.resolve(undefined),
+          api.get('/users/by-email', { params: { email: requestData.renter_email } }),
+          api.get('/users/by-email', { params: { email: requestData.owner_email } }),
+        ]);
+
+        if (isCancelled) return;
+
+        if (itemResult.status === 'fulfilled' && itemResult.value) {
+          const result = itemResult.value;
+          setItemInfo({
+            title: result.listing.title,
+            description: result.listing.description,
+            images: result.listing.images,
+            category: result.listing.category,
+            condition: result.listing.condition,
+            daily_rate: result.listing.pricePerDay ?? result.listing.daily_rate,
+            deposit: result.listing.deposit,
+            location: result.listing.location,
+          });
+
+          if (result.owner?.email?.toLowerCase() === requestData.owner_email.toLowerCase()) {
+            setOwnerProfile((prev) => prev || {
+              id: result.owner?.email || requestData.owner_email,
+              email: result.owner?.email || requestData.owner_email,
+              username: result.owner?.username,
+              full_name: result.owner?.full_name,
+              profile_picture: result.owner?.profile_picture,
+            });
           }
         }
-      } catch {
+
+        if (renterResult.status === 'fulfilled') {
+          const data = renterResult.value.data?.data || renterResult.value.data;
+          setRenterProfile(data || null);
+        }
+
+        if (ownerResult.status === 'fulfilled') {
+          const data = ownerResult.value.data?.data || ownerResult.value.data;
+          setOwnerProfile(data || null);
+        }
+      } catch (error) {
+        console.error('Error loading rental agreement:', error);
         toast.error(t('rentalDetail.notFound'), () => navigation.goBack());
       } finally {
-        setIsLoading(false);
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
       }
-    })();
-  }, [rentalId]);
+    };
 
-  const getReceiptRequest = async () => {
-    if (!rental) return;
-    const baseUrl = api.defaults.baseURL || '';
-    const token = await getToken();
-    if (!token) {
-      toast.error(t('rentalDetail.sessionExpired'));
-      return null;
-    }
-    const receiptUrl = `${baseUrl}/receipts?rental_request_id=${encodeURIComponent(rental.id)}&lang=${encodeURIComponent(language)}`;
-    return { receiptUrl, token };
-  };
+    loadData();
 
-  const downloadReceiptFile = async () => {
-    const request = await getReceiptRequest();
-    if (!request || !rental) return null;
-    const destination = new File(Paths.cache, `receipt-${rental.id}.pdf`);
-    return File.downloadFileAsync(request.receiptUrl, destination, {
-      headers: {
-        Authorization: `Bearer ${request.token}`,
-        Accept: 'application/pdf',
-      },
-      idempotent: true,
-    });
-  };
-
-  const handleDownloadReceipt = async () => {
-    if (!rental) return;
-    setReceiptActionLoading('download');
-    try {
-      const request = await getReceiptRequest();
-      if (!request) return;
-
-      if (Platform.OS === 'web') {
-        const downloaded = await downloadReceiptFile();
-        if (!downloaded) return;
-      } else if (Platform.OS === 'android') {
-        const downloaded = await downloadReceiptFile();
-        if (!downloaded) return;
-
-        const permissions = await LegacyFileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-        if (!permissions.granted) return;
-
-        const base64 = await downloaded.base64();
-        const fileUri = await LegacyFileSystem.StorageAccessFramework.createFileAsync(
-          permissions.directoryUri,
-          `receipt-${rental.id}-${Date.now()}`,
-          'application/pdf',
-        );
-        await LegacyFileSystem.writeAsStringAsync(fileUri, base64, {
-          encoding: LegacyFileSystem.EncodingType.Base64,
-        });
-      } else {
-        const targetDirectory = await Directory.pickDirectoryAsync();
-        const targetFile = targetDirectory.createFile(`receipt-${rental.id}-${Date.now()}.pdf`, 'application/pdf');
-        await File.downloadFileAsync(request.receiptUrl, targetFile, {
-          headers: {
-            Authorization: `Bearer ${request.token}`,
-            Accept: 'application/pdf',
-          },
-          idempotent: true,
-        });
-      }
-      toast.success(t('rentalDetail.receiptDownloaded'));
-    } catch (err: any) {
-      const msg = err?.message || '';
-      if (msg.toLowerCase().includes('cancel')) {
-        return;
-      } else if (msg.includes('401') || msg.includes('Unauthorized')) {
-        toast.error(t('rentalDetail.sessionExpiredReceipt'));
-      } else if (msg.includes('400') || msg.includes('only available')) {
-        toast.warning(t('rentalDetail.receiptUnavailable'));
-      } else {
-        toast.error(t('rentalDetail.receiptFailed'));
-      }
-    } finally {
-      setReceiptActionLoading(null);
-    }
-  };
-
-  const handleShareReceipt = async () => {
-    if (!rental) return;
-    setReceiptActionLoading('share');
-    try {
-      const downloaded = await downloadReceiptFile();
-      if (!downloaded) return;
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(downloaded.uri, {
-          mimeType: 'application/pdf',
-          dialogTitle: `Receipt - ${rental.id}`,
-        });
-      } else {
-        toast.success(t('rentalDetail.receiptDownloaded'));
-      }
-    } catch (err: any) {
-      const msg = err?.message || '';
-      if (msg.includes('401') || msg.includes('Unauthorized')) {
-        toast.error(t('rentalDetail.sessionExpiredReceipt'));
-      } else if (msg.includes('400') || msg.includes('only available')) {
-        toast.warning(t('rentalDetail.receiptUnavailable'));
-      } else {
-        toast.error(t('rentalDetail.receiptFailed'));
-      }
-    } finally {
-      setReceiptActionLoading(null);
-    }
-  };
+    return () => {
+      isCancelled = true;
+    };
+  }, [navigation, rentalId, t]);
 
   if (isLoading) {
     return (
@@ -227,265 +263,295 @@ export const RentalDetailScreen = () => {
 
   if (!rental) {
     return (
-        <View style={styles.centered}>
+      <View style={styles.centered}>
         <Text style={styles.notFoundText}>{t('rentalDetail.notFound')}</Text>
       </View>
     );
   }
 
-  const isRenter = rental.renter_email === userEmail;
-  const statusColor = STATUS_COLOR[rental.status] ?? '#6B7280';
-  const rentalStartDate = parseRentalBoundaryDate(rental.start_date);
-  const rentalEndDate = parseRentalBoundaryDate(rental.end_date);
-  const startDate = rentalStartDate.toLocaleDateString(locale, {
-    month: 'long', day: 'numeric', year: 'numeric',
-  });
-  const endDate = rentalEndDate.toLocaleDateString(locale, {
-    month: 'long', day: 'numeric', year: 'numeric',
-  });
-  const createdDate = new Date(rental.created_date).toLocaleDateString(locale, {
-    month: 'short', day: 'numeric', year: 'numeric',
+  const startBoundary = parseRentalBoundaryDate(rental.start_date);
+  const endBoundary = parseRentalBoundaryDate(rental.end_date);
+  const hasDateRange =
+    rental.status !== 'inquiry' &&
+    !Number.isNaN(startBoundary.getTime()) &&
+    !Number.isNaN(endBoundary.getTime());
+
+  const startDate = hasDateRange
+    ? startBoundary.toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric' })
+    : null;
+  const endDate = hasDateRange
+    ? endBoundary.toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric' })
+    : null;
+  const createdAtLabel = new Date(rental.created_date).toLocaleString(locale, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
   });
 
-  const totalDays = Math.max(
-    1,
-    Math.ceil((rentalEndDate.getTime() - rentalStartDate.getTime()) / 86400000),
-  );
-
+  const totalDays = hasDateRange
+    ? Math.max(1, Math.ceil((endBoundary.getTime() - startBoundary.getTime()) / 86400000) + 1)
+    : 0;
   const rentalCost = rental.total_amount ?? 0;
   const platformFee = typeof rental.platform_fee === 'number' ? rental.platform_fee : rentalCost * 0.15;
-  const securityDeposit = typeof rental.security_deposit === 'number' ? rental.security_deposit : 0;
-  const totalPaid = typeof rental.total_paid === 'number' ? rental.total_paid : rentalCost + platformFee + securityDeposit;
-  const ownerPayout = rentalCost - platformFee;
-  const reportRules = getConditionReportRules(rental, conditionReports, userEmail);
-
-  const locationStr = itemInfo?.location
+  const securityDeposit =
+    typeof rental.security_deposit === 'number' ? rental.security_deposit : itemInfo?.deposit ?? 0;
+  const totalPaid =
+    typeof rental.total_paid === 'number' ? rental.total_paid : rentalCost + platformFee + securityDeposit;
+  const ownerPayout = rentalCost;
+  const statusMeta = STATUS_META[rental.status] ?? { bg: '#E2E8F0', text: '#334155' };
+  const itemImage = itemInfo?.images?.[0];
+  const locationLabel = itemInfo?.location
     ? typeof itemInfo.location === 'string'
       ? itemInfo.location
       : [itemInfo.location.address, itemInfo.location.city].filter(Boolean).join(', ')
-    : undefined;
+    : '';
+  const pickupReports = conditionReports.filter((report) => report.report_type === 'pickup');
+  const returnReports = conditionReports.filter((report) => report.report_type === 'return');
 
-  return (
-    <View style={styles.container}>
-      <GlobalHeader />
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text variant="titleLarge" style={styles.headerTitle}>{t('rentalDetail.title')}</Text>
+  const renderConditionReportCard = (report: ConditionReport) => {
+    const reportMeta = CONDITION_REPORT_META[report.report_type];
+
+    return (
+      <View
+        key={report.id}
+        style={[
+          styles.reportCard,
+          { backgroundColor: reportMeta.cardBg, borderColor: reportMeta.cardBorder },
+        ]}
+      >
+        <View style={styles.reportCardHeader}>
+          <View style={styles.reportHeaderMeta}>
+            <MaterialCommunityIcons name="camera-outline" size={18} color={reportMeta.icon} />
+            <View style={styles.reportHeaderText}>
+              <Text style={styles.reportHeaderTitle}>{reportMeta.title}</Text>
+              <Text style={styles.reportMetaText}>by {report.reported_by_email}</Text>
+            </View>
+          </View>
+          <View style={[styles.reportDateBadge, { backgroundColor: reportMeta.badgeBg }]}>
+            <Text style={[styles.reportDateBadgeText, { color: reportMeta.badgeText }]}>
+              {new Date(report.created_date).toLocaleString(locale, {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+              })}
+            </Text>
+          </View>
         </View>
 
-        {/* Item Image */}
-        {itemInfo?.images && itemInfo.images.length > 0 && (
-          <View style={styles.imageContainer}>
-            <Image source={{ uri: itemInfo.images[0] }} style={styles.itemImage} resizeMode="cover" />
-          </View>
-        )}
+        {report.notes ? (
+          <Text style={styles.reportNotes}>{report.notes}</Text>
+        ) : null}
 
-        {/* Status Card */}
-        <View style={styles.card}>
-          <View style={styles.statusRow}>
-            <View style={[styles.statusBadge, { backgroundColor: statusColor + '18' }]}>
-              <Text style={[styles.statusText, { color: statusColor }]}>
-                {t(`rentalHistory.status.${rental.status}`).toUpperCase()}
+        {report.damages_reported?.length ? (
+          <View style={styles.reportDamageAlert}>
+            <View style={styles.reportDamageAlertHeader}>
+              <MaterialCommunityIcons name="alert-outline" size={16} color="#DC2626" />
+              <Text style={styles.reportDamageAlertTitle}>
+                {report.damages_reported.length} Damage(s) Reported
               </Text>
             </View>
-            <Text style={styles.dateText}>{t('rentalDetail.filed', { date: createdDate })}</Text>
-          </View>
-          <Text style={styles.roleTag}>{isRenter ? t('rentalDetail.renterRole') : t('rentalDetail.ownerRole')}</Text>
-        </View>
-
-        {/* Item Details */}
-        {itemInfo && (
-          <View style={styles.card}>
-            <Text style={styles.sectionLabel}>{t('rentalDetail.itemDetails')}</Text>
-            <InfoRow label={t('rentalDetail.titleLabel')} value={itemInfo.title} />
-            {itemInfo.category && <InfoRow label={t('rentalDetail.categoryLabel')} value={itemInfo.category} />}
-            {itemInfo.condition && <InfoRow label={t('rentalDetail.conditionLabel')} value={itemInfo.condition} />}
-            {locationStr && <InfoRow label={t('rentalDetail.locationLabel')} value={locationStr} />}
-            {itemInfo.description && (
-              <Text style={styles.descriptionText} numberOfLines={3}>{itemInfo.description}</Text>
-            )}
-          </View>
-        )}
-
-        {/* Dates */}
-        <View style={styles.card}>
-          <Text style={styles.sectionLabel}>{t('rentalDetail.rentalPeriod')}</Text>
-          <View style={styles.datesRow}>
-            <View style={styles.dateBlock}>
-              <Text style={styles.dateBlockLabel}>{t('rentalDetail.start')}</Text>
-              <Text style={styles.dateBlockValue}>{startDate}</Text>
-            </View>
-            <MaterialCommunityIcons name="arrow-right" size={20} color="#CBD5E1" />
-            <View style={[styles.dateBlock, { alignItems: 'flex-end' }]}>
-              <Text style={styles.dateBlockLabel}>{t('rentalDetail.end')}</Text>
-              <Text style={styles.dateBlockValue}>{endDate}</Text>
-            </View>
-          </View>
-          <Text style={styles.durationText}>{t(totalDays !== 1 ? 'rentalDetail.days_plural' : 'rentalDetail.days', { count: totalDays })}</Text>
-        </View>
-
-        {/* People */}
-        <View style={styles.card}>
-          <Text style={styles.sectionLabel}>{t('rentalDetail.parties')}</Text>
-          <InfoRow label={t('rentalDetail.renter')} value={rental.renter_email} />
-          <InfoRow label={t('rentalDetail.owner')} value={rental.owner_email} />
-        </View>
-
-        {/* Financials */}
-        <View style={styles.card}>
-          <Text style={styles.sectionLabel}>{t('rentalDetail.pricing')}</Text>
-          {itemInfo?.daily_rate !== undefined && (
-            <InfoRow label={t('rentalDetail.dailyRate')} value={`$${itemInfo.daily_rate.toFixed(2)}`} />
-          )}
-          {itemInfo?.daily_rate !== undefined && (
-            <InfoRow label={t('rentalDetail.duration')} value={t(totalDays !== 1 ? 'rentalDetail.days_plural' : 'rentalDetail.days', { count: totalDays })} />
-          )}
-          <InfoRow label={t('rentalDetail.rentalCost')} value={`$${rentalCost.toFixed(2)}`} />
-          <InfoRow label={t('rentalDetail.platformFee')} value={`$${platformFee.toFixed(2)}`} />
-          <InfoRow label={t('rentalDetail.securityDeposit')} value={`$${securityDeposit.toFixed(2)}`} />
-          <View style={[styles.infoRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>{t('rentalDetail.totalPaid')}</Text>
-            <Text style={styles.totalValue}>${totalPaid.toFixed(2)}</Text>
-          </View>
-          {!isRenter && (
-            <View style={[styles.infoRow, { borderBottomWidth: 0, marginTop: 4 }]}>
-              <Text style={[styles.infoLabel, { color: '#059669' }]}>{t('rentalDetail.ownerPayout')}</Text>
-              <Text style={[styles.infoValue, { color: '#059669', fontWeight: '700' }]}>${ownerPayout.toFixed(2)}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Message */}
-        {rental.message ? (
-          <View style={styles.card}>
-            <Text style={styles.sectionLabel}>{t('rentalDetail.message')}</Text>
-            <Text style={styles.messageText}>"{rental.message}"</Text>
+            {report.damages_reported.map((damage, index) => (
+              <Text key={`${report.id}-damage-${index}`} style={styles.damageDescription}>
+                <Text style={styles.damageSeverityInline}>{damage.severity}: </Text>
+                {damage.description}
+              </Text>
+            ))}
           </View>
         ) : null}
 
-        {/* Actions */}
-        <View style={styles.actions}>
-          <Button
-            mode="contained"
-            onPress={() =>
-              navigation.navigate('Chat', {
-                rentalRequestId: rental.id,
-                otherUserEmail: isRenter ? rental.owner_email : rental.renter_email,
-                itemId: rental.item_id,
-              })
-            }
-            style={styles.chatBtn}
-            contentStyle={styles.btnContent}
-            icon="message-outline"
-          >
-            {t('rentalDetail.openChat')}
-          </Button>
-          <Button
-            mode="outlined"
-            onPress={handleDownloadReceipt}
-            loading={receiptActionLoading === 'download'}
-            disabled={receiptActionLoading !== null}
-            style={styles.receiptBtn}
-            contentStyle={styles.btnContent}
-            icon="download"
-          >
-            {t('rentalDetail.downloadReceipt')}
-          </Button>
-          <Button
-            mode="outlined"
-            onPress={handleShareReceipt}
-            loading={receiptActionLoading === 'share'}
-            disabled={receiptActionLoading !== null}
-            style={styles.receiptBtn}
-            contentStyle={styles.btnContent}
-            icon="share-variant-outline"
-          >
-            {t('rentalDetail.shareReceipt')}
-          </Button>
+        {report.condition_photos?.length ? (
+          <View style={styles.reportTextBlock}>
+            <Text style={styles.reportBlockLabel}>Photos</Text>
+            <View style={styles.photoGrid}>
+              {report.condition_photos.map((url, index) => (
+                <Image
+                  key={`${report.id}-photo-${index}`}
+                  source={{ uri: url }}
+                  style={styles.reportPhoto}
+                  resizeMode="cover"
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
 
-          {/* Condition Reports */}
-          {rental && (
-            <>
-              <View style={styles.conditionSummaryCard}>
-                <Text style={styles.sectionLabel}>{t('rentalDetail.conditionReports')}</Text>
-                <Text style={styles.conditionSummaryText}>
-                  {t('rentalDetail.pickupReports', { count: reportRules.pickupReports.length })}
-                </Text>
-                <Text style={styles.conditionSummaryText}>
-                  {t('rentalDetail.returnReports', { count: reportRules.returnReports.length })}
-                </Text>
+  return (
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <MaterialCommunityIcons name="arrow-left" size={20} color="#0F172A" />
+          </TouchableOpacity>
+          <Text style={styles.topBarTitle}>Rental Agreement</Text>
+        </View>
+
+        <View style={styles.heroCard}>
+          <View style={styles.heroTitleRow}>
+            <MaterialCommunityIcons name="file-document-outline" size={24} color="#FFFFFF" />
+            <Text style={styles.heroTitle}>Rental Agreement</Text>
+          </View>
+          <Text style={styles.heroMeta}>Agreement ID: {rental.id}</Text>
+          <Text style={styles.heroMetaSecondary}>Created: {createdAtLabel}</Text>
+        </View>
+
+        <View style={styles.statusRow}>
+          <Text style={styles.statusLabel}>Status:</Text>
+          <View style={[styles.statusBadge, { backgroundColor: statusMeta.bg }]}>
+            <Text style={[styles.statusBadgeText, { color: statusMeta.text }]}>
+              {rental.status.replace(/_/g, ' ').toUpperCase()}
+            </Text>
+          </View>
+        </View>
+
+        {itemInfo ? (
+          <SectionCard icon="package-variant-closed" title="Rental Item">
+            <View style={styles.itemContent}>
+              {itemImage ? (
+                <Image source={{ uri: itemImage }} style={styles.itemImage} resizeMode="cover" />
+              ) : (
+                <View style={[styles.itemImage, styles.itemImagePlaceholder]}>
+                  <MaterialCommunityIcons name="image-outline" size={28} color="#94A3B8" />
+                </View>
+              )}
+              <View style={styles.itemDetails}>
+                <Text style={styles.itemTitle}>{itemInfo.title}</Text>
+                {itemInfo.description ? (
+                  <Text style={styles.itemDescription} numberOfLines={3}>
+                    {itemInfo.description}
+                  </Text>
+                ) : null}
+
+                <View style={styles.pillWrap}>
+                  {itemInfo.category ? (
+                    <View style={styles.outlinePill}>
+                      <Text style={styles.outlinePillText}>{itemInfo.category}</Text>
+                    </View>
+                  ) : null}
+                  {itemInfo.condition ? (
+                    <View style={styles.outlinePill}>
+                      <Text style={styles.outlinePillText}>{itemInfo.condition} condition</Text>
+                    </View>
+                  ) : null}
+                  {locationLabel ? (
+                    <View style={styles.outlinePill}>
+                      <MaterialCommunityIcons name="map-marker-outline" size={12} color="#475569" />
+                      <Text style={styles.outlinePillText}>{locationLabel}</Text>
+                    </View>
+                  ) : null}
+                </View>
               </View>
-              <Button
-                mode="outlined"
-                onPress={() =>
-                  navigation.navigate('ConditionReport', {
-                    rentalRequestId: rental.id,
-                    reportType: 'pickup',
-                  })
-                }
-                style={styles.receiptBtn}
-                contentStyle={styles.btnContent}
-                icon="clipboard-check-outline"
-                disabled={!reportRules.canCreatePickupReport && !reportRules.userPickupReport}
-              >
-                {reportRules.userPickupReport ? t('rentalDetail.viewPickupReport') : t('rentalDetail.pickupReport')}
-              </Button>
-              {!reportRules.canCreatePickupReport && !reportRules.userPickupReport && reportRules.pickupStatusMessage ? (
-                <Text style={styles.conditionHint}>{reportRules.pickupStatusMessage}</Text>
-              ) : null}
-              <Button
-                mode="outlined"
-                onPress={() =>
-                  navigation.navigate('ConditionReport', {
-                    rentalRequestId: rental.id,
-                    reportType: 'return',
-                  })
-                }
-                style={styles.receiptBtn}
-                contentStyle={styles.btnContent}
-                icon="clipboard-arrow-left-outline"
-                disabled={!reportRules.canCreateReturnReport && !reportRules.userReturnReport}
-              >
-                {reportRules.userReturnReport ? t('rentalDetail.viewReturnReport') : t('rentalDetail.returnReport')}
-              </Button>
-              {!reportRules.canCreateReturnReport && !reportRules.userReturnReport && reportRules.returnStatusMessage ? (
-                <Text style={styles.conditionHint}>{reportRules.returnStatusMessage}</Text>
-              ) : null}
-            </>
-          )}
+            </View>
+          </SectionCard>
+        ) : null}
 
-          {/* Rental Extension - only for paid rentals */}
-          {rental && rental.status === 'paid' && (
-            <Button
-              mode="outlined"
-              onPress={() =>
-                navigation.navigate('RentalExtension', {
-                  rentalRequestId: rental.id,
-                  currentEndDate: rental.end_date,
-                  dailyRate: itemInfo?.daily_rate || 0,
-                  ownerEmail: rental.owner_email,
-                  isOwner: !isRenter,
-                })
-              }
-              style={styles.receiptBtn}
-              contentStyle={styles.btnContent}
-              icon="calendar-plus"
-            >
-              {isRenter ? t('rentalDetail.requestExtension') : t('rentalDetail.viewExtensions')}
-            </Button>
-          )}
+        <SectionCard icon="account-outline" title="Parties Involved">
+          <View style={styles.partiesGrid}>
+            <PartyCard
+              title="Item Owner"
+              profile={ownerProfile}
+              email={rental.owner_email}
+              navigation={navigation}
+            />
+            <PartyCard
+              title="Renter"
+              profile={renterProfile}
+              email={rental.renter_email}
+              navigation={navigation}
+            />
+          </View>
+        </SectionCard>
 
-          <Button
-            mode="outlined"
-            onPress={() => navigation.goBack()}
-            style={styles.backBtnAction}
-            contentStyle={styles.btnContent}
-          >
-            {t('common.back')}
-          </Button>
+        {hasDateRange ? (
+          <SectionCard icon="calendar-range" title="Rental Period">
+            <DetailRow label="Start Date" value={startDate || '-'} />
+            <DetailRow label="End Date" value={endDate || '-'} />
+            <View style={styles.sectionDivider} />
+            <DetailRow
+              label="Total Duration"
+              value={`${totalDays} ${totalDays === 1 ? 'day' : 'days'}`}
+              emphasized
+            />
+          </SectionCard>
+        ) : null}
+
+        {rental.status !== 'inquiry' ? (
+          <SectionCard icon="currency-usd" title="Pricing Details">
+            {itemInfo?.daily_rate !== undefined ? (
+              <DetailRow label="Daily Rate" value={`${formatCurrency(itemInfo.daily_rate)}/day`} />
+            ) : null}
+            {hasDateRange ? <DetailRow label="Number of Days" value={String(totalDays)} /> : null}
+            <DetailRow label="Base Rental Cost" value={formatCurrency(rentalCost)} />
+            <DetailRow label="Platform Fee (15%)" value={formatCurrency(platformFee)} />
+            {securityDeposit > 0 ? (
+              <DetailRow label="Security Deposit" value={formatCurrency(securityDeposit)} />
+            ) : null}
+            <View style={styles.sectionDivider} />
+            <DetailRow
+              label="Total Paid by Renter"
+              value={formatCurrency(totalPaid)}
+              emphasized
+              valueColor="#16A34A"
+            />
+            <View style={styles.ownerPayoutCard}>
+              <Text style={styles.ownerPayoutText}>
+                <Text style={styles.ownerPayoutStrong}>Owner Payout:</Text> {formatCurrency(ownerPayout)}
+              </Text>
+              <Text style={styles.ownerPayoutSubtext}>(platform fee is paid by renter)</Text>
+            </View>
+          </SectionCard>
+        ) : null}
+
+        {rental.message ? (
+          <SectionCard icon="message-text-outline" title="Initial Request Message">
+            <View style={styles.messageCard}>
+              <Text style={styles.messageText}>"{rental.message}"</Text>
+            </View>
+          </SectionCard>
+        ) : null}
+
+        {conditionReports.length > 0 ? (
+          <SectionCard icon="clipboard-check-outline" title="Condition Reports">
+            {pickupReports.length > 0 ? (
+              <View style={styles.reportGroup}>
+                <Text style={styles.reportGroupTitle}>
+                  Pre-Rental Condition ({pickupReports.length} of 2)
+                </Text>
+                {pickupReports.map(renderConditionReportCard)}
+              </View>
+            ) : null}
+
+            {returnReports.length > 0 ? (
+              <View style={styles.reportGroup}>
+                <Text style={styles.reportGroupTitle}>
+                  Return Condition ({returnReports.length} of 2)
+                </Text>
+                {returnReports.map(renderConditionReportCard)}
+              </View>
+            ) : null}
+          </SectionCard>
+        ) : null}
+
+        <SectionCard icon="shield-check-outline" title="Terms & Conditions">
+          <View style={styles.termsList}>
+            {AGREEMENT_TERMS.map((term) => (
+              <View key={term} style={styles.termRow}>
+                <MaterialCommunityIcons name="check-circle" size={16} color="#16A34A" style={styles.termIcon} />
+                <Text style={styles.termText}>{term}</Text>
+              </View>
+            ))}
+          </View>
+        </SectionCard>
+
+        <View style={styles.footerCard}>
+          <Text style={styles.footerText}>
+            This agreement is governed by Rentany's Terms of Service and Privacy Policy.
+          </Text>
         </View>
       </ScrollView>
     </View>
@@ -493,108 +559,420 @@ export const RentalDetailScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  scroll: { paddingBottom: 40 },
-  headerRow: {
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  scroll: {
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 40,
+    gap: 14,
+  },
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
     gap: 12,
+    marginBottom: 2,
   },
   backBtn: {
-    padding: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  headerTitle: { fontWeight: '700', color: '#0F172A' },
-  imageContainer: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  itemImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 16,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
+  },
+  topBarTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  heroCard: {
+    backgroundColor: '#0F172A',
+    borderRadius: 20,
+    padding: 20,
+    marginTop: 4,
+  },
+  heroTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  heroTitle: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  heroMeta: {
+    color: '#CBD5E1',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  heroMetaSecondary: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginTop: 4,
   },
   statusRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statusLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#334155',
   },
   statusBadge: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 999,
   },
-  statusText: { fontWeight: '700', fontSize: typography.small },
-  dateText: { color: '#64748B', fontSize: typography.small },
-  roleTag: { color: '#64748B', fontSize: typography.small, fontStyle: 'italic' },
-  sectionLabel: { fontWeight: '700', color: '#0F172A', fontSize: typography.body, marginBottom: 12 },
-  descriptionText: {
-    color: '#475569',
-    fontSize: typography.body,
-    lineHeight: 22,
-    marginTop: 8,
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
-  datesRow: {
+  sectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    gap: 10,
+    marginBottom: 14,
   },
-  dateBlock: { flex: 1 },
-  dateBlockLabel: { color: '#94A3B8', fontSize: typography.small, marginBottom: 4 },
-  dateBlockValue: { color: '#0F172A', fontWeight: '600', fontSize: typography.body },
-  durationText: { color: '#64748B', fontSize: typography.small, fontStyle: 'italic' },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  infoLabel: { color: '#64748B', fontSize: typography.body },
-  infoValue: {
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
     color: '#0F172A',
-    fontWeight: '600',
-    fontSize: typography.body,
-    flex: 1,
-    textAlign: 'right',
-    marginLeft: 8,
   },
-  totalRow: { borderBottomWidth: 0, marginTop: 4 },
-  totalLabel: { fontWeight: '700', color: '#0F172A', fontSize: typography.tabLabel },
-  totalValue: { fontWeight: '800', color: '#0F172A', fontSize: 20 },
-  messageText: { color: '#475569', fontStyle: 'italic', lineHeight: 22, fontSize: typography.body },
-  actions: { marginHorizontal: 16, gap: 10 },
-  chatBtn: { backgroundColor: colors.primary, borderRadius: 12 },
-  receiptBtn: { borderColor: '#111827', borderRadius: 12 },
-  conditionSummaryCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+  itemContent: {
+    flexDirection: 'row',
+    gap: 14,
+  },
+  itemImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 14,
+    backgroundColor: '#E2E8F0',
+  },
+  itemImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemDetails: {
+    flex: 1,
+  },
+  itemTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 6,
+  },
+  itemDescription: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#475569',
+    marginBottom: 10,
+  },
+  pillWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  outlinePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#F8FAFC',
+  },
+  outlinePillText: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  partiesGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  partyCard: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  conditionSummaryText: { color: '#475569', fontSize: typography.small, marginTop: 4 },
-  conditionHint: { color: '#64748B', fontSize: typography.small, lineHeight: 18, marginTop: -4 },
-  backBtnAction: { borderColor: colors.primary, borderRadius: 12 },
-  btnContent: { paddingVertical: 6 },
-  notFoundText: { color: '#94A3B8', fontSize: typography.body },
+  partyCardLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+  },
+  partyCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  partyAvatarWrap: {
+    flexShrink: 0,
+  },
+  partyAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  partyAvatarPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E2E8F0',
+  },
+  partyTextBlock: {
+    flex: 1,
+  },
+  partyName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  partyHandle: {
+    fontSize: 12,
+    color: '#475569',
+    marginTop: 2,
+  },
+  partyEmail: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    gap: 12,
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: '#64748B',
+    flex: 1,
+  },
+  detailLabelStrong: {
+    color: '#334155',
+    fontWeight: '700',
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F172A',
+    textAlign: 'right',
+    flex: 1,
+  },
+  detailValueStrong: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 6,
+  },
+  ownerPayoutCard: {
+    marginTop: 12,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    padding: 12,
+  },
+  ownerPayoutText: {
+    color: '#1E3A8A',
+    fontSize: 12,
+  },
+  ownerPayoutStrong: {
+    fontWeight: '700',
+  },
+  ownerPayoutSubtext: {
+    color: '#2563EB',
+    fontSize: 11,
+    marginTop: 4,
+  },
+  messageCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 14,
+  },
+  messageText: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#475569',
+    fontStyle: 'italic',
+  },
+  reportGroup: {
+    gap: 10,
+    marginBottom: 14,
+  },
+  reportGroupTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  reportCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    padding: 14,
+  },
+  reportCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 10,
+  },
+  reportHeaderMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  reportHeaderText: {
+    flex: 1,
+  },
+  reportHeaderTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  reportDateBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  reportDateBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  reportMetaText: {
+    fontSize: 12,
+    color: '#475569',
+    marginTop: 2,
+  },
+  reportNotes: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#475569',
+    marginBottom: 10,
+  },
+  reportTextBlock: {
+    marginTop: 10,
+  },
+  reportBlockLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 6,
+  },
+  reportDamageAlert: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 2,
+  },
+  reportDamageAlertHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  reportDamageAlertTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#7F1D1D',
+  },
+  damageDescription: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#991B1B',
+    marginTop: 4,
+  },
+  damageSeverityInline: {
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  reportPhoto: {
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: 10,
+    backgroundColor: '#E2E8F0',
+  },
+  termsList: {
+    gap: 12,
+  },
+  termRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  termIcon: {
+    marginTop: 2,
+  },
+  termText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#475569',
+  },
+  footerCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+  },
+  footerText: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+    color: '#64748B',
+  },
+  notFoundText: {
+    color: '#94A3B8',
+    fontSize: typography.body,
+  },
 });

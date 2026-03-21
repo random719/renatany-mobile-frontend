@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { getMessages, sendMessage } from '../services/messageService';
 import { Message } from '../types/models';
+import { sortMessagesChronologically } from '../utils/messageOrdering';
 
 interface ChatState {
   messagesByRequest: Record<string, Message[]>;
@@ -22,9 +23,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const data = await getMessages(rentalRequestId);
-      const sorted = [...data].sort(
-        (a, b) => new Date(a.created_date).getTime() - new Date(b.created_date).getTime(),
-      );
+      const sorted = sortMessagesChronologically(data);
       set((state) => ({
         messagesByRequest: { ...state.messagesByRequest, [rentalRequestId]: sorted },
         isLoading: false,
@@ -42,7 +41,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set((state) => {
         const existing = state.messagesByRequest[rentalRequestId] ?? [];
         return {
-          messagesByRequest: { ...state.messagesByRequest, [rentalRequestId]: [...existing, newMsg] },
+          messagesByRequest: {
+            ...state.messagesByRequest,
+            [rentalRequestId]: sortMessagesChronologically([...existing, newMsg]),
+          },
           isSending: false,
         };
       });

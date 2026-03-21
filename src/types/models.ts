@@ -90,10 +90,15 @@ export interface PublicUserProfile {
 export interface AppNotification {
   id: string;
   user_email: string;
-  type: 'booking_update' | 'new_message' | 'review' | 'promotion' | 'system' | 'dispute';
+  type: string;
   title: string;
   body: string;
+  message?: string;
+  link?: string;
+  related_id?: string;
   data?: Record<string, string>;
   is_read: boolean;
   created_date: string;
+  created_at?: string;
+  read_at?: string;
 }

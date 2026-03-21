@@ -3,12 +3,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Button, HelperText, Text, TextInput } from 'react-native-paper';
 import { ScreenLayout } from '../../components/common/ScreenLayout';
 import { useI18n } from '../../i18n';
 import { api } from '../../services/api';
 import { getRentalRequests } from '../../services/rentalService';
+import { toast } from '../../store/toastStore';
 import { colors, typography } from '../../theme';
 import { Listing } from '../../types/listing';
 import { RentalRequest } from '../../types/models';
@@ -27,6 +28,10 @@ export const ConversationsScreen = () => {
     const [itemsMap, setItemsMap] = useState<Record<string, Listing>>({});
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'sent' | 'inbox'>('sent');
+    const [reportModalVisible, setReportModalVisible] = useState(false);
+    const [reportUserEmail, setReportUserEmail] = useState('');
+    const [reportComment, setReportComment] = useState('');
+    const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
     const fetchConversations = useCallback(async () => {
         if (!userEmail) {
@@ -79,6 +84,41 @@ export const ConversationsScreen = () => {
     const inInbox = conversations.filter(c => c.owner_email === userEmail);
     const displayedConversations = activeTab === 'sent' ? sentByMe : inInbox;
     const totalActive = conversations.length;
+
+    const openReportUserModal = (email: string) => {
+        if (!email || email === userEmail) return;
+        setReportUserEmail(email);
+        setReportComment('');
+        setReportModalVisible(true);
+    };
+
+    const closeReportUserModal = (force = false) => {
+        if (isSubmittingReport && !force) return;
+        setReportModalVisible(false);
+        setReportUserEmail('');
+        setReportComment('');
+    };
+
+    const handleSubmitUserReport = async () => {
+        if (!userEmail || !reportUserEmail || !reportComment.trim()) return;
+
+        try {
+            setIsSubmittingReport(true);
+            await api.post('/reports/user', {
+                reporter_email: userEmail,
+                reported_email: reportUserEmail,
+                reason: 'other',
+                description: reportComment.trim(),
+            });
+            closeReportUserModal(true);
+            toast.success(t('conversations.reportSubmitted'));
+        } catch (error: any) {
+            const message = error?.response?.data?.error || error?.message || t('conversations.reportFailed');
+            toast.error(message);
+        } finally {
+            setIsSubmittingReport(false);
+        }
+    };
 
     const renderCard = (conv: RentalRequest) => {
         const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
@@ -179,6 +219,26 @@ export const ConversationsScreen = () => {
                         <MaterialCommunityIcons name="message-outline" size={15} color="#475569" />
                         <Text style={styles.btnOutlineText}>{t('conversations.openChat')}</Text>
                     </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.btnOutline, styles.btnAgreement]}
+                        onPress={() => navigation.navigate('RentalDetail', { rentalId: conv.id })}
+                        activeOpacity={0.7}
+                    >
+                        <MaterialCommunityIcons name="file-document-outline" size={15} color="#1D4ED8" />
+                        <Text style={[styles.btnOutlineText, styles.btnAgreementText]}>{t('conversations.viewAgreement')}</Text>
+                    </TouchableOpacity>
+
+                    {otherEmail !== userEmail ? (
+                        <TouchableOpacity
+                            style={[styles.btnOutline, styles.btnReport]}
+                            onPress={() => openReportUserModal(otherEmail)}
+                            activeOpacity={0.7}
+                        >
+                            <MaterialCommunityIcons name="flag-outline" size={15} color="#B91C1C" />
+                            <Text style={[styles.btnOutlineText, styles.btnReportText]}>{t('conversations.reportUser')}</Text>
+                        </TouchableOpacity>
+                    ) : null}
                 </View>
 
                 {/* Submitted date */}
@@ -259,6 +319,60 @@ export const ConversationsScreen = () => {
                     )}
                 </View>
                 </View>
+
+                <Modal
+                    visible={reportModalVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={closeReportUserModal}
+                >
+                    <View style={styles.modalOverlay}>
+                        <Pressable style={styles.modalBackdrop} onPress={closeReportUserModal} />
+                        <View style={styles.modalCard}>
+                            <Text style={styles.modalTitle}>{t('conversations.reportUser')}</Text>
+                            <Text style={styles.modalSubtitle}>
+                                {t('conversations.reportingUser', { email: reportUserEmail })}
+                            </Text>
+
+                            <Text style={styles.modalLabel}>{t('conversations.reportReason')}</Text>
+                            <TextInput
+                                mode="outlined"
+                                multiline
+                                value={reportComment}
+                                onChangeText={setReportComment}
+                                placeholder={t('conversations.reportPlaceholder')}
+                                outlineStyle={styles.modalInputOutline}
+                                style={styles.modalInput}
+                                contentStyle={styles.modalInputContent}
+                                numberOfLines={5}
+                                disabled={isSubmittingReport}
+                            />
+                            <HelperText type="error" visible={!reportComment.trim() && reportComment.length > 0}>
+                                {t('conversations.reportReasonRequired')}
+                            </HelperText>
+
+                            <View style={styles.modalActions}>
+                                <Button
+                                    mode="text"
+                                    onPress={closeReportUserModal}
+                                    disabled={isSubmittingReport}
+                                    textColor="#64748B"
+                                >
+                                    {t('common.cancel')}
+                                </Button>
+                                <Button
+                                    mode="contained"
+                                    onPress={handleSubmitUserReport}
+                                    loading={isSubmittingReport}
+                                    disabled={isSubmittingReport || !reportComment.trim()}
+                                    buttonColor="#B91C1C"
+                                >
+                                    {t('conversations.submitReport')}
+                                </Button>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
         </ScreenLayout>
     );
 };
@@ -507,9 +621,79 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: '#475569',
     },
+    btnAgreement: {
+        borderColor: '#93C5FD',
+        backgroundColor: '#EFF6FF',
+    },
+    btnAgreementText: {
+        color: '#1D4ED8',
+    },
+    btnReport: {
+        borderColor: '#FECACA',
+        backgroundColor: '#FEF2F2',
+    },
+    btnReportText: {
+        color: '#B91C1C',
+    },
     submittedDate: {
         fontSize: 10,
         color: '#94A3B8',
         marginTop: 4,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(15, 23, 42, 0.4)',
+        justifyContent: 'center',
+        paddingHorizontal: 20,
+    },
+    modalBackdrop: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    modalCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.12,
+        shadowRadius: 18,
+        elevation: 8,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#0F172A',
+        marginBottom: 4,
+    },
+    modalSubtitle: {
+        fontSize: 13,
+        color: '#64748B',
+        marginBottom: 16,
+    },
+    modalLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#334155',
+        marginBottom: 8,
+    },
+    modalInput: {
+        backgroundColor: '#FFFFFF',
+    },
+    modalInputOutline: {
+        borderRadius: 12,
+        borderColor: '#CBD5E1',
+    },
+    modalInputContent: {
+        minHeight: 96,
+        textAlignVertical: 'top',
+    },
+    modalActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 8,
     },
 });

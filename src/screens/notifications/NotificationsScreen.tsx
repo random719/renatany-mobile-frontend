@@ -12,7 +12,6 @@ import { ActivityIndicator, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { useI18n } from '../../i18n';
 import {
-  deleteNotification,
   getNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -20,61 +19,35 @@ import {
 import { colors, typography } from '../../theme';
 import { AppNotification } from '../../types/models';
 
-const TYPE_ICON: Record<AppNotification['type'], string> = {
-  booking_update: 'calendar-check',
-  new_message: 'message',
-  review: 'star',
-  dispute: 'alert-circle',
-  system: 'bell',
-  promotion: 'tag',
+const NOTIFICATION_EMOJI: Record<string, string> = {
+  listing_report_action: '⚠️',
+  user_report_action: '⚠️',
+  report_outcome: '✅',
+  rental_request: '📦',
+  booking_update: '📦',
+  message: '💬',
+  new_message: '💬',
+  payment: '💰',
+  review: '⭐',
+  dispute: '⚠️',
+  promotion: '🏷️',
+  system: '🔔',
 };
 
-const TYPE_COLOR: Record<AppNotification['type'], string> = {
-  booking_update: '#2563EB',
-  new_message: '#16A34A',
-  review: '#D97706',
-  dispute: '#DC2626',
-  system: '#6B7280',
-  promotion: '#9333EA',
-};
+const getNotificationEmoji = (type: string) => NOTIFICATION_EMOJI[type] ?? '🔔';
 
 const getLocale = (language: string) =>
   language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
 
-const relativeTime = (
-  iso: string,
-  language: string,
-  t: (key: string, params?: Record<string, string | number>) => string,
-) => {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return t('common.justNow');
-  if (mins < 60) return t('notifications.minutesAgo', { count: mins });
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return t('notifications.hoursAgo', { count: hrs });
-  const days = Math.floor(hrs / 24);
-  if (days === 1) return t('common.yesterday');
-  return new Date(iso).toLocaleDateString(getLocale(language), { month: 'short', day: 'numeric' });
-};
-
-const dayGroup = (iso: string, t: (key: string) => string) => {
-  const diff = Date.now() - new Date(iso).getTime();
-  if (diff < 86400000) return t('common.today');
-  if (diff < 172800000) return t('common.yesterday');
-  return t('common.older');
-};
-
-type Section = { title: string; data: AppNotification[] };
-
-const groupNotifications = (notifications: AppNotification[], t: (key: string) => string): Section[] => {
-  const groups: Record<string, AppNotification[]> = {};
-  notifications.forEach((n) => {
-    const g = dayGroup(n.created_date, t);
-    if (!groups[g]) groups[g] = [];
-    groups[g].push(n);
+const formatTimestamp = (iso: string, language: string) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString(getLocale(language), {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
   });
-  const order = [t('common.today'), t('common.yesterday'), t('common.older')];
-  return order.filter((g) => groups[g]).map((g) => ({ title: g, data: groups[g] }));
 };
 
 export const NotificationsScreen = () => {
@@ -88,77 +61,83 @@ export const NotificationsScreen = () => {
     if (!quiet) setIsLoading(true);
     try {
       const data = await getNotifications({ limit: 50 });
-      setNotifications(data.sort((a, b) =>
-        new Date(b.created_date).getTime() - new Date(a.created_date).getTime()
-      ));
+      setNotifications(
+        [...data].sort(
+          (a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime(),
+        ),
+      );
     } catch {
-      // silently fail
+      setNotifications([]);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleMarkRead = async (id: string) => {
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
+      prev.map((notification) =>
+        notification.id === id ? { ...notification, is_read: true } : notification,
+      ),
     );
-    try { await markNotificationRead(id); } catch { /* ignore */ }
+    try {
+      await markNotificationRead(id);
+    } catch {
+      // optimistic update only
+    }
   };
 
   const handleMarkAllRead = async () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    try { await markAllNotificationsRead(); } catch { /* ignore */ }
+    setNotifications((prev) => prev.map((notification) => ({ ...notification, is_read: true })));
+    try {
+      await markAllNotificationsRead();
+    } catch {
+      // optimistic update only
+    }
   };
 
-  const handleDelete = async (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-    try { await deleteNotification(id); } catch { /* ignore */ }
-  };
+  const unreadCount = notifications.filter((notification) => !notification.is_read).length;
 
-  const sections = groupNotifications(notifications, t as any);
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  const renderItem = ({ item }: { item: AppNotification }) => (
+    <TouchableOpacity
+      style={[styles.notificationRow, !item.is_read && styles.unreadRow]}
+      onPress={() => handleMarkRead(item.id)}
+      activeOpacity={0.75}
+    >
+      <View style={styles.emojiWrap}>
+        <Text style={styles.emoji}>{getNotificationEmoji(item.type)}</Text>
+      </View>
 
-  const renderItem = ({ item }: { item: AppNotification }) => {
-    const iconName = TYPE_ICON[item.type] ?? 'bell';
-    const iconColor = TYPE_COLOR[item.type] ?? '#6B7280';
-
-    return (
-      <TouchableOpacity
-        style={[styles.notifCard, !item.is_read && styles.unreadCard]}
-        onPress={() => handleMarkRead(item.id)}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.iconCircle, { backgroundColor: iconColor + '18' }]}>
-          <MaterialCommunityIcons name={iconName as keyof typeof MaterialCommunityIcons.glyphMap} size={22} color={iconColor} />
+      <View style={styles.notificationBody}>
+        <View style={styles.titleRow}>
+          <Text style={styles.notificationTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
+          {!item.is_read ? (
+            <TouchableOpacity
+              onPress={() => handleMarkRead(item.id)}
+              style={styles.markReadButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons name="check" size={16} color="#0F172A" />
+            </TouchableOpacity>
+          ) : null}
         </View>
-        <View style={styles.notifBody}>
-          <View style={styles.notifTitleRow}>
-            <Text style={styles.notifTitle} numberOfLines={1}>{item.title}</Text>
-            {!item.is_read && <View style={styles.unreadDot} />}
-          </View>
-          <Text style={styles.notifBodyText} numberOfLines={2}>{item.body}</Text>
-          <Text style={styles.notifTime}>{relativeTime(item.created_date, language, t as any)}</Text>
-        </View>
-        <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <MaterialCommunityIcons name="close" size={16} color="#94A3B8" />
-        </TouchableOpacity>
-      </TouchableOpacity>
-    );
-  };
 
-  const renderSectionHeader = (title: string) => (
-    <Text style={styles.sectionHeader}>{title}</Text>
+        {item.body ? (
+          <Text style={styles.notificationMessage} numberOfLines={3}>
+            {item.body}
+          </Text>
+        ) : null}
+
+        <Text style={styles.notificationTime}>{formatTimestamp(item.created_date, language)}</Text>
+      </View>
+    </TouchableOpacity>
   );
-
-  type ListItem = AppNotification | { __section: string };
-
-  const flatData: ListItem[] = sections.flatMap((s) => [
-    { __section: s.title } as ListItem,
-    ...s.data,
-  ]);
 
   return (
     <View style={styles.container}>
@@ -168,11 +147,15 @@ export const NotificationsScreen = () => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text variant="titleLarge" style={styles.title}>{t('notifications.title')}</Text>
-        {unreadCount > 0 && (
+        <Text variant="titleLarge" style={styles.title}>
+          {t('notifications.title')}
+        </Text>
+        {unreadCount > 0 ? (
           <TouchableOpacity onPress={handleMarkAllRead}>
             <Text style={styles.markAllText}>{t('notifications.markAllRead')}</Text>
           </TouchableOpacity>
+        ) : (
+          <View style={styles.headerSpacer} />
         )}
       </View>
 
@@ -181,37 +164,41 @@ export const NotificationsScreen = () => {
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
-        <FlatList
-          data={flatData}
-          keyExtractor={(item, idx) =>
-            '__section' in item ? `section-${item.__section}` : (item as AppNotification).id ?? String(idx)
-          }
-          renderItem={({ item }) => {
-            if ('__section' in item) return renderSectionHeader(item.__section as string);
-            return renderItem({ item: item as AppNotification });
-          }}
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={() => { setIsRefreshing(true); load(true); }}
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="bell-off-outline" size={64} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>{t('notifications.emptyTitle')}</Text>
-              <Text style={styles.emptySubtitle}>{t('notifications.emptySubtitle')}</Text>
-            </View>
-          }
-        />
+        <View style={styles.panel}>
+          <FlatList
+            data={notifications}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            contentContainerStyle={notifications.length === 0 ? styles.emptyList : undefined}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={() => {
+                  setIsRefreshing(true);
+                  load(true);
+                }}
+              />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons name="bell-off-outline" size={52} color="#CBD5E1" />
+                <Text style={styles.emptyTitle}>{t('notifications.emptyTitle')}</Text>
+                <Text style={styles.emptySubtitle}>{t('notifications.emptySubtitle')}</Text>
+              </View>
+            }
+          />
+        </View>
       )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -226,50 +213,108 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  title: { flex: 1, fontWeight: '700', color: '#0F172A' },
-  markAllText: { color: colors.accentBlue, fontWeight: '600', fontSize: typography.body },
-  list: { paddingHorizontal: 16, paddingBottom: 40 },
-  sectionHeader: {
+  title: {
+    flex: 1,
     fontWeight: '700',
-    color: '#94A3B8',
-    fontSize: typography.small,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 16,
-    marginBottom: 8,
+    color: '#0F172A',
   },
-  notifCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 12,
+  markAllText: {
+    color: colors.accentBlue,
+    fontWeight: '600',
+    fontSize: typography.body,
   },
-  unreadCard: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
+  headerSpacer: {
+    width: 88,
   },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  centered: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
   },
-  notifBody: { flex: 1 },
-  notifTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  notifTitle: { fontWeight: '700', color: '#0F172A', fontSize: typography.body, flex: 1 },
-  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#3B82F6', flexShrink: 0 },
-  notifBodyText: { color: '#475569', fontSize: typography.body, lineHeight: 20, marginBottom: 6 },
-  notifTime: { color: '#94A3B8', fontSize: typography.small },
-  deleteBtn: { padding: 4 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
-  emptyTitle: { fontWeight: '700', color: '#475569', fontSize: typography.tabLabel },
-  emptySubtitle: { color: '#94A3B8', fontSize: typography.body },
+  panel: {
+    flex: 1,
+    marginHorizontal: 16,
+    marginBottom: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+  },
+  notificationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 12,
+  },
+  unreadRow: {
+    backgroundColor: '#EFF6FF80',
+  },
+  emojiWrap: {
+    width: 30,
+    alignItems: 'center',
+    paddingTop: 2,
+  },
+  emoji: {
+    fontSize: 22,
+  },
+  notificationBody: {
+    flex: 1,
+    gap: 6,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  notificationTitle: {
+    flex: 1,
+    color: '#0F172A',
+    fontSize: typography.body,
+    fontWeight: '700',
+  },
+  markReadButton: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+  },
+  notificationMessage: {
+    color: '#64748B',
+    fontSize: typography.small,
+    lineHeight: 19,
+  },
+  notificationTime: {
+    color: '#94A3B8',
+    fontSize: 12,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginLeft: 58,
+  },
+  emptyList: {
+    flexGrow: 1,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    gap: 10,
+  },
+  emptyTitle: {
+    color: '#0F172A',
+    fontSize: typography.tabLabel,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    color: '#64748B',
+    fontSize: typography.body,
+    textAlign: 'center',
+  },
 });

@@ -1,5 +1,6 @@
 import { mockCategories } from '../data/categories';
 import { mockListings } from '../data/listings';
+import { Platform } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 import { Category, Listing, ListingFilter, CreateListingFormData, SavedSearch } from '../types/listing';
 import { api } from './api';
@@ -297,25 +298,52 @@ export const getItemsByOwner = async (ownerId: string): Promise<Listing[]> => {
   return (res.data.data || res.data).map(mapItem);
 };
 
-export const uploadFile = async (uri: string, type: string = 'image'): Promise<string> => {
+type UploadFileSource =
+  | string
+  | {
+      uri: string;
+      file?: File;
+      fileName?: string | null;
+      mimeType?: string | null;
+      name?: string | null;
+      type?: string | null;
+    };
+
+export const uploadFile = async (source: UploadFileSource, type: string = 'image'): Promise<string> => {
   if (!USE_API) {
     // When API is not connected, use the local URI directly
     await new Promise((r) => setTimeout(r, 200));
-    return uri;
+    return typeof source === 'string' ? source : source.uri;
   }
 
+  const uri = typeof source === 'string' ? source : source.uri;
   const formData = new FormData();
-  const filename = uri.split('/').pop() || `${type}_${Date.now()}`;
-  const match = /\.(\w+)$/.exec(filename);
-  const mimeType = type === 'video'
-    ? `video/${match?.[1] || 'mp4'}`
-    : `image/${match?.[1] || 'jpeg'}`;
+  const filename =
+    (typeof source === 'string' ? null : source.fileName || source.name) ||
+    uri.split('/').pop() ||
+    `${type}_${Date.now()}`;
+  const fallbackMatch = /\.(\w+)$/.exec(filename);
+  const fallbackMimeType = type === 'video'
+    ? `video/${fallbackMatch?.[1] || 'mp4'}`
+    : `image/${fallbackMatch?.[1] || 'jpeg'}`;
+  const mimeType = typeof source === 'string' ? fallbackMimeType : source.mimeType || source.type || fallbackMimeType;
 
-  formData.append('file', {
-    uri,
-    name: filename,
-    type: mimeType,
-  } as any);
+  if (Platform.OS === 'web') {
+    const browserFile = typeof source === 'string' ? undefined : source.file;
+    if (browserFile) {
+      formData.append('file', browserFile, browserFile.name || filename);
+    } else {
+      const webResponse = await fetch(uri);
+      const blob = await webResponse.blob();
+      formData.append('file', blob, filename);
+    }
+  } else {
+    formData.append('file', {
+      uri,
+      name: filename,
+      type: mimeType,
+    } as any);
+  }
 
   const token = useAuthStore.getState().token;
   const baseUrl = api.defaults.baseURL || '';

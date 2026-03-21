@@ -8,14 +8,13 @@ import {
   Image,
   Modal,
   Platform,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
   KeyboardAvoidingView,
   TextInput,
 } from 'react-native';
-import { ActivityIndicator, Button, Text } from 'react-native-paper';
+import { ActivityIndicator, Text } from 'react-native-paper';
 import { ScreenLayout } from '../../components/common/ScreenLayout';
 import { useI18n } from '../../i18n';
 import {
@@ -38,6 +37,21 @@ const SEVERITY_OPTIONS = [
   { value: 'moderate' as const, color: '#F97316', icon: 'alert' },
   { value: 'severe' as const, color: '#EF4444', icon: 'alert-octagon' },
 ];
+
+const REPORT_THEME = {
+  pickup: {
+    tint: '#EFF6FF',
+    border: '#BFDBFE',
+    icon: '#2563EB',
+    text: '#1D4ED8',
+  },
+  return: {
+    tint: '#F5F3FF',
+    border: '#DDD6FE',
+    icon: '#7C3AED',
+    text: '#6D28D9',
+  },
+} as const;
 
 export const ConditionReportScreen = () => {
   const navigation = useNavigation<Nav>();
@@ -96,6 +110,21 @@ export const ConditionReportScreen = () => {
   const blockedMessage = reportType === 'pickup'
     ? rules?.pickupStatusMessage
     : rules?.returnStatusMessage;
+  const reportTheme = REPORT_THEME[reportType];
+  const reportTitle = reportType === 'pickup'
+    ? t('conditionReport.pickupTitle')
+    : t('conditionReport.returnTitle');
+  const reportSubtitle = reportType === 'pickup'
+    ? t('conditionReport.pickupSubtitle')
+    : t('conditionReport.returnSubtitle');
+  const reportTimestamp = existingReport
+    ? new Date(existingReport.created_date).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+    : null;
 
   const pickImages = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -110,7 +139,7 @@ export const ConditionReportScreen = () => {
       setUploadStatus(t('conditionReport.uploading'));
       try {
         const uploadedUrls = await Promise.all(
-          result.assets.map((asset) => uploadFile(asset.uri, 'image'))
+          result.assets.map((asset) => uploadFile(asset as any, 'image'))
         );
         setPhotos((prev) => [...prev, ...uploadedUrls]);
         setUploadStatus(null);
@@ -141,7 +170,7 @@ export const ConditionReportScreen = () => {
       setUploadStatus(t('conditionReport.uploading'));
       try {
         const asset = result.assets[0];
-        const url = await uploadFile(asset.uri, 'image');
+        const url = await uploadFile(asset as any, 'image');
         setPhotos((prev) => [...prev, url]);
         setUploadStatus(null);
       } catch (error: any) {
@@ -231,7 +260,7 @@ export const ConditionReportScreen = () => {
               <MaterialCommunityIcons name="arrow-left" size={24} color="#0F172A" />
               <Text style={styles.backText}>{t('common.back')}</Text>
             </TouchableOpacity>
-            <Text style={styles.title}>{reportType === 'pickup' ? t('conditionReport.pickupTitle') : t('conditionReport.returnTitle')}</Text>
+            <Text style={styles.title}>{reportTitle}</Text>
             <Text style={styles.subtitle}>{t('conditionReport.backLoadFailed')}</Text>
           </View>
         </ScreenLayout>
@@ -250,57 +279,78 @@ export const ConditionReportScreen = () => {
               <Text style={styles.backText}>{t('common.back')}</Text>
             </TouchableOpacity>
 
-            <Text style={styles.title}>
-              {reportType === 'pickup' ? t('conditionReport.pickupTitle') : t('conditionReport.returnTitle')}
-            </Text>
-            <View style={styles.submittedBadge}>
-              <MaterialCommunityIcons name="check-circle" size={18} color="#10B981" />
-              <Text style={styles.submittedText}>{t('conditionReport.submitted')}</Text>
-            </View>
-
-            {existingReport.condition_photos.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>{t('conditionReport.photos')}</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {existingReport.condition_photos.map((url, i) => (
-                    <Image key={i} source={{ uri: url }} style={styles.existingPhoto} />
-                  ))}
-                </ScrollView>
+            <View style={[styles.reportShell, { backgroundColor: reportTheme.tint, borderColor: reportTheme.border }]}>
+              <View style={styles.reportTopRow}>
+                <View style={styles.reportHeadingRow}>
+                  <MaterialCommunityIcons name="camera-outline" size={18} color={reportTheme.icon} />
+                  <Text style={styles.reportHeadingText}>{reportTitle}</Text>
+                </View>
+                {reportTimestamp ? <Text style={styles.reportTimestamp}>{reportTimestamp}</Text> : null}
               </View>
-            )}
 
-            {existingReport.notes && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>{t('conditionReport.notes')}</Text>
-                <Text style={styles.notesText}>{existingReport.notes}</Text>
+              <View style={styles.submittedBadge}>
+                <MaterialCommunityIcons name="check-circle" size={18} color="#10B981" />
+                <Text style={styles.submittedText}>{t('conditionReport.submitted')}</Text>
               </View>
-            )}
 
-            {existingReport.signature ? (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>{t('conditionReport.signatureLabel')}</Text>
-                <Text style={styles.notesText}>{existingReport.signature}</Text>
-              </View>
-            ) : null}
+              {existingReport.notes ? (
+                <Text style={styles.reportNotes}>{existingReport.notes}</Text>
+              ) : null}
 
-            {existingReport.damages_reported.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>{t('conditionReport.damagesReported')}</Text>
-                {existingReport.damages_reported.map((d, i) => (
-                  <View key={i} style={styles.damageItem}>
-                    <View style={[styles.severityDot, { backgroundColor: SEVERITY_OPTIONS.find((s) => s.value === d.severity)?.color || '#999' }]} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.damageSeverity}>{t(`conditionReport.severity.${d.severity}`)}</Text>
-                      <Text style={styles.damageDesc}>{d.description}</Text>
-                    </View>
+              {existingReport.damages_reported.length > 0 && (
+                <View style={styles.displaySection}>
+                  <View style={styles.displaySectionHeader}>
+                    <MaterialCommunityIcons name="alert-outline" size={16} color="#EA580C" />
+                    <Text style={styles.displaySectionTitle}>{t('conditionReport.damagesReported')}</Text>
                   </View>
-                ))}
-              </View>
-            )}
+                  {existingReport.damages_reported.map((d, i) => {
+                    const damageTone = SEVERITY_OPTIONS.find((s) => s.value === d.severity)?.color || '#999999';
+                    return (
+                      <View key={i} style={styles.displayDamageCard}>
+                        <View style={styles.displayDamageHeader}>
+                          <Text style={styles.displayDamageDesc}>{d.description}</Text>
+                          <View style={[styles.displaySeverityPill, { backgroundColor: `${damageTone}20`, borderColor: `${damageTone}40` }]}>
+                            <Text style={[styles.displaySeverityText, { color: damageTone }]}>
+                              {t(`conditionReport.severity.${d.severity}`)}
+                            </Text>
+                          </View>
+                        </View>
+                        {d.photo_url ? (
+                          <Image source={{ uri: d.photo_url }} style={styles.displayDamagePhoto} />
+                        ) : null}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
 
-            <Text style={styles.dateText}>
-              {t('conditionReport.submittedOn', { date: new Date(existingReport.created_date).toLocaleDateString() })}
-            </Text>
+              {existingReport.condition_photos.length > 0 && (
+                <View style={styles.displaySection}>
+                  <Text style={styles.displaySectionTitle}>{t('conditionReport.photos')}</Text>
+                  <View style={styles.photoGrid}>
+                    {existingReport.condition_photos.map((url, i) => (
+                      <Image key={i} source={{ uri: url }} style={styles.displayPhoto} />
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {existingReport.signature ? (
+                <View style={styles.displaySection}>
+                  <Text style={styles.displaySectionTitle}>{t('conditionReport.signatureLabel')}</Text>
+                  <View style={styles.displayValueBox}>
+                    <Text style={styles.displayValueText}>{existingReport.signature}</Text>
+                  </View>
+                </View>
+              ) : null}
+
+              <View style={styles.reportFooter}>
+                <Text style={styles.reportFooterText}>
+                  {t('conditionReport.submittedOn', { date: new Date(existingReport.created_date).toLocaleDateString() })}
+                </Text>
+                <Text style={styles.reportFooterText}>{existingReport.reported_by_email}</Text>
+              </View>
+            </View>
           </View>
         </ScreenLayout>
       </View>
@@ -317,9 +367,7 @@ export const ConditionReportScreen = () => {
               <Text style={styles.backText}>{t('common.back')}</Text>
             </TouchableOpacity>
 
-            <Text style={styles.title}>
-              {reportType === 'pickup' ? t('conditionReport.pickupTitle') : t('conditionReport.returnTitle')}
-            </Text>
+            <Text style={styles.title}>{reportTitle}</Text>
             <View style={styles.infoCard}>
               <MaterialCommunityIcons name="information-outline" size={22} color="#2563EB" />
               <View style={styles.infoCardBody}>
@@ -353,152 +401,171 @@ export const ConditionReportScreen = () => {
             <Text style={styles.backText}>{t('common.back')}</Text>
           </TouchableOpacity>
 
-          <Text style={styles.title}>
-            {reportType === 'pickup' ? t('conditionReport.pickupTitle') : t('conditionReport.returnTitle')}
-          </Text>
-          <Text style={styles.subtitle}>
-            {reportType === 'pickup'
-              ? t('conditionReport.pickupSubtitle')
-              : t('conditionReport.returnSubtitle')}
-          </Text>
-
-          {uploadError ? (
-            <View style={styles.errorCard}>
-              <MaterialCommunityIcons name="alert-circle-outline" size={22} color="#B91C1C" />
-              <View style={styles.errorCardBody}>
-                <Text style={styles.errorCardTitle}>{t('conditionReport.uploadErrorTitle')}</Text>
-                <Text style={styles.errorCardText}>{uploadError}</Text>
-              </View>
+          <View style={[styles.formShell, { backgroundColor: reportTheme.tint, borderColor: reportTheme.border }]}>
+            <View style={styles.reportHeadingRow}>
+              <MaterialCommunityIcons name="camera-outline" size={20} color={reportTheme.icon} />
+              <Text style={styles.formHeadingText}>{reportTitle}</Text>
             </View>
-          ) : null}
+            <Text style={styles.subtitle}>{reportSubtitle}</Text>
 
-          {uploadStatus ? (
-            <View style={styles.infoCard}>
-              <MaterialCommunityIcons name="loading" size={22} color="#2563EB" />
-              <View style={styles.infoCardBody}>
-                <Text style={styles.infoCardTitle}>{t('conditionReport.uploading')}</Text>
-                <Text style={styles.infoCardText}>{uploadStatus}</Text>
-              </View>
+            <View style={styles.inlineInfoCard}>
+              <MaterialCommunityIcons name="information-outline" size={18} color={reportTheme.icon} />
+              <Text style={[styles.inlineInfoText, { color: reportTheme.text }]}>{reportSubtitle}</Text>
             </View>
-          ) : null}
 
-          {/* Photos Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              {t('conditionReport.photos')} <Text style={styles.required}>*</Text>
-            </Text>
-            <Text style={styles.sectionHint}>{t('conditionReport.requiredPhotosHint')}</Text>
-
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
-              {photos.map((url, i) => (
-                <View key={i} style={styles.photoContainer}>
-                  <Image source={{ uri: url }} style={styles.photo} />
-                  <TouchableOpacity style={styles.removePhotoBtn} onPress={() => removePhoto(i)}>
-                    <MaterialCommunityIcons name="close-circle" size={22} color="#EF4444" />
-                  </TouchableOpacity>
+            {uploadError ? (
+              <View style={styles.errorCard}>
+                <MaterialCommunityIcons name="alert-circle-outline" size={22} color="#B91C1C" />
+                <View style={styles.errorCardBody}>
+                  <Text style={styles.errorCardTitle}>{t('conditionReport.uploadErrorTitle')}</Text>
+                  <Text style={styles.errorCardText}>{uploadError}</Text>
                 </View>
-              ))}
+              </View>
+            ) : null}
 
-              {isUploading && (
-                <View style={[styles.photoContainer, styles.uploadingPlaceholder]}>
-                  <ActivityIndicator size="small" color={colors.primary} />
+            {uploadStatus ? (
+              <View style={styles.infoCard}>
+                <MaterialCommunityIcons name="loading" size={22} color="#2563EB" />
+                <View style={styles.infoCardBody}>
+                  <Text style={styles.infoCardTitle}>{t('conditionReport.uploading')}</Text>
+                  <Text style={styles.infoCardText}>{uploadStatus}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            <View style={styles.formCard}>
+              <Text style={styles.sectionTitle}>
+                {t('conditionReport.photos')} <Text style={styles.required}>*</Text>
+              </Text>
+              <Text style={styles.sectionHint}>{t('conditionReport.requiredPhotosHint')}</Text>
+
+              <View style={styles.photoActionRow}>
+                <TouchableOpacity style={[styles.photoActionButton, isUploading && styles.addPhotoBtnDisabled]} onPress={takePhoto} disabled={isUploading}>
+                  <MaterialCommunityIcons name="camera-outline" size={18} color="#0F172A" />
+                  <Text style={styles.photoActionText}>{t('conditionReport.camera')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.photoActionButton, isUploading && styles.addPhotoBtnDisabled]} onPress={pickImages} disabled={isUploading}>
+                  <MaterialCommunityIcons name="image-outline" size={18} color="#0F172A" />
+                  <Text style={styles.photoActionText}>{t('conditionReport.gallery')}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {photos.length > 0 && (
+                <View style={styles.photoGrid}>
+                  {photos.map((url, i) => (
+                    <View key={i} style={styles.photoGridItem}>
+                      <Image source={{ uri: url }} style={styles.displayPhoto} />
+                      <TouchableOpacity style={styles.removePhotoBtn} onPress={() => removePhoto(i)}>
+                        <MaterialCommunityIcons name="close-circle" size={22} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  {isUploading ? (
+                    <View style={[styles.photoGridItem, styles.uploadingTile]}>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    </View>
+                  ) : null}
                 </View>
               )}
 
-              <TouchableOpacity style={[styles.addPhotoBtn, isUploading && styles.addPhotoBtnDisabled]} onPress={pickImages} disabled={isUploading}>
-                <MaterialCommunityIcons name="image-plus" size={28} color="#6B7280" />
-                <Text style={styles.addPhotoText}>{t('conditionReport.gallery')}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={[styles.addPhotoBtn, isUploading && styles.addPhotoBtnDisabled]} onPress={takePhoto} disabled={isUploading}>
-                <MaterialCommunityIcons name="camera" size={28} color="#6B7280" />
-                <Text style={styles.addPhotoText}>{t('conditionReport.camera')}</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-
-          {/* Notes Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('conditionReport.notes')}</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder={t('conditionReport.notesPlaceholder')}
-              placeholderTextColor="#9CA3AF"
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              {t('conditionReport.signatureLabel')} <Text style={styles.required}>*</Text>
-            </Text>
-            <TextInput
-              style={styles.signatureInput}
-              placeholder={t('conditionReport.signaturePlaceholder')}
-              placeholderTextColor="#9CA3AF"
-              value={signature}
-              onChangeText={setSignature}
-              autoCapitalize="words"
-              autoCorrect={false}
-            />
-            <Text style={styles.sectionHint}>{t('conditionReport.signatureHint')}</Text>
-          </View>
-
-          {/* Damages Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{t('conditionReport.damages')}</Text>
-              <TouchableOpacity style={styles.addDamageBtn} onPress={() => setShowAddDamage(true)}>
-                <MaterialCommunityIcons name="plus" size={18} color="#FFFFFF" />
-                <Text style={styles.addDamageBtnText}>{t('conditionReport.addDamage')}</Text>
-              </TouchableOpacity>
+              {!photos.length && isUploading ? (
+                <View style={styles.singleUploadState}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.singleUploadText}>{t('conditionReport.uploading')}</Text>
+                </View>
+              ) : null}
             </View>
 
-            {damages.length === 0 ? (
-              <Text style={styles.noDamagesText}>{t('conditionReport.noDamages')}</Text>
-            ) : (
-              damages.map((d, i) => (
-                <View key={i} style={styles.damageCard}>
-                  <View style={styles.damageCardHeader}>
-                    <View style={[styles.severityBadge, { backgroundColor: SEVERITY_OPTIONS.find((s) => s.value === d.severity)?.color + '20' }]}>
-                      <MaterialCommunityIcons
-                        name={SEVERITY_OPTIONS.find((s) => s.value === d.severity)?.icon as any || 'alert'}
-                        size={14}
-                        color={SEVERITY_OPTIONS.find((s) => s.value === d.severity)?.color}
-                      />
-                      <Text style={[styles.severityText, { color: SEVERITY_OPTIONS.find((s) => s.value === d.severity)?.color }]}>
-                        {t(`conditionReport.severity.${d.severity}`)}
-                      </Text>
+            <View style={styles.formCard}>
+              <Text style={styles.sectionTitle}>{t('conditionReport.notes')}</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder={t('conditionReport.notesPlaceholder')}
+                placeholderTextColor="#9CA3AF"
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+            </View>
+
+            <View style={styles.formCard}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>{t('conditionReport.damages')}</Text>
+                <TouchableOpacity style={styles.secondaryDamageBtn} onPress={() => setShowAddDamage(true)}>
+                  <Text style={styles.secondaryDamageBtnText}>{t('conditionReport.addDamage')}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {damages.length === 0 ? (
+                <Text style={styles.noDamagesText}>{t('conditionReport.noDamages')}</Text>
+              ) : (
+                damages.map((d, i) => (
+                  <View key={i} style={styles.displayDamageCard}>
+                    <View style={styles.displayDamageHeader}>
+                      <Text style={styles.displayDamageDesc}>{d.description}</Text>
+                      <View
+                        style={[
+                          styles.displaySeverityPill,
+                          {
+                            backgroundColor: `${SEVERITY_OPTIONS.find((s) => s.value === d.severity)?.color || '#999999'}20`,
+                            borderColor: `${SEVERITY_OPTIONS.find((s) => s.value === d.severity)?.color || '#999999'}40`,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.displaySeverityText,
+                            { color: SEVERITY_OPTIONS.find((s) => s.value === d.severity)?.color || '#999999' },
+                          ]}
+                        >
+                          {t(`conditionReport.severity.${d.severity}`)}
+                        </Text>
+                      </View>
                     </View>
-                    <TouchableOpacity onPress={() => removeDamage(i)}>
-                      <MaterialCommunityIcons name="trash-can-outline" size={18} color="#EF4444" />
+                    <TouchableOpacity style={styles.inlineRemoveBtn} onPress={() => removeDamage(i)}>
+                      <Text style={styles.inlineRemoveText}>{t('common.cancel')}</Text>
                     </TouchableOpacity>
                   </View>
-                  <Text style={styles.damageCardDesc}>{d.description}</Text>
-                </View>
-              ))
-            )}
-          </View>
+                ))
+              )}
+            </View>
 
-          {/* Submit */}
-          <TouchableOpacity
-            style={[styles.submitBtn, (isSubmitting || photos.length === 0 || !signature.trim()) && styles.submitBtnDisabled]}
-            onPress={handleSubmit}
-            disabled={isSubmitting || photos.length === 0 || !signature.trim()}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <MaterialCommunityIcons name="check" size={20} color="#FFFFFF" />
-                <Text style={styles.submitBtnText}>{t('conditionReport.submit')}</Text>
-              </>
-            )}
-          </TouchableOpacity>
+            <View style={styles.formCard}>
+              <Text style={styles.sectionTitle}>
+                {t('conditionReport.signatureLabel')} <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={styles.signatureRow}>
+                <TextInput
+                  style={styles.signatureInput}
+                  placeholder={t('conditionReport.signaturePlaceholder')}
+                  placeholderTextColor="#9CA3AF"
+                  value={signature}
+                  onChangeText={setSignature}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                />
+                <MaterialCommunityIcons name="draw" size={18} color="#94A3B8" />
+              </View>
+              <Text style={styles.sectionHint}>{t('conditionReport.signatureHint')}</Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.submitBtn, (isSubmitting || photos.length === 0 || !signature.trim()) && styles.submitBtnDisabled]}
+              onPress={handleSubmit}
+              disabled={isSubmitting || photos.length === 0 || !signature.trim()}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="check-circle-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.submitBtnText}>{t('conditionReport.submit')}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </ScreenLayout>
 
@@ -561,40 +628,257 @@ export const ConditionReportScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  contentWrapper: { flex: 1, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 48, maxWidth: 768, width: '100%', alignSelf: 'center' },
+  contentWrapper: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 48,
+    maxWidth: 768,
+    width: '100%',
+    alignSelf: 'center',
+  },
   loadingContainer: { marginTop: 40, alignItems: 'center', justifyContent: 'center' },
   backButton: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   backText: { fontSize: 16, fontWeight: '500', color: '#0F172A', marginLeft: 6 },
   title: { fontSize: 28, fontWeight: 'bold', color: '#0F172A', letterSpacing: -0.5, marginBottom: 8 },
-  subtitle: { fontSize: 14, color: '#6B7280', lineHeight: 20, marginBottom: 24 },
-  section: { marginBottom: 24 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#0F172A', marginBottom: 4 },
-  sectionHint: { fontSize: 13, color: '#9CA3AF' },
+  subtitle: { fontSize: 14, color: '#475569', lineHeight: 20, marginTop: 10, marginBottom: 20 },
+  reportShell: {
+    borderWidth: 2,
+    borderRadius: 24,
+    padding: 18,
+  },
+  formShell: {
+    borderWidth: 2,
+    borderRadius: 24,
+    padding: 18,
+    gap: 16,
+  },
+  reportTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  reportHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexShrink: 1,
+  },
+  reportHeadingText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+    flexShrink: 1,
+  },
+  formHeadingText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
+    flexShrink: 1,
+  },
+  reportTimestamp: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  submittedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    alignSelf: 'flex-start',
+    marginTop: 14,
+    marginBottom: 18,
+  },
+  submittedText: { fontSize: 14, fontWeight: '600', color: '#10B981' },
+  reportNotes: { fontSize: 14, color: '#334155', lineHeight: 21, marginBottom: 18 },
+  displaySection: { marginTop: 18 },
+  displaySectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  displaySectionTitle: { fontSize: 14, fontWeight: '700', color: '#334155', marginBottom: 10 },
+  displayDamageCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 10,
+  },
+  displayDamageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  displayDamageDesc: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1E293B',
+    lineHeight: 20,
+  },
+  displaySeverityPill: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  displaySeverityText: { fontSize: 12, fontWeight: '700' },
+  displayDamagePhoto: {
+    width: '100%',
+    aspectRatio: 1.4,
+    borderRadius: 14,
+    marginTop: 10,
+  },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  photoGridItem: {
+    width: '31%',
+    aspectRatio: 1,
+    position: 'relative',
+  },
+  displayPhoto: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 14,
+    backgroundColor: '#E2E8F0',
+  },
+  removePhotoBtn: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+  },
+  displayValueBox: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  displayValueText: { fontSize: 15, color: '#0F172A', fontWeight: '500' },
+  reportFooter: {
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#CBD5E1',
+    gap: 4,
+  },
+  reportFooterText: { fontSize: 12, color: '#64748B' },
+  inlineInfoCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#FFFFFFB3',
+    borderWidth: 1,
+    borderColor: '#D6E4FF',
+    borderRadius: 16,
+    padding: 14,
+  },
+  inlineInfoText: { flex: 1, fontSize: 14, lineHeight: 20 },
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 18,
+    padding: 14,
+    gap: 10,
+  },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
+  sectionHint: { fontSize: 13, color: '#64748B', lineHeight: 18 },
   required: { color: '#EF4444' },
-  photoContainer: { width: 100, height: 100, borderRadius: 10, marginRight: 10, position: 'relative' },
-  photo: { width: 100, height: 100, borderRadius: 10 },
-  removePhotoBtn: { position: 'absolute', top: -6, right: -6, backgroundColor: '#FFFFFF', borderRadius: 12 },
-  uploadingPlaceholder: { backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
-  addPhotoBtn: { width: 100, height: 100, borderRadius: 10, borderWidth: 2, borderColor: '#E5E7EB', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  photoActionRow: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  photoActionButton: {
+    flex: 1,
+    minHeight: 46,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+  },
+  photoActionText: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
   addPhotoBtnDisabled: { opacity: 0.5 },
-  addPhotoText: { fontSize: 11, color: '#6B7280', marginTop: 4 },
-  textInput: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, padding: 14, fontSize: 14, color: '#0F172A', minHeight: 100 },
-  signatureInput: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#0F172A' },
-  addDamageBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, gap: 4 },
-  addDamageBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
-  noDamagesText: { fontSize: 14, color: '#9CA3AF', fontStyle: 'italic', paddingVertical: 12 },
-  damageCard: { backgroundColor: '#FFFFFF', borderRadius: 10, padding: 14, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 10 },
-  damageCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  severityBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, gap: 4 },
-  severityText: { fontSize: 12, fontWeight: '600' },
-  damageCardDesc: { fontSize: 14, color: '#374151', lineHeight: 20 },
-  submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, paddingVertical: 16, borderRadius: 12, gap: 8, marginTop: 8 },
+  uploadingTile: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  singleUploadState: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  singleUploadText: { fontSize: 13, color: '#475569' },
+  textInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 14,
+    color: '#0F172A',
+    minHeight: 104,
+  },
+  secondaryDamageBtn: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: '#FFFFFF',
+  },
+  secondaryDamageBtnText: { fontSize: 13, fontWeight: '700', color: '#0F172A' },
+  noDamagesText: { fontSize: 14, color: '#64748B', fontStyle: 'italic', paddingVertical: 4 },
+  inlineRemoveBtn: { marginTop: 10, alignSelf: 'flex-start' },
+  inlineRemoveText: { fontSize: 13, fontWeight: '600', color: '#DC2626' },
+  signatureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+  },
+  signatureInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  submitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    paddingVertical: 16,
+    borderRadius: 14,
+    gap: 8,
+  },
   submitBtnDisabled: { opacity: 0.5 },
   submitBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  // Existing report styles
-  submittedBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ECFDF5', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, alignSelf: 'flex-start', marginBottom: 24 },
-  submittedText: { fontSize: 14, fontWeight: '600', color: '#10B981' },
   infoCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -633,13 +917,6 @@ const styles = StyleSheet.create({
   },
   metaLabel: { fontSize: 12, color: '#6B7280', textTransform: 'uppercase' },
   metaValue: { fontSize: 15, color: '#0F172A', fontWeight: '600', marginBottom: 6 },
-  existingPhoto: { width: 120, height: 120, borderRadius: 10, marginRight: 10 },
-  notesText: { fontSize: 14, color: '#374151', lineHeight: 20, backgroundColor: '#F9FAFB', padding: 14, borderRadius: 10 },
-  damageItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  severityDot: { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
-  damageSeverity: { fontSize: 13, fontWeight: '600', color: '#374151' },
-  damageDesc: { fontSize: 14, color: '#6B7280' },
-  dateText: { fontSize: 13, color: '#9CA3AF', marginTop: 16 },
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalBackdrop: { flex: 1 },
