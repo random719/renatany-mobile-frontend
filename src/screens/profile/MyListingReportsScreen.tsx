@@ -1,12 +1,14 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Surface, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { useI18n } from '../../i18n';
 import * as listingService from '../../services/listingService';
+import { toast } from '../../store/toastStore';
 import { colors, typography } from '../../theme';
 
 export const MyListingReportsScreen = () => {
@@ -56,6 +58,14 @@ export const MyListingReportsScreen = () => {
   const handleRefresh = useCallback(() => {
     loadReports(true);
   }, [loadReports]);
+
+  const handleOpenEvidence = useCallback(async (url: string) => {
+    try {
+      await WebBrowser.openBrowserAsync(url);
+    } catch {
+      toast.error(t('listingReports.openEvidenceFailed'));
+    }
+  }, [t]);
 
   return (
     <View style={styles.mainContainer}>
@@ -130,7 +140,10 @@ export const MyListingReportsScreen = () => {
                   <Text style={styles.descriptionText}>{report.description}</Text>
 
                   {report.evidence_urls?.length ? (
-                    <View style={styles.metaRow}>
+                    <View style={styles.sectionBlock}>
+                      <Text style={styles.sectionLabel}>
+                        {t('listingReports.evidenceLabel', { count: report.evidence_urls.length })}
+                      </Text>
                       <View style={styles.metaChip}>
                         <MaterialCommunityIcons name="paperclip" size={15} color="#475569" />
                         <Text style={styles.metaChipText}>
@@ -138,6 +151,21 @@ export const MyListingReportsScreen = () => {
                             count: report.evidence_urls.length,
                           })}
                         </Text>
+                      </View>
+                      <View style={styles.evidenceGrid}>
+                        {report.evidence_urls.map((url, idx) => (
+                          <TouchableOpacity
+                            key={`${report.id}-evidence-${idx}`}
+                            style={styles.evidenceGridItem}
+                            onPress={() => handleOpenEvidence(url)}
+                            activeOpacity={0.8}
+                          >
+                            <Image source={{ uri: url }} style={styles.evidenceGridImage} />
+                            <View style={styles.evidenceOverlay}>
+                              <MaterialCommunityIcons name="open-in-new" size={16} color="#FFFFFF" />
+                            </View>
+                          </TouchableOpacity>
+                        ))}
                       </View>
                     </View>
                   ) : null}
@@ -289,7 +317,17 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
   },
+  sectionBlock: {
+    gap: 10,
+  },
+  sectionLabel: {
+    fontSize: typography.caption,
+    color: '#475569',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
   metaChip: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -304,6 +342,36 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
     color: '#475569',
     fontWeight: '600',
+  },
+  evidenceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  evidenceGridItem: {
+    width: 104,
+    height: 104,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#E2E8F0',
+    position: 'relative',
+  },
+  evidenceGridImage: {
+    width: '100%',
+    height: '100%',
+  },
+  evidenceOverlay: {
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   notesBox: {
     backgroundColor: '#F8FAFC',

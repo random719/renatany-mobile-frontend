@@ -911,8 +911,10 @@ export const translations = {
       emptySubtitle: 'When you report a listing, it will appear here so you can follow the review status.',
       listingFallback: 'Listing',
       reportedOn: 'Reported {{date}}',
+      evidenceLabel: 'Evidence ({{count}})',
       evidenceCount: '{{count}} evidence file',
       evidenceCount_plural: '{{count}} evidence files',
+      openEvidenceFailed: 'Could not open this evidence file.',
       adminNote: 'Admin note',
       reasons: {
         fraud: 'Fraudulent Listing',
@@ -2594,8 +2596,10 @@ export const translations = {
       emptySubtitle: 'Lorsque vous signalez une annonce, elle apparaîtra ici pour vous permettre de suivre son traitement.',
       listingFallback: 'Annonce',
       reportedOn: 'Signalé {{date}}',
+      evidenceLabel: 'Preuves ({{count}})',
       evidenceCount: '{{count}} fichier de preuve',
       evidenceCount_plural: '{{count}} fichiers de preuve',
+      openEvidenceFailed: 'Impossible d’ouvrir cette pièce jointe.',
       adminNote: "Note de l'administrateur",
       reasons: {
         fraud: 'Annonce frauduleuse',
@@ -4272,8 +4276,10 @@ export const translations = {
       emptySubtitle: 'Cuando reportes un anuncio, aparecerá aquí para que puedas seguir su estado.',
       listingFallback: 'Anuncio',
       reportedOn: 'Reportado {{date}}',
+      evidenceLabel: 'Evidencia ({{count}})',
       evidenceCount: '{{count}} archivo de evidencia',
       evidenceCount_plural: '{{count}} archivos de evidencia',
+      openEvidenceFailed: 'No se pudo abrir este archivo de evidencia.',
       adminNote: 'Nota del administrador',
       reasons: {
         fraud: 'Anuncio fraudulento',
@@ -5949,8 +5955,10 @@ export const translations = {
       emptySubtitle: 'Wenn du eine Anzeige meldest, erscheint sie hier, damit du den Prüfstatus verfolgen kannst.',
       listingFallback: 'Anzeige',
       reportedOn: 'Gemeldet {{date}}',
+      evidenceLabel: 'Beweise ({{count}})',
       evidenceCount: '{{count}} Beweisdatei',
       evidenceCount_plural: '{{count}} Beweisdateien',
+      openEvidenceFailed: 'Diese Beweisdatei konnte nicht geoffnet werden.',
       adminNote: 'Admin-Hinweis',
       reasons: {
         fraud: 'Betrügerische Anzeige',
