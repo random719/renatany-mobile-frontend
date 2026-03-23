@@ -330,7 +330,7 @@ export const ChatScreen = () => {
     try {
       const response = await createCheckoutSession({
         rental_request_id: rental.id,
-        return_url: checkoutReturnUrl,
+        mobile_return_url: checkoutReturnUrl,
       });
       const checkoutUrl = response.url || response.checkout_url;
       const checkoutSessionId = response.session_id;

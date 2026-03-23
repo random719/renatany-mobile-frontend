@@ -596,7 +596,6 @@ export const ListingDetailScreen = () => {
     return backendUser;
   }, [backendUser, refreshBackendUser]);
 
-  // API base URL (without /api) used for mobile return pages
   const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://172.28.145.1:5000/api').replace(/\/api$/, '');
   const identityReturnUrl = `${API_BASE}/api/stripe/app-return/identity`;
   const cardReturnUrl = `${API_BASE}/api/stripe/app-return/profile`;
