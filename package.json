@@ -7,6 +7,9 @@
     "start:dev-client": "expo start --dev-client",
     "android": "expo run:android",
     "android:dev": "expo run:android",
+    "build:apk": "cd android && ./gradlew assembleRelease",
+    "build:aab": "cd android && ./gradlew bundleRelease",
+    "install:apk": "adb install -r android/app/build/outputs/apk/release/app-release.apk",
     "ios": "expo run:ios",
     "web": "expo start --web"
   },
@@ -50,6 +53,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
+    "eas-cli": "^18.5.0",
     "typescript": "~5.9.2"
   },
   "private": true
