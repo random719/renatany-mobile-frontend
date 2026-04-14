@@ -20,7 +20,10 @@ export const ListingCard = ({ listing, onPress, onToggleLike, style }: ListingCa
   return (
     <TouchableOpacity style={[styles.container, style]} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.imageWrapper}>
-        <Image source={{ uri: listing.images[0] }} style={styles.image} />
+        <Image
+          source={listing.images?.[0] ? { uri: listing.images[0] } : { uri: '' }}
+          style={styles.image}
+        />
 
         {/* Pink Category Badge */}
         <View style={styles.categoryBadge}>

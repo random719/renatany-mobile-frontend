@@ -3,6 +3,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as WebBrowser from 'expo-web-browser';
+import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -52,7 +53,15 @@ const REPORT_REASON_VALUES = [
   'other',
 ] as const;
 
-const isVideoUrl = (url: string): boolean => /\.(mp4|mov|webm)$/i.test(url);
+const isVideoUrl = (url: string): boolean => {
+  if (!url) return false;
+  // Strip query params (S3 presigned URLs have ?X-Amz-... after the extension)
+  const cleanPath = url.split('?')[0];
+  if (/\.(mp4|mov|webm|avi|m4v|mkv)$/i.test(cleanPath)) return true;
+  // Fallback: check if the S3 folder path contains /videos/
+  if (/\/videos\//i.test(cleanPath)) return true;
+  return false;
+};
 
 export const ListingDetailScreen = () => {
   const { language, t } = useI18n();
@@ -111,6 +120,8 @@ export const ListingDetailScreen = () => {
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showAIChat, setShowAIChat] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const videoRef = useRef<Video>(null);
   const reportReasons = REPORT_REASON_VALUES.map((value) => ({
     value,
     label: t(`listingDetail.reportReasons.${value}`),
@@ -869,8 +880,51 @@ export const ListingDetailScreen = () => {
           <View style={styles.mainMediaWrapper}>
             {isVideoUrl(displayMedia[selectedMediaIndex]) ? (
               <View style={styles.videoPlaceholder}>
-                <MaterialCommunityIcons name="play-circle-outline" size={64} color="#FFFFFF" />
-                <Text style={styles.videoText}>{t('listingDetail.video')}</Text>
+                <Video
+                  ref={videoRef}
+                  source={{ uri: displayMedia[selectedMediaIndex] }}
+                  style={styles.heroVideo}
+                  resizeMode={ResizeMode.CONTAIN}
+                  isLooping={false}
+                  onPlaybackStatusUpdate={(status: AVPlaybackStatus) => {
+                    if (status.isLoaded) {
+                      // Sync icon state with actual player state
+                      setIsVideoPlaying(status.isPlaying);
+                      if (status.didJustFinish) {
+                        setIsVideoPlaying(false);
+                        videoRef.current?.setPositionAsync(0);
+                      }
+                    }
+                  }}
+                />
+                {/* Tap overlay — imperatively play/pause via ref */}
+                <TouchableOpacity
+                  style={styles.videoPlayOverlay}
+                  activeOpacity={0.85}
+                  onPress={async () => {
+                    if (!videoRef.current) return;
+                    const status = await videoRef.current.getStatusAsync();
+                    if (status.isLoaded) {
+                      if (status.isPlaying) {
+                        await videoRef.current.pauseAsync();
+                      } else {
+                        await videoRef.current.playAsync();
+                      }
+                    }
+                  }}
+                >
+                  {/* Show icon always when paused, hide when playing */}
+                  {!isVideoPlaying && (
+                    <View style={styles.videoPlayBtn}>
+                      <MaterialCommunityIcons name="play" size={40} color="#FFFFFF" />
+                    </View>
+                  )}
+                  {isVideoPlaying && (
+                    <View style={[styles.videoPlayBtn, { opacity: 0 }]}>
+                      <MaterialCommunityIcons name="pause" size={40} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
               </View>
             ) : (
               <TouchableOpacity
@@ -916,7 +970,15 @@ export const ListingDetailScreen = () => {
                     styles.thumbnail,
                     selectedMediaIndex === index && styles.thumbnailActive,
                   ]}
-                  onPress={() => setSelectedMediaIndex(index)}
+                  onPress={async () => {
+                    // Stop any playing video before switching
+                    if (videoRef.current) {
+                      await videoRef.current.pauseAsync().catch(() => {});
+                      await videoRef.current.setPositionAsync(0).catch(() => {});
+                    }
+                    setIsVideoPlaying(false);
+                    setSelectedMediaIndex(index);
+                  }}
                 >
                   {isVideoUrl(media) ? (
                     <View style={styles.videoThumb}>
@@ -2268,6 +2330,24 @@ const styles = StyleSheet.create({
     width: '100%',
     height: IMAGE_HEIGHT,
     backgroundColor: '#1E293B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  heroVideo: {
+    width: '100%',
+    height: IMAGE_HEIGHT,
+  },
+  videoPlayOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoPlayBtn: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
   },
