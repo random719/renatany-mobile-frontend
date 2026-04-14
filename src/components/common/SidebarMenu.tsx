@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  Image,
 } from "react-native";
 import { Text } from "react-native-paper";
 import { useI18n } from "../../i18n";
@@ -187,10 +188,10 @@ export const SidebarMenu = () => {
         <View style={styles.header}>
           <View style={styles.logoRow}>
             <View style={styles.logoIcon}>
-              <MaterialCommunityIcons
-                name="home-outline"
-                size={24}
-                color="#FFFFFF"
+              <Image
+                source={require("../../../assets/logo.png")}
+                style={{ width: 28, height: 28, borderRadius: 14 }}
+                resizeMode="cover"
               />
             </View>
             <Text style={styles.logoText}>Rentany</Text>

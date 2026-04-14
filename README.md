@@ -631,6 +631,115 @@ Matching the web app design:
 - **Sidebar on web = Bottom tabs on mobile**
 - Light and dark mode via React Native Paper `MD3LightTheme` / `MD3DarkTheme`
 
+## Platform Workflow (End-to-End)
+
+### Core roles
+- **Guest:** can browse listings; limited actions until sign-in.
+- **Renter:** requests/instant-books items, pays, chats, submits condition reports, downloads receipts, leaves reviews, files disputes.
+- **Owner:** lists items, receives requests, approves/declines (unless instant booking), chats, completes rental (release payment), participates in condition reports, handles disputes.
+- **Admin:** reviews platform reports/disputes, security checks, and moderation actions.
+
+### 1) Browse → Item details
+- User navigates Browse / Categories / search results.
+- Opens Item Details page:
+  - Sees title, category, condition, price/day, availability calendar, share options.
+  - Can start a rental flow from the item.
+
+### 2) Listing an item (Owner)
+- Owner creates a listing:
+  - Basic info: title, description, category, condition, location.
+  - Media: photos/videos.
+  - Pricing & rules: daily rate, deposit, notice period, min/max days, same-day pickup, instant booking toggle, (optional) tiered pricing.
+- Listing becomes visible for renters to browse/rent.
+
+### 3) Rental request vs Instant booking
+**A) Standard request (most common)**
+- Renter submits request for date range (and any required details).
+- Request status becomes pending.
+- Owner reviews in conversations and either:
+  - **Approve:** (Conditional Approval) Status becomes `pending verification`.
+  - **Decline:** Status becomes `declined`.
+  - *(Renter may also cancel → `cancelled`)*
+
+**B) Instant booking (if enabled by owner)**
+- Renter books and is auto-approved conditionally (skips manual approval).
+- Status moves to `pending verification`.
+
+### 4) Conversations / Chat (both parties)
+- Each rental request has a chat thread used for:
+  - Messaging + attachments (photos/docs)
+  - Status updates (system messages)
+  - Actions depending on status (approve/decline, pay, dispute, review, etc.)
+- Tabs in “My Conversations”:
+  - Sent (renter’s outgoing requests)
+  - Inbox/Received (owner’s incoming requests)
+
+### 5) Payment Pre-Auth & KYC Phase (iDenfy)
+- Once status is `pending verification` (after Owner approval or Instant Booking):
+  - Renter completes **Pre-authorisation** (payment hold).
+  - **KYC Check (iDenfy)** is required (for unverified users on their first rental).
+    - *Note:* If it is the Owner's first time renting out an item, the Owner must also pass KYC upon accepting the request.
+  - **If KYC passes** → Booking confirmed (status becomes `approved` or `paid`), and rental can start.
+  - **If KYC fails** → Auto-cancel (status becomes `cancelled`, and pre-authorisation is dropped).
+- **What’s pre-authorized/paid:** Typically: rental cost + platform fee + security deposit (if any).
+- Receipt generation uses the same totals when available.
+
+### 6) Pickup condition reporting (both parties)
+- When status is paid, the platform prompts Pickup Condition Reports.
+- Both renter and owner should submit pickup condition reports (photos/notes) in a defined window around the start date.
+- These reports protect both parties and are required for smooth completion.
+
+### 7) Rental period
+- Item is used during the rental duration.
+- Chat remains the coordination channel.
+- (Optional) renter can request an extension near the end, which the owner can approve/decline.
+
+### 8) Return condition reporting (both parties)
+- After rental ends, the platform prompts Return Condition Reports.
+- Both renter and owner submit return reports (photos/notes) within the allowed window.
+
+### 9) Completion & payout (Owner)
+- After:
+  - rental period ends, and
+  - required pickup + return reports are submitted,
+- Owner can Release Payment to complete the rental:
+  - status becomes completed
+  - owner payout is released according to your payment rules.
+
+### 10) Reviews (both parties)
+- Once completed, users can Leave a Review (rating/comment + optional photos).
+- Reviews are tied to the rental request and shown on profiles/listings.
+
+### 11) Receipts (Renter/Owner)
+- For paid or completed rentals, users can Download Receipt.
+- The PDF receipt includes: parties, dates, item, breakdown (rental, fee, deposit), total paid.
+- Receipt content is generated in the current platform language.
+
+### 12) Disputes (both parties) + Admin resolution
+- Disputes can be filed typically when status is paid/completed.
+- Users upload evidence; admin reviews and resolves per policy.
+- Dispute workflow is managed via the disputes pages and admin dashboards.
+
+### 13) Reporting & moderation
+- Report Listing / Report User flows open a report dialog:
+  - reason + description + evidence upload
+- Reports feed into admin review pages (reports listing, user reports, fraud reports).
+- Admin can mark status, investigate, resolve, and take actions.
+
+### 14) Notifications
+- Bell dropdown shows unread notifications and allows:
+  - Mark all as read
+  - View notification links
+- UI labels are translated; notification content depends on what the backend sends.
+
+### 15) Language / Localization
+- The platform uses a language context (useLanguage) and translation keys.
+- UI text across modals/pages (share, availability calendar, report dialogs, booking success, chat UI, receipts, rental agreement preview, notifications UI) follows the current language.
+
+### Status lifecycle (typical)
+- inquiry (optional) → pending → pending_verification (pre-auth + KYC) → approved (booking confirmed) → paid → completed
+- Alternate endings: declined, cancelled, rejected, archived (cleanup/old threads)
+
 ## Development Commands
 
 ```bash

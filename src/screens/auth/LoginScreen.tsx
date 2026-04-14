@@ -1,16 +1,15 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { Text, TextInput, Button, Divider, HelperText } from 'react-native-paper';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSignIn, useSignUp } from '@clerk/expo/legacy';
+import type { StackNavigationProp } from '@react-navigation/stack';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import { useSignIn, useSignUp } from '@clerk/expo/legacy';
-import { GoogleIcon, FacebookIcon } from '../../components/SocialIcons';
-import { getEmailError, getPasswordError } from '../../utils/validators';
-import { colors, typography } from '../../theme';
+import React, { useState } from 'react';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Button, Divider, HelperText, Text, TextInput } from 'react-native-paper';
+import { FacebookIcon, GoogleIcon } from '../../components/SocialIcons';
 import { useI18n } from '../../i18n';
-import type { StackNavigationProp } from '@react-navigation/stack';
+import { colors, typography } from '../../theme';
 import type { AuthStackParamList } from '../../types/navigation';
+import { getEmailError, getPasswordError } from '../../utils/validators';
 
 type Props = {
   navigation: StackNavigationProp<AuthStackParamList, 'Login'>;
@@ -93,7 +92,7 @@ export const LoginScreen = ({ navigation }: Props) => {
   };
 
   const activateSession = async (sessionId: string | null | undefined) => {
-    if (!sessionId) {
+    if (!sessionId || !setActive) {
       setClerkError('Sign-in completed, but no session was returned.');
       return;
     }
@@ -102,7 +101,7 @@ export const LoginScreen = ({ navigation }: Props) => {
   };
 
   const beginSecondFactorFlow = async (attempt: any) => {
-    const supportedSecondFactors = attempt?.supportedSecondFactors ?? signIn.supportedSecondFactors ?? [];
+    const supportedSecondFactors = attempt?.supportedSecondFactors ?? signIn?.supportedSecondFactors ?? [];
     const hasBackupCode = supportedSecondFactors.some((factor: any) => factor?.strategy === 'backup_code');
     const hasTotp = supportedSecondFactors.some((factor: any) => factor?.strategy === 'totp');
     const emailCodeFactor = supportedSecondFactors.find((factor: any) => factor?.strategy === 'email_code');
@@ -115,7 +114,7 @@ export const LoginScreen = ({ navigation }: Props) => {
     setClerkError(null);
 
     if (emailCodeFactor) {
-      await signIn.prepareSecondFactor({ strategy: 'email_code' } as any);
+      await signIn?.prepareSecondFactor({ strategy: 'email_code' } as any);
       setVerificationStrategy('email_code');
       setVerificationHint(
         emailCodeFactor?.safeIdentifier
@@ -143,7 +142,7 @@ export const LoginScreen = ({ navigation }: Props) => {
   };
 
   const handleSecondFactorVerification = async () => {
-    if (!isLoaded || verificationStrategy === 'none') return;
+    if (!isLoaded || !signIn || verificationStrategy === 'none') return;
     if (!verificationCode.trim()) {
       setClerkError('Verification code is required.');
       return;
@@ -153,7 +152,7 @@ export const LoginScreen = ({ navigation }: Props) => {
     setClerkError(null);
 
     try {
-      const attempt = await signIn.attemptSecondFactor({
+      const attempt = await signIn?.attemptSecondFactor({
         strategy: verificationStrategy,
         code: verificationCode.trim(),
       } as any);
@@ -173,13 +172,13 @@ export const LoginScreen = ({ navigation }: Props) => {
   };
 
   const handleResendVerificationCode = async () => {
-    if (verificationStrategy !== 'email_code') return;
+    if (verificationStrategy !== 'email_code' || !signIn) return;
 
     setIsLoading(true);
     setClerkError(null);
 
     try {
-      await signIn.prepareSecondFactor({ strategy: 'email_code' } as any);
+      await signIn?.prepareSecondFactor({ strategy: 'email_code' } as any);
       setVerificationCode('');
       setVerificationHint('We sent a fresh verification code to your email.');
     } catch (err: any) {
@@ -192,22 +191,22 @@ export const LoginScreen = ({ navigation }: Props) => {
   const handleSignIn = async () => {
     setEmailTouched(true);
     setPasswordTouched(true);
-    if (!isLoaded) {
+    if (!isLoaded || !signIn) {
       setClerkError('Authentication is still loading. Please try again.');
       return;
     }
     if (!canSubmit) return;
 
     // Check if there is already a complete session waiting to be activated
-    if (signIn.status === 'complete' && signIn.createdSessionId) {
-      await activateSession(signIn.createdSessionId);
+    if (signIn?.status === 'complete' && signIn?.createdSessionId) {
+      await activateSession(signIn?.createdSessionId);
       return;
     }
 
     setIsLoading(true);
     setClerkError(null);
     try {
-      const completeSignIn = await signIn.create({
+      const completeSignIn = await signIn?.create({
         strategy: 'password',
         identifier: email.trim().toLowerCase(),
         password,
@@ -227,11 +226,11 @@ export const LoginScreen = ({ navigation }: Props) => {
       }
     } catch (err: any) {
       const errorMessage = err.errors?.[0]?.message;
-      
+
       // Handle "Session already exists" specifically
       if (errorMessage === 'Session already exists') {
-        if (signIn.status === 'complete' && signIn.createdSessionId) {
-          await activateSession(signIn.createdSessionId);
+        if (signIn?.status === 'complete' && signIn?.createdSessionId) {
+          await activateSession(signIn?.createdSessionId);
           return;
         }
       }
@@ -243,14 +242,14 @@ export const LoginScreen = ({ navigation }: Props) => {
   };
 
   const handleGoogleSignIn = async () => {
-    if (!isLoaded || !isSignUpLoaded) return;
+    if (!isLoaded || !isSignUpLoaded || !signIn || !signUp || !setActive) return;
     setIsLoading(true);
     setClerkError(null);
     try {
       const redirectUrl = AuthSession.makeRedirectUri({ path: 'oauth-native-callback' });
-      await signIn.create({ strategy: 'oauth_google', redirectUrl });
+      await signIn?.create({ strategy: 'oauth_google', redirectUrl });
 
-      const verificationUrl = signIn.firstFactorVerification?.externalVerificationRedirectURL?.toString();
+      const verificationUrl = signIn?.firstFactorVerification?.externalVerificationRedirectURL?.toString();
       if (!verificationUrl) {
         setClerkError(t('auth.googleStartFailed'));
         return;
@@ -268,17 +267,17 @@ export const LoginScreen = ({ navigation }: Props) => {
 
       const params = new URL(authSessionResult.url).searchParams;
       const rotatingTokenNonce = params.get('rotating_token_nonce') || '';
-      await signIn.reload({ rotatingTokenNonce });
+      await signIn?.reload({ rotatingTokenNonce });
 
-      if (signIn.status === 'complete' && signIn.createdSessionId) {
-        await setActive({ session: signIn.createdSessionId });
+      if (signIn?.status === 'complete' && signIn?.createdSessionId) {
+        await setActive({ session: signIn?.createdSessionId });
         return;
       }
 
-      if (signIn.firstFactorVerification?.status === 'transferable') {
-        await signUp.create({ transfer: true });
-        if (signUp.createdSessionId) {
-          await setActive({ session: signUp.createdSessionId });
+      if (signIn?.firstFactorVerification?.status === 'transferable') {
+        await signUp?.create({ transfer: true });
+        if (signUp?.createdSessionId) {
+          await setActive({ session: signUp?.createdSessionId });
           return;
         }
       }
@@ -292,14 +291,14 @@ export const LoginScreen = ({ navigation }: Props) => {
   };
 
   const handleFacebookSignIn = async () => {
-    if (!isLoaded || !isSignUpLoaded) return;
+    if (!isLoaded || !isSignUpLoaded || !signIn || !signUp || !setActive) return;
     setIsLoading(true);
     setClerkError(null);
     try {
       const redirectUrl = AuthSession.makeRedirectUri({ path: 'oauth-native-callback' });
-      await signIn.create({ strategy: 'oauth_facebook', redirectUrl });
+      await signIn?.create({ strategy: 'oauth_facebook', redirectUrl });
 
-      const verificationUrl = signIn.firstFactorVerification?.externalVerificationRedirectURL?.toString();
+      const verificationUrl = signIn?.firstFactorVerification?.externalVerificationRedirectURL?.toString();
       if (!verificationUrl) {
         setClerkError(t('auth.facebookStartFailed'));
         return;
@@ -317,17 +316,17 @@ export const LoginScreen = ({ navigation }: Props) => {
 
       const params = new URL(authSessionResult.url).searchParams;
       const rotatingTokenNonce = params.get('rotating_token_nonce') || '';
-      await signIn.reload({ rotatingTokenNonce });
+      await signIn?.reload({ rotatingTokenNonce });
 
-      if (signIn.status === 'complete' && signIn.createdSessionId) {
-        await setActive({ session: signIn.createdSessionId });
+      if (signIn?.status === 'complete' && signIn?.createdSessionId) {
+        await setActive({ session: signIn?.createdSessionId });
         return;
       }
 
-      if (signIn.firstFactorVerification?.status === 'transferable') {
-        await signUp.create({ transfer: true });
-        if (signUp.createdSessionId) {
-          await setActive({ session: signUp.createdSessionId });
+      if (signIn?.firstFactorVerification?.status === 'transferable') {
+        await signUp?.create({ transfer: true });
+        if (signUp?.createdSessionId) {
+          await setActive({ session: signUp?.createdSessionId });
           return;
         }
       }
@@ -353,8 +352,11 @@ export const LoginScreen = ({ navigation }: Props) => {
           {/* Logo */}
           <View style={styles.logoContainer}>
             <View style={styles.logoCircle}>
-              <MaterialCommunityIcons name="home-outline" size={32} color="#FFFFFF" />
-              <Text style={styles.logoText}>{t('auth.rentable')}</Text>
+              <Image
+                source={require('../../../assets/logo.png')}
+                style={{ width: 64, height: 64, borderRadius: 32 }}
+                resizeMode="cover"
+              />
             </View>
           </View>
 

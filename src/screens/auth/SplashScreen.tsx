@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Image } from 'react-native';
 import { Text, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, typography } from '../../theme';
@@ -21,8 +21,11 @@ export const SplashScreen = ({ navigation }: Props) => {
   return (
     <View style={styles.container}>
       <View style={styles.logoCircle}>
-        <MaterialCommunityIcons name="home-outline" size={48} color="#FFFFFF" />
-        <Text style={styles.logoLabel}>Rentable</Text>
+        <Image
+          source={require('../../../assets/logo.png')}
+          style={{ width: 80, height: 80, borderRadius: 40 }}
+          resizeMode="cover"
+        />
       </View>
       <Text style={styles.appName}>Rentany</Text>
       <Text style={styles.tagline}>Rent anything, from anyone.</Text>
