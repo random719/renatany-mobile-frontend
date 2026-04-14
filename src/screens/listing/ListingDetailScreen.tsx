@@ -27,6 +27,7 @@ import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { ListingCard } from '../../components/listing/ListingCard';
 import { api } from '../../services/api';
+import { idenfyService } from '../../services/idenfyService';
 import { getRentalRequests } from '../../services/bookingService';
 import * as listingService from '../../services/listingService';
 import { sendMessage } from '../../services/messageService';
@@ -608,10 +609,8 @@ export const ListingDetailScreen = () => {
   }, [backendUser, refreshBackendUser]);
 
   const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://172.28.145.1:5000/api').replace(/\/api$/, '');
-  const identityReturnUrl = `${API_BASE}/api/stripe/app-return/identity`;
   const cardReturnUrl = `${API_BASE}/api/stripe/app-return/profile`;
   const bankReturnUrl = `${API_BASE}/api/stripe/app-return/stripe/confirm`;
-  const nativeIdentityCallback = 'rentany://identity-verified';
   const nativeCardCallback = 'rentany://payment-setup-complete';
   const nativeBankCallback = 'rentany://bank-connect-complete';
 
@@ -624,18 +623,12 @@ export const ListingDetailScreen = () => {
   const handleStartKyc = async () => {
     setIsStartingKyc(true);
     try {
-      const res = await api.post('/stripe/identity/create-session', {
-        from: 'rental-request',
-        item_id: listing?.id,
-        mobile_return_url: identityReturnUrl,
-      });
-      const url = res.data?.data?.url || res.data?.url;
-      if (!url) {
-        toast.error(t('listingDetail.verificationStartFailed'));
-        setIsStartingKyc(false);
-        return;
-      }
-      openStripeAndWatchReturn(url, nativeIdentityCallback, async () => {
+      // Launch native iDenfy SDK
+      const result = await idenfyService.startVerification();
+
+      if (result) {
+        // Even if SDK returns, we poll the backend to ensure the webhook status 
+        // has propagated to the user model.
         const latestUser = await waitForVerifiedKyc();
         const latestKycStatus = latestUser?.kyc_status;
 
@@ -644,18 +637,20 @@ export const ListingDetailScreen = () => {
           setIdentityVerificationReason(null);
           toast.success(t('listingDetail.verificationComplete'));
         } else if (latestKycStatus === 'failed') {
+          // If SDK says OK but backend says failed, it might be a suspicious result
           setShowIdentityVerificationCard(true);
           toast.error(t('listingDetail.verificationRetry'));
         } else {
+          // Likely status is still 'pending'
           setShowIdentityVerificationCard(false);
           setIdentityVerificationReason(null);
           toast.info(t('listingDetail.verificationSubmitted'));
         }
-
-        setIsStartingKyc(false);
-      });
+      }
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || t('listingDetail.startVerificationFailed'));
+      const errorMsg = err?.response?.data?.error || err?.message || t('listingDetail.startVerificationFailed');
+      toast.error(errorMsg);
+    } finally {
       setIsStartingKyc(false);
     }
   };

@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.rentany.app"
+      "bundleIdentifier": "com.rentany.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "RentAny needs camera access to verify your identity."
+      }
     },
     "android": {
       "package": "com.rentany.app",
