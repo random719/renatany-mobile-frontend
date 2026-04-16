@@ -3,7 +3,7 @@ export interface RentalRequest {
   item_id: string;
   renter_email: string;
   owner_email: string;
-  status: 'pending' | 'approved' | 'rejected' | 'paid' | 'cancelled' | 'completed' | 'inquiry' | 'declined';
+  status: 'pending' | 'pending_verification' | 'approved' | 'rejected' | 'paid' | 'cancelled' | 'completed' | 'inquiry' | 'declined';
   start_date: string;
   end_date: string;
   total_amount: number;

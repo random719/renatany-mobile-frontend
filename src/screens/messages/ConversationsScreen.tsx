@@ -47,7 +47,7 @@ export const ConversationsScreen = () => {
 
             const allRentals = [...asRenter, ...asOwner];
             const uniqueRentals = Array.from(new Map(allRentals.map(r => [r.id, r])).values());
-            const activeRentals = uniqueRentals.filter(r => ['pending', 'approved', 'paid', 'inquiry'].includes(r.status));
+            const activeRentals = uniqueRentals.filter(r => ['pending', 'approved', 'paid', 'inquiry', 'pending_verification'].includes(r.status));
             activeRentals.sort((a, b) => new Date(b.updated_date).getTime() - new Date(a.updated_date).getTime());
             setConversations(activeRentals);
 
@@ -80,8 +80,8 @@ export const ConversationsScreen = () => {
         }, [fetchConversations])
     );
 
-    const sentByMe = conversations.filter(c => c.renter_email === userEmail);
-    const inInbox = conversations.filter(c => c.owner_email === userEmail);
+    const sentByMe = conversations.filter(c => c.renter_email?.toLowerCase() === userEmail?.toLowerCase());
+    const inInbox = conversations.filter(c => c.owner_email?.toLowerCase() === userEmail?.toLowerCase());
     const displayedConversations = activeTab === 'sent' ? sentByMe : inInbox;
     const totalActive = conversations.length;
 
@@ -324,10 +324,10 @@ export const ConversationsScreen = () => {
                     visible={reportModalVisible}
                     transparent
                     animationType="fade"
-                    onRequestClose={closeReportUserModal}
+                    onRequestClose={() => closeReportUserModal()}
                 >
                     <View style={styles.modalOverlay}>
-                        <Pressable style={styles.modalBackdrop} onPress={closeReportUserModal} />
+                        <Pressable style={styles.modalBackdrop} onPress={() => closeReportUserModal()} />
                         <View style={styles.modalCard}>
                             <Text style={styles.modalTitle}>{t('conversations.reportUser')}</Text>
                             <Text style={styles.modalSubtitle}>
@@ -354,7 +354,7 @@ export const ConversationsScreen = () => {
                             <View style={styles.modalActions}>
                                 <Button
                                     mode="text"
-                                    onPress={closeReportUserModal}
+                                    onPress={() => closeReportUserModal()}
                                     disabled={isSubmittingReport}
                                     textColor="#64748B"
                                 >

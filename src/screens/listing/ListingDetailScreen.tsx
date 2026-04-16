@@ -502,36 +502,7 @@ export const ListingDetailScreen = () => {
       const startDate = new Date(sorted[0]).toISOString();
       const endDate = new Date(sorted[sorted.length - 1]).toISOString();
 
-      const kycCheckRes = await api.get('/rental-requests/kyc-check', {
-        params: {
-          item_id: listing.id,
-          start_date: startDate,
-          end_date: endDate,
-        },
-      }).catch(() => null);
-      const kycCheck = kycCheckRes?.data?.data;
 
-      if (kycCheck?.user_kyc_status) {
-        setBackendUser((prev: any) => ({
-          ...(prev || {}),
-          kyc_status: kycCheck.user_kyc_status,
-        }));
-      }
-
-      if (kycCheck?.kyc_required) {
-        if (kycCheck.user_kyc_status === 'pending') {
-          toast.info(t('listingDetail.kycProcessing'));
-          return;
-        }
-        const riskLabel = kycCheck.risk_trigger === 'amount'
-          ? t('listingDetail.riskHighValue')
-          : kycCheck.risk_trigger === 'category'
-            ? t('listingDetail.riskHighCategory')
-            : t('listingDetail.riskVerificationRequired');
-        setIdentityVerificationReason(riskLabel);
-        setShowIdentityVerificationCard(true);
-        return;
-      }
 
       const ownerEmail = owner?.email ?? listing.ownerId;
       const res = await api.post('/rental-requests', {
@@ -564,17 +535,7 @@ export const ListingDetailScreen = () => {
       setRequestSentSuccessfully(true);
     } catch (err: any) {
       const data = err?.response?.data;
-      if (data?.kyc_required) {
-        if (backendUser?.kyc_status === 'pending') {
-          toast.info(t('listingDetail.kycProcessing'));
-        } else {
-          const riskLabel = data.risk_trigger === 'amount' ? t('listingDetail.riskHighValue') : data.risk_trigger === 'category' ? t('listingDetail.riskHighCategory') : t('listingDetail.riskVerificationRequired');
-          setIdentityVerificationReason(riskLabel);
-          setShowIdentityVerificationCard(true);
-        }
-      } else {
-        toast.error(data?.error || t('listingDetail.submitRequestFailed'));
-      }
+      toast.error(data?.error || t('listingDetail.submitRequestFailed'));
     } finally {
       setIsSubmittingRental(false);
     }
@@ -623,10 +584,21 @@ export const ListingDetailScreen = () => {
   const handleStartKyc = async () => {
     setIsStartingKyc(true);
     try {
-      // Launch native iDenfy SDK
+      // Launch native iDenfy SDK (with web fallback if not linked)
       const result = await idenfyService.startVerification();
+      if (!result) return;
 
-      if (result) {
+      if (result.method === 'web') {
+        const idenfyReturnUrl = 'rentany://idenfy-complete'; // or profile redirect
+        await WebBrowser.openAuthSessionAsync(result.url, idenfyReturnUrl);
+        setIsStartingKyc(false);
+        // After browser closes, poll backend
+        await waitForVerifiedKyc();
+        return;
+      }
+
+      const sdkResult = result.result;
+      if (sdkResult) {
         // Even if SDK returns, we poll the backend to ensure the webhook status 
         // has propagated to the user model.
         const latestUser = await waitForVerifiedKyc();
