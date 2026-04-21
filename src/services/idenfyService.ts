@@ -16,10 +16,14 @@ export const idenfyService = {
    * Calls the backend to get a session token, then launches the native SDK.
    * If the native SDK is not linked (Expo Go), it returns the web redirect URL.
    */
-  startVerification: async (): Promise<IdenfyVerificationResult | null> => {
+  startVerification: async (params?: {
+    successUrl?: string;
+    errorUrl?: string;
+    callbackUrl?: string;
+  }): Promise<IdenfyVerificationResult | null> => {
     try {
       // 1. Obtain an authentication token and redirect URL from the backend
-      const res = await api.post('/idenfy/create-token');
+      const res = await api.post('/idenfy/create-token', params);
       const authToken = res.data?.data?.authToken;
       const redirectUrl = res.data?.data?.redirectUrl;
 
@@ -59,6 +63,18 @@ export const idenfyService = {
         apiError,
         fullError: error,
       });
+      throw error;
+    }
+  },
+
+  /**
+   * (Development only) Manually force verification for the current user.
+   */
+  testForceVerify: async (): Promise<void> => {
+    try {
+      await api.post('/idenfy/test-force-verify');
+    } catch (error) {
+      console.error('[idenfyService] Force Verify Error:', error);
       throw error;
     }
   },

@@ -520,7 +520,12 @@ export const ChatScreen = () => {
     if (!rental) return;
     setIsStartingKyc(true);
     try {
-      const result = await idenfyService.startVerification();
+      const idenfyReturnUrl = 'rentany://idenfy-complete';
+      const result = await idenfyService.startVerification({
+        successUrl: idenfyReturnUrl,
+        errorUrl: idenfyReturnUrl,
+        callbackUrl: `${API_BASE}/idenfy/webhook`,
+      });
       if (!result) return;
 
       if (result.method === 'web') {
@@ -655,20 +660,43 @@ export const ChatScreen = () => {
               </TouchableOpacity>
             ) : null}
             {canVerify ? (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.primaryAction, { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]}
-                onPress={handleStartKyc}
-                disabled={isStartingKyc || isUpdatingStatus}
-              >
-                {isStartingKyc ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <MaterialCommunityIcons name="shield-account-outline" size={18} color="#FFFFFF" />
-                    <Text style={styles.primaryActionText}>{t('chat.verifyIdentity') || 'Verify Identity'}</Text>
-                  </>
+              <View style={{ gap: 8, flex: 1, flexDirection: 'row' }}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.primaryAction, { flex: 1, backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]}
+                  onPress={handleStartKyc}
+                  disabled={isStartingKyc || isUpdatingStatus}
+                >
+                  {isStartingKyc ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name="shield-account-outline" size={18} color="#FFFFFF" />
+                      <Text style={styles.primaryActionText}>{t('chat.verifyIdentity') || 'Verify Identity'}</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                {__DEV__ && (
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.secondaryAction, { flex: 0.4, borderColor: '#DC2626' }]}
+                    onPress={async () => {
+                      try {
+                        setIsStartingKyc(true);
+                        await idenfyService.testForceVerify();
+                        toast.success('Force Verified!');
+                        await loadChatData(true);
+                      } catch (e: any) {
+                        toast.error('Force Verify Failed');
+                      } finally {
+                        setIsStartingKyc(false);
+                      }
+                    }}
+                    disabled={isStartingKyc || isUpdatingStatus}
+                  >
+                    <MaterialCommunityIcons name="test-tube" size={18} color="#DC2626" />
+                    <Text style={[styles.secondaryActionText, { color: '#DC2626' }]}>Force</Text>
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
+              </View>
             ) : null}
             {canCancel ? (
               <TouchableOpacity

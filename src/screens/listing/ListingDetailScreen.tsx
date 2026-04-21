@@ -585,7 +585,12 @@ export const ListingDetailScreen = () => {
     setIsStartingKyc(true);
     try {
       // Launch native iDenfy SDK (with web fallback if not linked)
-      const result = await idenfyService.startVerification();
+      const idenfyReturnUrl = 'rentany://idenfy-complete'; // or profile redirect
+      const result = await idenfyService.startVerification({
+        successUrl: idenfyReturnUrl,
+        errorUrl: idenfyReturnUrl,
+        callbackUrl: `${API_BASE}/idenfy/webhook`,
+      });
       if (!result) return;
 
       if (result.method === 'web') {
@@ -1282,6 +1287,41 @@ export const ListingDetailScreen = () => {
               </View>
 
               <View style={styles.connectActions}>
+                <View style={{ gap: 8, flexDirection: 'row' }}>
+                  <TouchableOpacity
+                    style={[styles.identityPrimaryBtn, { flex: 1, backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]}
+                    onPress={handleStartKyc}
+                    disabled={isStartingKyc}
+                  >
+                    {isStartingKyc ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.identityPrimaryBtnText}>{t('listingDetail.verifyNow')}</Text>
+                    )}
+                  </TouchableOpacity>
+                  {__DEV__ && (
+                    <TouchableOpacity
+                      style={[styles.identityPrimaryBtn, { flex: 0.4, backgroundColor: '#FFFFFF', borderColor: '#DC2626', borderWidth: 1 }]}
+                      onPress={async () => {
+                        try {
+                          setIsStartingKyc(true);
+                          await idenfyService.testForceVerify();
+                          toast.success('Force Verified!');
+                          setShowIdentityVerificationCard(false);
+                          setIdentityVerificationReason(null);
+                          await refreshBackendUser();
+                        } catch (e: any) {
+                          toast.error('Force Verify Failed');
+                        } finally {
+                          setIsStartingKyc(false);
+                        }
+                      }}
+                      disabled={isStartingKyc}
+                    >
+                      <Text style={[styles.identityPrimaryBtnText, { color: '#DC2626' }]}>Force</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <TouchableOpacity
                   style={[styles.connectCardBtnRent, isConnectingCard && styles.connectCardBtnDisabled]}
                   onPress={handleConnectCard}
