@@ -355,8 +355,20 @@ export const ChatScreen = () => {
         setConfirmModal(null);
         setIsUpdatingStatus(true);
         try {
-          await updateRentalRequestStatus(rental.id, nextStatus);
-          await sendSystemNote(options.systemMessage);
+          const updated = await updateRentalRequestStatus(rental.id, nextStatus);
+          
+          let actualSystemMessage = options.systemMessage;
+          // If the backend auto-promoted the status or if we transition to pending_verification,
+          // adjust the system message for clarity.
+          if (nextStatus === 'pending_verification') {
+            if (updated.status === 'pending_verification') {
+              actualSystemMessage = t('chat.approvePendingVerificationSystem');
+            } else {
+              actualSystemMessage = t('chat.approveSystem');
+            }
+          }
+
+          await sendSystemNote(actualSystemMessage);
           await loadChatData(true);
         } catch (error: any) {
           toast.error(error?.response?.data?.error || error?.message || t('chat.actionFailed'));
@@ -528,22 +540,39 @@ export const ChatScreen = () => {
       }
 
       const sdkResult = result.result;
-      const autoStatus = sdkResult.autoIdentificationStatus;
-      const manualStatus = sdkResult.manualIdentificationStatus;
-      if (autoStatus === 'APPROVED' || autoStatus === 'FAILED' || manualStatus === 'APPROVED' || manualStatus === 'FAILED') {
-        const isApproved = autoStatus === 'APPROVED' || manualStatus === 'APPROVED';
-        setBackendUser((prev: any) => ({ ...prev, kyc_status: isApproved ? 'verified' : 'failed' }));
-        
-        if (isApproved) {
+      if (sdkResult) {
+        // Poll for backend synchronization
+        const latestUser = await waitForVerifiedKyc();
+        const finalStatus = latestUser?.kyc_status;
+
+        if (finalStatus === 'verified') {
             await sendSystemNote(t('chat.identityVerifiedNote') || 'Identity verified securely');
             toast.success(t('chat.identityVerified') || 'Identity Verified!');
-            // Trigger backend to re-evaluate the promotion to 'approved'
             await updateRentalRequestStatus(rental.id, 'pending_verification').catch(() => {});
-        } else {
+        } else if (finalStatus === 'failed') {
             toast.error(t('chat.identityFailed') || 'Identity verification failed');
+        } else {
+            // Webhook delayed: rely on SDK optimistic result
+            const autoStatus = sdkResult.autoIdentificationStatus;
+            const manualStatus = sdkResult.manualIdentificationStatus;
+            const isApproved = autoStatus === 'APPROVED' || manualStatus === 'APPROVED';
+            
+            setBackendUser((prev: any) => ({ ...prev, kyc_status: isApproved ? 'verified' : 'failed' }));
+            
+            if (isApproved) {
+                await sendSystemNote(t('chat.identityVerifiedNote') || 'Identity verified securely');
+                toast.success(t('chat.identityVerified') || 'Identity Verified!');
+                await updateRentalRequestStatus(rental.id, 'pending_verification').catch(() => {});
+            } else {
+                toast.error(t('chat.identityFailed') || 'Identity verification failed');
+            }
         }
       }
-      await loadChatData(true);
+      
+      // Load chat data without overwriting the user data
+      setIsLoading(true);
+      await Promise.all([loadMessages(true), loadRental()]);
+      setIsLoading(false);
     } catch (e: any) {
       const errorMsg = e.response?.data?.error || e.message || t('chat.kycError');
       toast.error(errorMsg);
@@ -588,7 +617,7 @@ export const ChatScreen = () => {
                   onPress={() => handleStatusAction('pending_verification', {
                     title: t('chat.approveTitle'),
                     message: t('chat.approvePrompt'),
-                    systemMessage: t('chat.approveSystem'),
+                    systemMessage: t('chat.approveSystem'), // Default; handled conditionally in handleStatusAction
                   })}
                   disabled={isUpdatingStatus}
                 >

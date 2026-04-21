@@ -12,6 +12,8 @@ interface AuthState {
   logout: () => void;
   clearError: () => void;
   setToken: (token: string | null) => void;
+  getTokenFunc: (() => Promise<string | null>) | null;
+  setGetTokenFunc: (fn: (() => Promise<string | null>) | null) => void;
 }
 
 export const useAuthStore = create<AuthState>()(persist((set) => ({
@@ -20,6 +22,7 @@ export const useAuthStore = create<AuthState>()(persist((set) => ({
   isLoading: false,
   error: null,
   isAuthenticated: false,
+  getTokenFunc: null,
 
   logout: () => {
     set({ user: null, token: null, isAuthenticated: false, error: null });
@@ -28,6 +31,8 @@ export const useAuthStore = create<AuthState>()(persist((set) => ({
   clearError: () => set({ error: null }),
 
   setToken: (token) => set({ token }),
+  
+  setGetTokenFunc: (fn) => set({ getTokenFunc: fn }),
 }), {
   name: 'auth-storage',
   storage: createJSONStorage(() => AsyncStorage),

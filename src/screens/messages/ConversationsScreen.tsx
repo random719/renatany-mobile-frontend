@@ -122,13 +122,14 @@ export const ConversationsScreen = () => {
 
     const renderCard = (conv: RentalRequest) => {
         const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-            pending:   { label: t('conversations.status.pending'),   bg: '#FEF9C3', text: '#854D0E' },
-            approved:  { label: t('conversations.status.approved'),  bg: '#DCFCE7', text: '#166534' },
-            paid:      { label: t('conversations.status.paid'),      bg: '#F3E8FF', text: '#6B21A8' },
-            inquiry:   { label: t('conversations.status.inquiry'),   bg: '#E0F2FE', text: '#075985' },
-            completed: { label: t('conversations.status.completed'), bg: '#F1F5F9', text: '#334155' },
-            declined:  { label: t('conversations.status.declined'),  bg: '#FEE2E2', text: '#991B1B' },
-            cancelled: { label: t('conversations.status.cancelled'), bg: '#F1F5F9', text: '#64748B' },
+            pending:              { label: t('conversations.status.pending'),              bg: '#FEF9C3', text: '#854D0E' },
+            pending_verification: { label: t('conversations.status.pending_verification'), bg: '#FEF9C3', text: '#854D0E' },
+            approved:             { label: t('conversations.status.approved'),             bg: '#DCFCE7', text: '#166534' },
+            paid:                 { label: t('conversations.status.paid'),                 bg: '#F3E8FF', text: '#6B21A8' },
+            inquiry:              { label: t('conversations.status.inquiry'),              bg: '#E0F2FE', text: '#075985' },
+            completed:            { label: t('conversations.status.completed'),            bg: '#F1F5F9', text: '#334155' },
+            declined:             { label: t('conversations.status.declined'),             bg: '#FEE2E2', text: '#991B1B' },
+            cancelled:            { label: t('conversations.status.cancelled'),            bg: '#F1F5F9', text: '#64748B' },
         };
         const item = itemsMap[conv.item_id];
         const status = STATUS_CONFIG[conv.status] ?? { label: conv.status.toUpperCase(), bg: '#F1F5F9', text: '#334155' };
@@ -162,7 +163,7 @@ export const ConversationsScreen = () => {
                                 {item ? (item.title || t('conversations.untitledItem')) : t('common.loading')}
                             </Text>
                             <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-                                <Text style={[styles.statusText, { color: status.text }]}>{status.label}</Text>
+                                <Text style={[styles.statusText, { color: status.text }]} numberOfLines={1}>{status.label}</Text>
                             </View>
                         </View>
 
@@ -549,7 +550,7 @@ const styles = StyleSheet.create({
     },
     cardTitleRow: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        alignItems: 'center', // Vertically center badge with title
         justifyContent: 'space-between',
         gap: 8,
         marginBottom: 4,
@@ -566,14 +567,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 6,
         paddingVertical: 2,
         flexShrink: 0,
+        maxWidth: '50%',
     },
     statusText: {
-        fontSize: 10,
+        fontSize: 9, // Slightly smaller to ensure "Pending Verification" fits
         fontWeight: '700',
+        textAlign: 'center',
     },
     cardInfoRow: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         gap: 4,
     },
     cardInfoText: {
