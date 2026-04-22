@@ -922,7 +922,7 @@ export const ListingDetailScreen = () => {
             {listing.instant_booking && (
               <View style={styles.instantBadge}>
                 <MaterialCommunityIcons name="lightning-bolt" size={14} color="#FFFFFF" />
-                <Text style={styles.instantBadgeText}>{t('listingDetail.instantBooking')}</Text>
+                <Text variant="labelSmall" style={styles.instantBadgeText}>{t('listingDetail.instantBooking')}</Text>
               </View>
             )}
           </View>
@@ -934,7 +934,7 @@ export const ListingDetailScreen = () => {
               data={displayMedia}
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.thumbnailList}
+              contentContainerStyle={styles.thumbnailList as any}
               keyExtractor={(_, index) => `thumb-${index}`}
               renderItem={({ item: media, index }) => (
                 <TouchableOpacity
@@ -1287,41 +1287,40 @@ export const ListingDetailScreen = () => {
               </View>
 
               <View style={styles.connectActions}>
-                <View style={{ gap: 8, flexDirection: 'row' }}>
+                <TouchableOpacity
+                  style={[styles.identityPrimaryBtn, { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]}
+                  onPress={handleStartKyc}
+                  disabled={isStartingKyc}
+                >
+                  {isStartingKyc ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.identityPrimaryBtnText}>{t('listingDetail.verifyNow')}</Text>
+                  )}
+                </TouchableOpacity>
+
+                {__DEV__ && (
                   <TouchableOpacity
-                    style={[styles.identityPrimaryBtn, { flex: 1, backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]}
-                    onPress={handleStartKyc}
+                    style={{ alignSelf: 'center', marginTop: 4, paddingVertical: 4, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#D1D5DB' }}
+                    onPress={async () => {
+                      try {
+                        setIsStartingKyc(true);
+                        await idenfyService.testForceVerify();
+                        toast.success('Force Verified!');
+                        setShowIdentityVerificationCard(false);
+                        setIdentityVerificationReason(null);
+                        await refreshBackendUser();
+                      } catch (e: any) {
+                        toast.error('Force Verify Failed');
+                      } finally {
+                        setIsStartingKyc(false);
+                      }
+                    }}
                     disabled={isStartingKyc}
                   >
-                    {isStartingKyc ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.identityPrimaryBtnText}>{t('listingDetail.verifyNow')}</Text>
-                    )}
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#9CA3AF' }}>DEV: Force Verify User</Text>
                   </TouchableOpacity>
-                  {__DEV__ && (
-                    <TouchableOpacity
-                      style={[styles.identityPrimaryBtn, { flex: 0.4, backgroundColor: '#FFFFFF', borderColor: '#DC2626', borderWidth: 1 }]}
-                      onPress={async () => {
-                        try {
-                          setIsStartingKyc(true);
-                          await idenfyService.testForceVerify();
-                          toast.success('Force Verified!');
-                          setShowIdentityVerificationCard(false);
-                          setIdentityVerificationReason(null);
-                          await refreshBackendUser();
-                        } catch (e: any) {
-                          toast.error('Force Verify Failed');
-                        } finally {
-                          setIsStartingKyc(false);
-                        }
-                      }}
-                      disabled={isStartingKyc}
-                    >
-                      <Text style={[styles.identityPrimaryBtnText, { color: '#DC2626' }]}>Force</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+                )}
                 <TouchableOpacity
                   style={[styles.connectCardBtnRent, isConnectingCard && styles.connectCardBtnDisabled]}
                   onPress={handleConnectCard}
