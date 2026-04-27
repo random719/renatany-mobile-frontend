@@ -12,11 +12,27 @@ export const api = axios.create({
 
 import { useAuthStore } from '../store/authStore';
 
-api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().token;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+api.interceptors.request.use(async (config) => {
+  const getTokenFunc = useAuthStore.getState().getTokenFunc;
+  
+  if (getTokenFunc) {
+      try {
+          const freshToken = await getTokenFunc();
+          if (freshToken) {
+              useAuthStore.getState().setToken(freshToken); // Update fallback token
+              config.headers.Authorization = `Bearer ${freshToken}`;
+          }
+      } catch (error) {
+          console.warn("Failed to retrieve fresh Clerk token", error);
+      }
+  } else {
+      // Fallback if getTokenFunc is not set yet
+      const token = useAuthStore.getState().token;
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
   }
+  
   return config;
 });
 

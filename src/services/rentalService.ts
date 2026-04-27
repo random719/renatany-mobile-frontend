@@ -13,7 +13,7 @@ export const getRentalRequestById = async (id: string): Promise<RentalRequest> =
 
 export const updateRentalRequestStatus = async (
   id: string,
-  status: 'approved' | 'declined' | 'cancelled',
+  status: 'approved' | 'declined' | 'cancelled' | 'pending_verification',
   message?: string,
 ): Promise<RentalRequest> => {
   const response = await api.put(`/rental-requests/${id}`, {

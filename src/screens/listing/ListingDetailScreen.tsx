@@ -3,6 +3,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as WebBrowser from 'expo-web-browser';
+import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -26,6 +27,7 @@ import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { Footer } from '../../components/home/Footer';
 import { ListingCard } from '../../components/listing/ListingCard';
 import { api } from '../../services/api';
+import { idenfyService } from '../../services/idenfyService';
 import { getRentalRequests } from '../../services/bookingService';
 import * as listingService from '../../services/listingService';
 import { sendMessage } from '../../services/messageService';
@@ -52,7 +54,15 @@ const REPORT_REASON_VALUES = [
   'other',
 ] as const;
 
-const isVideoUrl = (url: string): boolean => /\.(mp4|mov|webm)$/i.test(url);
+const isVideoUrl = (url: string): boolean => {
+  if (!url) return false;
+  // Strip query params (S3 presigned URLs have ?X-Amz-... after the extension)
+  const cleanPath = url.split('?')[0];
+  if (/\.(mp4|mov|webm|avi|m4v|mkv)$/i.test(cleanPath)) return true;
+  // Fallback: check if the S3 folder path contains /videos/
+  if (/\/videos\//i.test(cleanPath)) return true;
+  return false;
+};
 
 export const ListingDetailScreen = () => {
   const { language, t } = useI18n();
@@ -111,6 +121,8 @@ export const ListingDetailScreen = () => {
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showAIChat, setShowAIChat] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const videoRef = useRef<Video>(null);
   const reportReasons = REPORT_REASON_VALUES.map((value) => ({
     value,
     label: t(`listingDetail.reportReasons.${value}`),
@@ -490,36 +502,7 @@ export const ListingDetailScreen = () => {
       const startDate = new Date(sorted[0]).toISOString();
       const endDate = new Date(sorted[sorted.length - 1]).toISOString();
 
-      const kycCheckRes = await api.get('/rental-requests/kyc-check', {
-        params: {
-          item_id: listing.id,
-          start_date: startDate,
-          end_date: endDate,
-        },
-      }).catch(() => null);
-      const kycCheck = kycCheckRes?.data?.data;
 
-      if (kycCheck?.user_kyc_status) {
-        setBackendUser((prev: any) => ({
-          ...(prev || {}),
-          kyc_status: kycCheck.user_kyc_status,
-        }));
-      }
-
-      if (kycCheck?.kyc_required) {
-        if (kycCheck.user_kyc_status === 'pending') {
-          toast.info(t('listingDetail.kycProcessing'));
-          return;
-        }
-        const riskLabel = kycCheck.risk_trigger === 'amount'
-          ? t('listingDetail.riskHighValue')
-          : kycCheck.risk_trigger === 'category'
-            ? t('listingDetail.riskHighCategory')
-            : t('listingDetail.riskVerificationRequired');
-        setIdentityVerificationReason(riskLabel);
-        setShowIdentityVerificationCard(true);
-        return;
-      }
 
       const ownerEmail = owner?.email ?? listing.ownerId;
       const res = await api.post('/rental-requests', {
@@ -552,17 +535,7 @@ export const ListingDetailScreen = () => {
       setRequestSentSuccessfully(true);
     } catch (err: any) {
       const data = err?.response?.data;
-      if (data?.kyc_required) {
-        if (backendUser?.kyc_status === 'pending') {
-          toast.info(t('listingDetail.kycProcessing'));
-        } else {
-          const riskLabel = data.risk_trigger === 'amount' ? t('listingDetail.riskHighValue') : data.risk_trigger === 'category' ? t('listingDetail.riskHighCategory') : t('listingDetail.riskVerificationRequired');
-          setIdentityVerificationReason(riskLabel);
-          setShowIdentityVerificationCard(true);
-        }
-      } else {
-        toast.error(data?.error || t('listingDetail.submitRequestFailed'));
-      }
+      toast.error(data?.error || t('listingDetail.submitRequestFailed'));
     } finally {
       setIsSubmittingRental(false);
     }
@@ -597,10 +570,8 @@ export const ListingDetailScreen = () => {
   }, [backendUser, refreshBackendUser]);
 
   const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://172.28.145.1:5000/api').replace(/\/api$/, '');
-  const identityReturnUrl = `${API_BASE}/api/stripe/app-return/identity`;
   const cardReturnUrl = `${API_BASE}/api/stripe/app-return/profile`;
   const bankReturnUrl = `${API_BASE}/api/stripe/app-return/stripe/confirm`;
-  const nativeIdentityCallback = 'rentany://identity-verified';
   const nativeCardCallback = 'rentany://payment-setup-complete';
   const nativeBankCallback = 'rentany://bank-connect-complete';
 
@@ -613,18 +584,28 @@ export const ListingDetailScreen = () => {
   const handleStartKyc = async () => {
     setIsStartingKyc(true);
     try {
-      const res = await api.post('/stripe/identity/create-session', {
-        from: 'rental-request',
-        item_id: listing?.id,
-        mobile_return_url: identityReturnUrl,
+      // Launch native iDenfy SDK (with web fallback if not linked)
+      const idenfyReturnUrl = 'rentany://idenfy-complete'; // or profile redirect
+      const result = await idenfyService.startVerification({
+        successUrl: idenfyReturnUrl,
+        errorUrl: idenfyReturnUrl,
+        callbackUrl: `${API_BASE}/idenfy/webhook`,
       });
-      const url = res.data?.data?.url || res.data?.url;
-      if (!url) {
-        toast.error(t('listingDetail.verificationStartFailed'));
+      if (!result) return;
+
+      if (result.method === 'web') {
+        const idenfyReturnUrl = 'rentany://idenfy-complete'; // or profile redirect
+        await WebBrowser.openAuthSessionAsync(result.url, idenfyReturnUrl);
         setIsStartingKyc(false);
+        // After browser closes, poll backend
+        await waitForVerifiedKyc();
         return;
       }
-      openStripeAndWatchReturn(url, nativeIdentityCallback, async () => {
+
+      const sdkResult = result.result;
+      if (sdkResult) {
+        // Even if SDK returns, we poll the backend to ensure the webhook status 
+        // has propagated to the user model.
         const latestUser = await waitForVerifiedKyc();
         const latestKycStatus = latestUser?.kyc_status;
 
@@ -633,18 +614,20 @@ export const ListingDetailScreen = () => {
           setIdentityVerificationReason(null);
           toast.success(t('listingDetail.verificationComplete'));
         } else if (latestKycStatus === 'failed') {
+          // If SDK says OK but backend says failed, it might be a suspicious result
           setShowIdentityVerificationCard(true);
           toast.error(t('listingDetail.verificationRetry'));
         } else {
+          // Likely status is still 'pending'
           setShowIdentityVerificationCard(false);
           setIdentityVerificationReason(null);
           toast.info(t('listingDetail.verificationSubmitted'));
         }
-
-        setIsStartingKyc(false);
-      });
+      }
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || t('listingDetail.startVerificationFailed'));
+      const errorMsg = err?.response?.data?.error || err?.message || t('listingDetail.startVerificationFailed');
+      toast.error(errorMsg);
+    } finally {
       setIsStartingKyc(false);
     }
   };
@@ -869,8 +852,51 @@ export const ListingDetailScreen = () => {
           <View style={styles.mainMediaWrapper}>
             {isVideoUrl(displayMedia[selectedMediaIndex]) ? (
               <View style={styles.videoPlaceholder}>
-                <MaterialCommunityIcons name="play-circle-outline" size={64} color="#FFFFFF" />
-                <Text style={styles.videoText}>{t('listingDetail.video')}</Text>
+                <Video
+                  ref={videoRef}
+                  source={{ uri: displayMedia[selectedMediaIndex] }}
+                  style={styles.heroVideo}
+                  resizeMode={ResizeMode.CONTAIN}
+                  isLooping={false}
+                  onPlaybackStatusUpdate={(status: AVPlaybackStatus) => {
+                    if (status.isLoaded) {
+                      // Sync icon state with actual player state
+                      setIsVideoPlaying(status.isPlaying);
+                      if (status.didJustFinish) {
+                        setIsVideoPlaying(false);
+                        videoRef.current?.setPositionAsync(0);
+                      }
+                    }
+                  }}
+                />
+                {/* Tap overlay — imperatively play/pause via ref */}
+                <TouchableOpacity
+                  style={styles.videoPlayOverlay}
+                  activeOpacity={0.85}
+                  onPress={async () => {
+                    if (!videoRef.current) return;
+                    const status = await videoRef.current.getStatusAsync();
+                    if (status.isLoaded) {
+                      if (status.isPlaying) {
+                        await videoRef.current.pauseAsync();
+                      } else {
+                        await videoRef.current.playAsync();
+                      }
+                    }
+                  }}
+                >
+                  {/* Show icon always when paused, hide when playing */}
+                  {!isVideoPlaying && (
+                    <View style={styles.videoPlayBtn}>
+                      <MaterialCommunityIcons name="play" size={40} color="#FFFFFF" />
+                    </View>
+                  )}
+                  {isVideoPlaying && (
+                    <View style={[styles.videoPlayBtn, { opacity: 0 }]}>
+                      <MaterialCommunityIcons name="pause" size={40} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
               </View>
             ) : (
               <TouchableOpacity
@@ -896,7 +922,7 @@ export const ListingDetailScreen = () => {
             {listing.instant_booking && (
               <View style={styles.instantBadge}>
                 <MaterialCommunityIcons name="lightning-bolt" size={14} color="#FFFFFF" />
-                <Text style={styles.instantBadgeText}>{t('listingDetail.instantBooking')}</Text>
+                <Text variant="labelSmall" style={styles.instantBadgeText}>{t('listingDetail.instantBooking')}</Text>
               </View>
             )}
           </View>
@@ -908,7 +934,7 @@ export const ListingDetailScreen = () => {
               data={displayMedia}
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.thumbnailList}
+              contentContainerStyle={styles.thumbnailList as any}
               keyExtractor={(_, index) => `thumb-${index}`}
               renderItem={({ item: media, index }) => (
                 <TouchableOpacity
@@ -916,7 +942,15 @@ export const ListingDetailScreen = () => {
                     styles.thumbnail,
                     selectedMediaIndex === index && styles.thumbnailActive,
                   ]}
-                  onPress={() => setSelectedMediaIndex(index)}
+                  onPress={async () => {
+                    // Stop any playing video before switching
+                    if (videoRef.current) {
+                      await videoRef.current.pauseAsync().catch(() => {});
+                      await videoRef.current.setPositionAsync(0).catch(() => {});
+                    }
+                    setIsVideoPlaying(false);
+                    setSelectedMediaIndex(index);
+                  }}
                 >
                   {isVideoUrl(media) ? (
                     <View style={styles.videoThumb}>
@@ -1253,6 +1287,40 @@ export const ListingDetailScreen = () => {
               </View>
 
               <View style={styles.connectActions}>
+                <TouchableOpacity
+                  style={[styles.identityPrimaryBtn, { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]}
+                  onPress={handleStartKyc}
+                  disabled={isStartingKyc}
+                >
+                  {isStartingKyc ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.identityPrimaryBtnText}>{t('listingDetail.verifyNow')}</Text>
+                  )}
+                </TouchableOpacity>
+
+                {__DEV__ && (
+                  <TouchableOpacity
+                    style={{ alignSelf: 'center', marginTop: 4, paddingVertical: 4, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#D1D5DB' }}
+                    onPress={async () => {
+                      try {
+                        setIsStartingKyc(true);
+                        await idenfyService.testForceVerify();
+                        toast.success('Force Verified!');
+                        setShowIdentityVerificationCard(false);
+                        setIdentityVerificationReason(null);
+                        await refreshBackendUser();
+                      } catch (e: any) {
+                        toast.error('Force Verify Failed');
+                      } finally {
+                        setIsStartingKyc(false);
+                      }
+                    }}
+                    disabled={isStartingKyc}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#9CA3AF' }}>DEV: Force Verify User</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={[styles.connectCardBtnRent, isConnectingCard && styles.connectCardBtnDisabled]}
                   onPress={handleConnectCard}
@@ -2268,6 +2336,24 @@ const styles = StyleSheet.create({
     width: '100%',
     height: IMAGE_HEIGHT,
     backgroundColor: '#1E293B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  heroVideo: {
+    width: '100%',
+    height: IMAGE_HEIGHT,
+  },
+  videoPlayOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoPlayBtn: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -222,6 +222,9 @@ export const CreateListingScreen = () => {
         }
     }, [uploadedImages.length]);
 
+    const MAX_VIDEO_SIZE_MB = 50;
+    const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
+
     const pickVideos = useCallback(async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
@@ -235,9 +238,18 @@ export const CreateListingScreen = () => {
         });
         if (result.canceled || !result.assets?.length) return;
 
+        const asset = result.assets[0];
+
+        // Client-side size guard — reject before hitting the server
+        if (asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_BYTES) {
+            const sizeMB = (asset.fileSize / (1024 * 1024)).toFixed(1);
+            toast.error(`Video is too large (${sizeMB} MB). Maximum allowed size is ${MAX_VIDEO_SIZE_MB} MB.`);
+            return;
+        }
+
         setIsUploadingVideos(true);
         try {
-            const url = await uploadFile(result.assets[0].uri, 'video');
+            const url = await uploadFile(asset.uri, 'video');
             setUploadedVideos(prev => [...prev, url]);
         } catch (error) {
             console.error('Video upload failed:', error);

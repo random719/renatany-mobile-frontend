@@ -168,7 +168,8 @@ export const useListingStore = create<ListingState>()(
       },
  
       fetchListingById: async (id: string) => {
-        set({ isLoading: true, error: null });
+        // Clear stale selectedListing immediately so detail screen never shows wrong item
+        set({ isLoading: true, error: null, selectedListing: null, selectedListingOwner: null });
         try {
           const result = await listingService.getListingById(id);
           const listing = result?.listing || null;
@@ -223,29 +224,10 @@ export const useListingStore = create<ListingState>()(
         set({ isSubmitting: true, error: null });
         try {
           const result = await listingService.createItem(data);
-          const { userItems, listings } = get();
-          const newItem: Listing = {
-            id: result.id || `item_${Date.now()}`,
-            title: data.title || '',
-            description: data.description || '',
-            pricePerDay: Number(data.price_per_day) || 0,
-            category: data.category || '',
-            images: data.images || [],
-            ownerId: data.owner_id || '',
-            ownerName: data.owner_name || '',
-            location: data.location || '',
-            rating: 0,
-            likes: 0,
-            isLiked: false,
-            condition: data.condition || 'Good',
-            deposit: Number(data.deposit) || 0,
-            min_rental_days: Number(data.min_rental_days) || 1,
-            max_rental_days: Number(data.max_rental_days) || 30,
-            delivery_options: data.delivery_options || [],
-            createdAt: new Date().toISOString(),
-            ...result,
-          };
-          set({ userItems: [newItem, ...userItems], listings: [newItem, ...listings], isSubmitting: false });
+          set({ isSubmitting: false });
+          // Refetch from server so the card shows real images/data from DB
+          get().fetchListings();
+          if (data.owner_id) get().fetchUserItems(data.owner_id);
           return result;
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : 'Failed to create listing';
@@ -259,6 +241,9 @@ export const useListingStore = create<ListingState>()(
         try {
           await listingService.updateItem(id, data);
           set({ isSubmitting: false });
+          // Refresh listing detail and main list with latest server data
+          get().fetchListingById(id);
+          get().fetchListings();
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : 'Failed to update item';
           set({ error: message, isSubmitting: false });
@@ -270,9 +255,11 @@ export const useListingStore = create<ListingState>()(
         set({ isSubmitting: true, error: null });
         try {
           await listingService.deleteItem(id);
-          const { userItems } = get();
+          const { userItems, listings } = get();
           set({
             userItems: userItems.filter((item) => item.id !== id),
+            listings: listings.filter((item) => item.id !== id),
+            selectedListing: null,
             isSubmitting: false,
           });
         } catch (e: unknown) {

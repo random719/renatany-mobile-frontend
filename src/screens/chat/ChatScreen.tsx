@@ -6,11 +6,12 @@ import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -23,6 +24,8 @@ import { getConditionReports } from '../../services/conditionReportService';
 import { getMessages, sendMessage } from '../../services/messageService';
 import { createCheckoutSession, releaseRentalPayment, syncPaymentStatus } from '../../services/paymentService';
 import { getRentalRequestById, updateRentalRequestStatus } from '../../services/rentalService';
+import { idenfyService } from '../../services/idenfyService';
+import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { toast } from '../../store/toastStore';
 import { colors, typography } from '../../theme';
@@ -205,11 +208,18 @@ export const ChatScreen = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [rental, setRental] = useState<RentalRequest | null>(null);
   const [conditionReports, setConditionReports] = useState<ConditionReport[]>([]);
+  const [backendUser, setBackendUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+  const [isStartingKyc, setIsStartingKyc] = useState(false);
   const flatListRef = useRef<FlatList<Message>>(null);
 
   const loadMessages = useCallback(async (quiet = false) => {
@@ -234,14 +244,21 @@ export const ChatScreen = () => {
     return data;
   }, [rentalRequestId]);
 
+  const loadUserData = useCallback(async () => {
+    try {
+      const res = await api.get('/users/me');
+      setBackendUser(res.data?.data || res.data);
+    } catch {}
+  }, []);
+
   const loadChatData = useCallback(async (quiet = false) => {
     if (!quiet) setIsLoading(true);
     try {
-      await Promise.all([loadMessages(true), loadRental()]);
+      await Promise.all([loadMessages(true), loadRental(), loadUserData()]);
     } finally {
       setIsLoading(false);
     }
-  }, [loadMessages, loadRental]);
+  }, [loadMessages, loadRental, loadUserData]);
 
   useEffect(() => {
     loadChatData();
@@ -299,29 +316,67 @@ export const ChatScreen = () => {
     return rental;
   }, [loadMessages, loadRental, rental]);
 
-  const handleStatusAction = useCallback(async (
-    nextStatus: 'approved' | 'declined' | 'cancelled',
+  const refreshBackendUser = useCallback(async () => {
+    try {
+      await api.post('/stripe/payment-method/retrieve').catch(() => {});
+      await api.get('/stripe/connect/status').catch(() => {});
+      const userRes = await api.get('/users/me');
+      const nextUser = userRes.data?.data || userRes.data;
+      setBackendUser(nextUser);
+      return nextUser;
+    } catch (_) {
+      return null;
+    }
+  }, []);
+
+  const waitForVerifiedKyc = useCallback(async (attempts = 8, delayMs = 2000) => {
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const latestUser = await refreshBackendUser();
+      const kycStatus = latestUser?.kyc_status;
+      if (kycStatus === 'verified' || kycStatus === 'failed') {
+        return latestUser;
+      }
+      if (attempt < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+    return backendUser;
+  }, [backendUser, refreshBackendUser]);
+
+  const handleStatusAction = useCallback((
+    nextStatus: 'approved' | 'declined' | 'cancelled' | 'pending_verification',
     options: { title: string; message: string; systemMessage: string },
   ) => {
     if (!rental) return;
-    Alert.alert(options.title, options.message, [
-      { text: t('chat.no'), style: 'cancel' },
-      {
-        text: t('chat.yes'),
-        onPress: async () => {
-          setIsUpdatingStatus(true);
-          try {
-            await updateRentalRequestStatus(rental.id, nextStatus);
-            await sendSystemNote(options.systemMessage);
-            await loadChatData(true);
-          } catch (error: any) {
-            toast.error(error?.response?.data?.error || error?.message || t('chat.actionFailed'));
-          } finally {
-            setIsUpdatingStatus(false);
+    setConfirmModal({
+      title: options.title,
+      message: options.message,
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setIsUpdatingStatus(true);
+        try {
+          const updated = await updateRentalRequestStatus(rental.id, nextStatus);
+          
+          let actualSystemMessage = options.systemMessage;
+          // If the backend auto-promoted the status or if we transition to pending_verification,
+          // adjust the system message for clarity.
+          if (nextStatus === 'pending_verification') {
+            if (updated.status === 'pending_verification') {
+              actualSystemMessage = t('chat.approvePendingVerificationSystem');
+            } else {
+              actualSystemMessage = t('chat.approveSystem');
+            }
           }
-        },
+
+          await sendSystemNote(actualSystemMessage);
+          await loadChatData(true);
+        } catch (error: any) {
+          toast.error(error?.response?.data?.error || error?.message || t('chat.actionFailed'));
+        } finally {
+          setIsUpdatingStatus(false);
+        }
       },
-    ]);
+    });
   }, [loadChatData, rental, sendSystemNote, t]);
 
   const handleCheckout = useCallback(async () => {
@@ -384,39 +439,50 @@ export const ChatScreen = () => {
     }
   }, [checkoutReturnUrl, loadChatData, nativeCheckoutCallback, refreshRentalUntilSettled, rental, sendSystemNote]);
 
-  const handleRelease = useCallback(async () => {
+  const handleRelease = useCallback(() => {
     if (!rental) return;
-    Alert.alert(
-      t('chat.completeTitle'),
-      t('chat.completePrompt'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('chat.complete'),
-          onPress: async () => {
-            setIsUpdatingStatus(true);
-            try {
-              await releaseRentalPayment(rental.id);
-              await sendSystemNote(t('chat.paymentReleasedNote'));
-              await loadChatData(true);
-              toast.success(t('chat.rentalCompleted'));
-            } catch (error: any) {
-              toast.error(error?.response?.data?.error || error?.message || t('chat.rentalCompleteFailed'));
-            } finally {
-              setIsUpdatingStatus(false);
-            }
-          },
-        },
-      ],
-    );
-  }, [loadChatData, rental, sendSystemNote]);
+    setConfirmModal({
+      title: t('chat.completeTitle'),
+      message: t('chat.completePrompt'),
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setIsUpdatingStatus(true);
+        try {
+          await releaseRentalPayment(rental.id);
+          await sendSystemNote(t('chat.paymentReleasedNote'));
+          await loadChatData(true);
+          toast.success(t('chat.rentalCompleted'));
+        } catch (error: any) {
+          toast.error(error?.response?.data?.error || error?.message || t('chat.rentalCompleteFailed'));
+        } finally {
+          setIsUpdatingStatus(false);
+        }
+      },
+    });
+  }, [loadChatData, rental, sendSystemNote, t]);
 
-  const isOwner = rental?.owner_email === userEmail;
-  const isRenter = rental?.renter_email === userEmail;
+  const isOwner = rental?.owner_email?.toLowerCase() === userEmail?.toLowerCase();
+  const isRenter = rental?.renter_email?.toLowerCase() === userEmail?.toLowerCase();
   const reportRules = rental ? getConditionReportRules(rental, conditionReports, userEmail) : null;
   const canApproveDecline = isOwner && rental?.status === 'pending';
-  const canPay = isRenter && rental?.status === 'approved';
-  const canCancel = isRenter && (rental?.status === 'pending' || rental?.status === 'approved');
+  // Renter can pay if it's approved or pending_verification, and they haven't secured payment yet
+  const userUnverified = backendUser?.kyc_status !== 'verified';
+
+  // For 'approved' status: renter can pay immediately (no KYC needed for already-verified users or normal approved flow)
+  // For 'pending_verification': renter must verify identity FIRST, then pay
+  const canPay = isRenter && !(rental as any)?.payment_intent_id && (
+    rental?.status === 'approved' ||
+    (rental?.status === 'pending_verification' && !userUnverified)
+  );
+
+  const canCancel = isRenter && (rental?.status === 'pending' || rental?.status === 'approved' || rental?.status === 'pending_verification');
+
+  // Show "Verify Identity" when pending_verification and renter hasn't verified yet (regardless of payment)
+  const canVerify =
+    rental?.status === 'pending_verification' &&
+    userUnverified &&
+    isRenter;
+
   const canCompleteRental = isOwner && !!reportRules?.canReleasePayment;
   const rentalCost = rental?.total_amount ?? 0;
   const platformFee = typeof rental?.platform_fee === 'number' ? rental.platform_fee : rentalCost * 0.15;
@@ -435,6 +501,8 @@ export const ChatScreen = () => {
       case 'declined':
       case 'rejected':
         return { bg: '#FEE2E2', text: '#B91C1C', label: rental.status };
+      case 'pending_verification':
+        return { bg: '#FEF3C7', text: '#D97706', label: t('chat.pendingVerification') };
       case 'cancelled':
         return { bg: '#F1F5F9', text: '#64748B', label: t('conversations.status.cancelled') };
       default:
@@ -447,6 +515,76 @@ export const ChatScreen = () => {
       flatListRef.current?.scrollToEnd({ animated });
     });
   }, []);
+
+  const handleStartKyc = useCallback(async () => {
+    if (!rental) return;
+    setIsStartingKyc(true);
+    try {
+      const idenfyReturnUrl = 'rentany://idenfy-complete';
+      const result = await idenfyService.startVerification({
+        successUrl: idenfyReturnUrl,
+        errorUrl: idenfyReturnUrl,
+        callbackUrl: `${API_BASE}/idenfy/webhook`,
+      });
+      if (!result) return;
+
+      if (result.method === 'web') {
+        const idenfyReturnUrl = 'rentany://idenfy-complete';
+        await WebBrowser.openAuthSessionAsync(result.url, idenfyReturnUrl);
+        setIsStartingKyc(false);
+        // After browser closes, we poll the backend to check the final status
+        const latestUser = await waitForVerifiedKyc();
+        if (latestUser?.kyc_status === 'verified') {
+          await sendSystemNote(t('chat.identityVerifiedNote') || 'Identity verified securely');
+          toast.success(t('chat.identityVerified') || 'Identity Verified!');
+          // Trigger backend to re-evaluate the promotion to 'approved'
+          await updateRentalRequestStatus(rental.id, 'pending_verification').catch(() => {});
+        }
+        await loadChatData(true);
+        return;
+      }
+
+      const sdkResult = result.result;
+      if (sdkResult) {
+        // Poll for backend synchronization
+        const latestUser = await waitForVerifiedKyc();
+        const finalStatus = latestUser?.kyc_status;
+
+        if (finalStatus === 'verified') {
+            await sendSystemNote(t('chat.identityVerifiedNote') || 'Identity verified securely');
+            toast.success(t('chat.identityVerified') || 'Identity Verified!');
+            await updateRentalRequestStatus(rental.id, 'pending_verification').catch(() => {});
+        } else if (finalStatus === 'failed') {
+            toast.error(t('chat.identityFailed') || 'Identity verification failed');
+        } else {
+            // Webhook delayed: rely on SDK optimistic result
+            const autoStatus = sdkResult.autoIdentificationStatus;
+            const manualStatus = sdkResult.manualIdentificationStatus;
+            const isApproved = autoStatus === 'APPROVED' || manualStatus === 'APPROVED';
+            
+            setBackendUser((prev: any) => ({ ...prev, kyc_status: isApproved ? 'verified' : 'failed' }));
+            
+            if (isApproved) {
+                await sendSystemNote(t('chat.identityVerifiedNote') || 'Identity verified securely');
+                toast.success(t('chat.identityVerified') || 'Identity Verified!');
+                await updateRentalRequestStatus(rental.id, 'pending_verification').catch(() => {});
+            } else {
+                toast.error(t('chat.identityFailed') || 'Identity verification failed');
+            }
+        }
+      }
+      
+      // Load chat data without overwriting the user data
+      setIsLoading(true);
+      await Promise.all([loadMessages(true), loadRental()]);
+      setIsLoading(false);
+    } catch (e: any) {
+      const errorMsg = e.response?.data?.error || e.message || t('chat.kycError');
+      toast.error(errorMsg);
+    } finally {
+      setIsStartingKyc(false);
+    }
+  }, [rental, loadChatData, sendSystemNote, t]);
 
   const renderSummaryCard = useCallback(() => {
     if (!rental) return null;
@@ -475,16 +613,16 @@ export const ChatScreen = () => {
             deposit: securityDeposit.toFixed(2),
           })}
         </Text>
-        {canApproveDecline || canPay || canCancel || canCompleteRental ? (
+        {canApproveDecline || canPay || canVerify || canCancel || canCompleteRental ? (
           <View style={styles.actionRow}>
             {canApproveDecline ? (
               <>
                 <TouchableOpacity
                   style={[styles.actionButton, styles.primaryAction]}
-                  onPress={() => handleStatusAction('approved', {
+                  onPress={() => handleStatusAction('pending_verification', {
                     title: t('chat.approveTitle'),
                     message: t('chat.approvePrompt'),
-                    systemMessage: t('chat.approveSystem'),
+                    systemMessage: t('chat.approveSystem'), // Default; handled conditionally in handleStatusAction
                   })}
                   disabled={isUpdatingStatus}
                 >
@@ -520,6 +658,45 @@ export const ChatScreen = () => {
                   {isProcessingPayment ? t('chat.openingCheckout') : t('chat.payNow')}
                 </Text>
               </TouchableOpacity>
+            ) : null}
+            {canVerify ? (
+              <View style={{ gap: 8, flex: 1, flexDirection: 'row' }}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.primaryAction, { flex: 1, backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]}
+                  onPress={handleStartKyc}
+                  disabled={isStartingKyc || isUpdatingStatus}
+                >
+                  {isStartingKyc ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name="shield-account-outline" size={18} color="#FFFFFF" />
+                      <Text style={styles.primaryActionText}>{t('chat.verifyIdentity') || 'Verify Identity'}</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                {__DEV__ && (
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.secondaryAction, { flex: 0.4, borderColor: '#DC2626' }]}
+                    onPress={async () => {
+                      try {
+                        setIsStartingKyc(true);
+                        await idenfyService.testForceVerify();
+                        toast.success('Force Verified!');
+                        await loadChatData(true);
+                      } catch (e: any) {
+                        toast.error('Force Verify Failed');
+                      } finally {
+                        setIsStartingKyc(false);
+                      }
+                    }}
+                    disabled={isStartingKyc || isUpdatingStatus}
+                  >
+                    <MaterialCommunityIcons name="test-tube" size={18} color="#DC2626" />
+                    <Text style={[styles.secondaryActionText, { color: '#DC2626' }]}>Force</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             ) : null}
             {canCancel ? (
               <TouchableOpacity
@@ -673,6 +850,40 @@ export const ChatScreen = () => {
     <View style={styles.container}>
       <GlobalHeader />
 
+      {/* Confirmation Modal */}
+      <Modal
+        visible={!!confirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmModal(null)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setConfirmModal(null)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>{confirmModal?.title}</Text>
+            <Text style={styles.modalMessage}>{confirmModal?.message}</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnCancel]}
+                onPress={() => setConfirmModal(null)}
+              >
+                <Text style={styles.modalBtnCancelText}>{t('chat.no')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnConfirm]}
+                onPress={confirmModal?.onConfirm}
+                disabled={isUpdatingStatus}
+              >
+                {isUpdatingStatus ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalBtnConfirmText}>{t('chat.yes')}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <View style={styles.chatHeader}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <MaterialCommunityIcons name="arrow-left" size={22} color={colors.textPrimary} />
@@ -702,7 +913,7 @@ export const ChatScreen = () => {
               data={messages}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <MessageBubble msg={item} isOwn={item.sender_email === userEmail} locale={locale} />
+                <MessageBubble msg={item} isOwn={item.sender_email?.toLowerCase() === userEmail?.toLowerCase()} locale={locale} />
               )}
               style={styles.messageListView}
               contentContainerStyle={styles.messageList}
@@ -1053,4 +1264,64 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendBtnDisabled: { backgroundColor: '#E2E8F0' },
+  // Confirmation Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 380,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: '#475569',
+    lineHeight: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBtnCancel: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  modalBtnCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  modalBtnConfirm: {
+    backgroundColor: '#1F2937',
+  },
+  modalBtnConfirmText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
 });

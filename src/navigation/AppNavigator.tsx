@@ -39,6 +39,11 @@ const Stack = createStackNavigator<RootStackParamList>();
 export const AppNavigator = () => {
   const { isSignedIn, getToken } = useAuth();
   const setToken = useAuthStore((s) => s.setToken);
+  const setGetTokenFunc = useAuthStore((s) => s.setGetTokenFunc);
+
+  useEffect(() => {
+    setGetTokenFunc(getToken as any);
+  }, [getToken, setGetTokenFunc]);
 
   useEffect(() => {
     const syncToken = async () => {
