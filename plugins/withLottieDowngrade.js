@@ -14,7 +14,7 @@ const withLottieDowngrade = (config) => {
 
       podfile = podfile.replace(
         /target '\w+' do/g,
-        (match) => `${match}\n  pod 'lottie-ios', '< 4.5.0'`
+        (match) => `${match}\n  pod 'lottie-ios', '~> 4.2.0'`
       );
 
       fs.writeFileSync(podfilePath, podfile);
