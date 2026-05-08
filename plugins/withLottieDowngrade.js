@@ -2,7 +2,7 @@ const { withDangerousMod } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
-const withPodfileDeploymentTarget = (config, version) => {
+const withLottieDowngrade = (config) => {
   return withDangerousMod(config, [
     'ios',
     async (config) => {
@@ -10,11 +10,11 @@ const withPodfileDeploymentTarget = (config, version) => {
       if (!fs.existsSync(podfilePath)) return config;
       let podfile = fs.readFileSync(podfilePath, 'utf8');
 
-      if (podfile.includes('IPHONEOS_DEPLOYMENT_TARGET')) return config;
+      if (podfile.includes("pod 'lottie-ios'")) return config;
 
       podfile = podfile.replace(
-        /post_install do \|installer\|/g,
-        `post_install do |installer|\n  installer.pods_project.targets.each do |target|\n    target.build_configurations.each do |config|\n      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '${version}'\n    end\n  end\n`
+        /target '\w+' do/g,
+        (match) => `${match}\n  pod 'lottie-ios', '< 4.5.0'`
       );
 
       fs.writeFileSync(podfilePath, podfile);
@@ -23,4 +23,4 @@ const withPodfileDeploymentTarget = (config, version) => {
   ]);
 };
 
-module.exports = withPodfileDeploymentTarget;
+module.exports = withLottieDowngrade;
