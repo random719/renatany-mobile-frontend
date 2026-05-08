@@ -54,7 +54,8 @@
             "deploymentTarget": "16.0"
           }
         }
-      ]
+      ],
+      ["./plugins/withPodfileDeploymentTarget", "16.0"]
     ],
     "extra": {
       "eas": {
