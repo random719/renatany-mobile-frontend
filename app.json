@@ -15,8 +15,17 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.rentany.app",
+      "buildNumber": "1",
+      "associatedDomain": [],
       "infoPlist": {
-        "NSCameraUsageDescription": "RentAny needs camera access to verify your identity."
+        "NSCameraUsageDescription": "RentAny needs camera access to verify your identity and take photos of items.",
+        "NSPhotoLibraryUsageDescription": "RentAny needs photo library access to upload item images.",
+        "NSLocationWhenInUseUsageDescription": "RentAny uses your location to find items near you.",
+        "NSMicrophoneUsageDescription": "RentAny needs microphone access for video recordings of items.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false
+        },
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -37,7 +46,15 @@
       "expo-dev-client",
       "expo-font",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "16.0"
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {

@@ -3,10 +3,37 @@
     "version": ">= 16.0.0"
   },
   "build": {
+    "simulator": {
+      "extends": "production",
+      "ios": {
+        "simulator": true,
+        "image": "latest"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      }
+    },
+    "production": {
+      "ios": {
+        "image": "latest"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://rentany-backend-v1.onrender.com/api",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsucmVudGFueS5mciQ"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "arkasodharatech@gmail.com",
+        "ascAppId": "6766638909"
       }
     }
   }
