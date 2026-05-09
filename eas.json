@@ -10,10 +10,7 @@
         "image": "macos-sequoia-15.6-xcode-16.4"
       },
       "cache": {
-        "key": "v6"
-      },
-      "env": {
-        "IPHONEOS_DEPLOYMENT_TARGET": "16.0"
+        "key": "clean-v1"
       }
     },
     "preview": {
