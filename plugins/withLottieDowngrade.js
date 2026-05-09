@@ -44,14 +44,15 @@ function ensureDeploymentTargetInPostInstall(podfilePath) {
   // Check if the deployment target override already exists
   if (podfile.includes("pods_project.targets.each")) return;
 
-  // Match react_native_post_install(...) call and its closing end statement
-  // Inject the deployment target override AFTER react_native_post_install
-  const rnPostInstallRegex =
-    /(react_native_post_install\(\s*installer,\s*config\[:reactNativePath\],\s*:mac_catalyst_enabled\s*=>\s*false,\s*:ccache_enabled\s*=>\s*ccache_enabled\?\(podfile_properties\),\s*\)\s*\n)(\s*end\b)/;
+  // Use a simple, robust regex to find the post_install block
+  // Match from "post_install do |installer|" to the next "  end" (closing of the block)
+  // This is much more robust than matching exact react_native_post_install arguments
+  const postInstallRegex = /(post_install do \|installer\|[\s\S]*?)(\n  end\b)/;
 
-  if (rnPostInstallRegex.test(podfile)) {
-    const deploymentOverride =
-      `\n    installer.pods_project.targets.each do |target|\n` +
+  if (postInstallRegex.test(podfile)) {
+    const ourCode =
+      `\n    # Override ALL pod targets to ${MIN_IOS_DEPLOYMENT_TARGET}\n` +
+      `    installer.pods_project.targets.each do |target|\n` +
       `      target.build_configurations.each do |config|\n` +
       `        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '${MIN_IOS_DEPLOYMENT_TARGET}'\n` +
       `      end\n` +
@@ -66,12 +67,11 @@ function ensureDeploymentTargetInPostInstall(podfilePath) {
       `      end\n` +
       `    end\n`;
 
-    podfile = podfile.replace(
-      rnPostInstallRegex,
-      `$1${deploymentOverride}$2`
-    );
+    podfile = podfile.replace(postInstallRegex, `$1${ourCode}$2`);
     fs.writeFileSync(podfilePath, podfile);
     console.log(`[withLottieDowngrade] Added deployment target override to Podfile post_install`);
+  } else {
+    console.log(`[withLottieDowngrade] WARNING: Could not find post_install block in Podfile`);
   }
 }
 
