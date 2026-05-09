@@ -55,6 +55,15 @@ function ensureDeploymentTargetInPostInstall(podfilePath) {
       `      target.build_configurations.each do |config|\n` +
       `        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '${MIN_IOS_DEPLOYMENT_TARGET}'\n` +
       `      end\n` +
+      `    end\n\n` +
+      `    # Also fix the main project's pbxproj directly\n` +
+      `    pbxproj_path = File.join(installer.config.installation_root, 'RentAny.xcodeproj', 'project.pbxproj')\n` +
+      `    if File.exist?(pbxproj_path)\n` +
+      `      pbxproj_content = File.read(pbxproj_path)\n` +
+      `      if pbxproj_content.include?('IPHONEOS_DEPLOYMENT_TARGET')\n` +
+      `        pbxproj_content.gsub!(/IPHONEOS_DEPLOYMENT_TARGET = [\\d.]+;/, 'IPHONEOS_DEPLOYMENT_TARGET = ${MIN_IOS_DEPLOYMENT_TARGET};')\n` +
+      `        File.write(pbxproj_path, pbxproj_content)\n` +
+      `      end\n` +
       `    end\n`;
 
     podfile = podfile.replace(
