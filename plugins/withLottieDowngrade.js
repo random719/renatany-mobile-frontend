@@ -1,23 +1,28 @@
 const { withDangerousMod } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
+const Xcode = require('xcode');
 
 const MIN_IOS_DEPLOYMENT_TARGET = '16.0';
 
-// Matches any IPHONEOS_DEPLOYMENT_TARGET = X.X; entry in project.pbxproj
-const DEPLOYMENT_TARGET_REGEX = /IPHONEOS_DEPLOYMENT_TARGET = [\d.]+;/g;
-
 function setDeploymentTargetInPbxproj(pbxprojPath) {
-  if (!fs.existsSync(pbxprojPath)) return;
-  let pbxproj = fs.readFileSync(pbxprojPath, 'utf8');
-  if (DEPLOYMENT_TARGET_REGEX.test(pbxproj)) {
-    pbxproj = pbxproj.replace(
-      DEPLOYMENT_TARGET_REGEX,
-      `IPHONEOS_DEPLOYMENT_TARGET = ${MIN_IOS_DEPLOYMENT_TARGET};`
-    );
-    fs.writeFileSync(pbxprojPath, pbxproj);
-    console.log(`[withLottieDowngrade] Set ALL IPHONEOS_DEPLOYMENT_TARGET to ${MIN_IOS_DEPLOYMENT_TARGET} in project.pbxproj`);
-  }
+  return new Promise((resolve) => {
+    if (!fs.existsSync(pbxprojPath)) return resolve();
+
+    const project = Xcode.project(pbxprojPath);
+    project.parse((err) => {
+      if (err) {
+        console.log(`[withLottieDowngrade] Error parsing pbxproj: ${err.message}`);
+        return resolve();
+      }
+      // Use the official xcode API to set on ALL build configurations
+      project.updateBuildProperty('IPHONEOS_DEPLOYMENT_TARGET', MIN_IOS_DEPLOYMENT_TARGET);
+      // Write back the modified project
+      fs.writeFileSync(pbxprojPath, project.writeSync());
+      console.log(`[withLottieDowngrade] Set IPHONEOS_DEPLOYMENT_TARGET to ${MIN_IOS_DEPLOYMENT_TARGET} in project.pbxproj`);
+      resolve();
+    });
+  });
 }
 
 function addLottiePod(podfilePath) {
@@ -86,7 +91,7 @@ const withLottieDowngrade = (config) => {
       }
 
       try {
-        setDeploymentTargetInPbxproj(pbxprojPath);
+        await setDeploymentTargetInPbxproj(pbxprojPath);
       } catch (e) {
         console.log(`[withLottieDowngrade] ERROR in pbxproj fix: ${e.message}`);
       }
