@@ -18,7 +18,7 @@ type Nav = StackNavigationProp<SearchStackParamList, 'Search'>;
 
 export const SearchScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { user } = useUser();
   const userEmail = user?.emailAddresses?.[0]?.emailAddress;
   const {
@@ -422,7 +422,7 @@ export const SearchScreen = () => {
             {(activeFilter.minPrice || activeFilter.maxPrice) && (
               <View style={styles.filterTag}>
                 <Text style={styles.filterTagText}>
-                  ${activeFilter.minPrice || 0} - ${activeFilter.maxPrice || 'Any'}
+                  {formatCurrency(activeFilter.minPrice || 0, language)} - {activeFilter.maxPrice ? formatCurrency(activeFilter.maxPrice, language) : t('search.any')}
                 </Text>
                 <TouchableOpacity
                   onPress={() => {

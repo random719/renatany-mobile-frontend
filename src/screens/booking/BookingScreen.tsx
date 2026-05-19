@@ -8,6 +8,7 @@ import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { useI18n } from '../../i18n';
 import { calculatePricing } from '../../services/bookingService';
 import { colors, typography } from '../../theme';
+import { formatCurrency } from '../../utils/formatCurrency';
 import { RootStackParamList } from '../../types/navigation';
 
 type Nav = StackNavigationProp<RootStackParamList>;
@@ -131,20 +132,20 @@ export const BookingScreen = () => {
             <Text style={styles.sectionLabel}>{t('bookingConfirm.pricing')}</Text>
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>{t('bookingScreen.dailyRateSummary', { price: pricePerDay, count: totalDays })}</Text>
-              <Text style={styles.priceValue}>${pricing.dailyRate.toFixed(2)}</Text>
+              <Text style={styles.priceValue}>{formatCurrency(pricing.dailyRate, language)}</Text>
             </View>
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>{t('bookingConfirm.platformFee')}</Text>
-              <Text style={styles.priceValue}>${pricing.platformFee.toFixed(2)}</Text>
+              <Text style={styles.priceValue}>{formatCurrency(pricing.platformFee, language)}</Text>
             </View>
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>{t('bookingConfirm.securityDeposit')}</Text>
-              <Text style={styles.priceValue}>${pricing.deposit.toFixed(2)}</Text>
+              <Text style={styles.priceValue}>{formatCurrency(pricing.deposit, language)}</Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.priceRow}>
               <Text style={styles.totalLabel}>{t('bookingConfirm.total')}</Text>
-              <Text style={styles.totalValue}>${pricing.totalAmount.toFixed(2)}</Text>
+              <Text style={styles.totalValue}>{formatCurrency(pricing.totalAmount, language)}</Text>
             </View>
           </View>
         )}

@@ -38,6 +38,7 @@ import { Listing } from '../../types/listing';
 import { HomeStackParamList } from '../../types/navigation';
 import { AIChatAssistant } from './AIChatAssistant';
 import { useI18n } from '../../i18n';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 type Route = RouteProp<HomeStackParamList, 'ListingDetail'>;
 
@@ -401,44 +402,44 @@ export const ListingDetailScreen = () => {
     today.setHours(0, 0, 0, 0);
     const earliestStr = earliestAvailableDate.toISOString().split('T')[0];
 
-    // Past dates (60 days back): soft red
+    // Past dates (60 days back): light grey — clearly unavailable, no confusion
     for (let i = 1; i <= 60; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
       marks[d.toISOString().split('T')[0]] = {
         disabled: true, disableTouchEvent: true,
-        customStyles: { container: { backgroundColor: '#F7B7BC', borderRadius: 14 }, text: { color: '#FFFFFF' } },
+        customStyles: { container: { backgroundColor: '#E2E8F0', borderRadius: 14 }, text: { color: '#94A3B8' } },
       };
     }
 
-    // Today and notice period dates (today up to earliest - 1): amber or orange
+    // Today and notice period dates (today up to earliest - 1): pale yellow — caution, not yet available
     const todayStr = today.toISOString().split('T')[0];
     let cur = new Date(today);
     while (cur.toISOString().split('T')[0] < earliestStr) {
       const ds = cur.toISOString().split('T')[0];
       const isToday = ds === todayStr;
       if (!sameDayPickup && noticePeriodHours === 0 && isToday) {
-        // Same-day unavailable: orange
+        // Same-day unavailable
         marks[ds] = {
           disabled: true, disableTouchEvent: true,
-          customStyles: { container: { backgroundColor: '#FFD27E', borderRadius: 14 }, text: { color: '#FFFFFF' } },
+          customStyles: { container: { backgroundColor: '#FEF3C7', borderRadius: 14 }, text: { color: '#92400E' } },
         };
       } else {
-        // Notice period: amber
+        // Notice period
         marks[ds] = {
           disabled: true, disableTouchEvent: true,
-          customStyles: { container: { backgroundColor: '#FFD98F', borderRadius: 14 }, text: { color: '#FFFFFF' } },
+          customStyles: { container: { backgroundColor: '#FEF3C7', borderRadius: 14 }, text: { color: '#92400E' } },
         };
       }
       cur.setDate(cur.getDate() + 1);
     }
 
-    // Blocked by owner: darker red
+    // Blocked by owner: striped-style via diagonal lines emoji or distinct muted red
     blockedDates.forEach(ds => {
       if (!marks[ds]) {
         marks[ds] = {
           disabled: true, disableTouchEvent: true,
-          customStyles: { container: { backgroundColor: '#FB7185', borderRadius: 14 }, text: { color: '#FFFFFF' } },
+          customStyles: { container: { backgroundColor: '#FEE2E2', borderRadius: 14 }, text: { color: '#DC2626' } },
         };
       }
     });
@@ -970,7 +971,7 @@ export const ListingDetailScreen = () => {
           <View style={styles.priceRow}>
             <View style={styles.priceContainer}>
               <Text variant="displaySmall" style={styles.priceAmount}>
-                ${listing.pricePerDay}
+                ${formatCurrency(listing.pricePerDay, language)}
               </Text>
               <Text style={styles.priceUnit}>{t('listingDetail.perDay')}</Text>
             </View>
@@ -1010,7 +1011,7 @@ export const ListingDetailScreen = () => {
                 <MaterialCommunityIcons name="shield-outline" size={18} color={colors.textSecondary} />
                 <Text style={styles.infoLabel}>{t('listingDetail.securityDeposit')}</Text>
               </View>
-              <Text style={styles.infoValue}>${listing.deposit ?? 0}</Text>
+              <Text style={styles.infoValue}>{formatCurrency(listing.deposit ?? 0, language)}</Text>
             </View>
             <View style={styles.infoRow}>
               <View style={styles.infoLabelContainer}>
@@ -1044,8 +1045,8 @@ export const ListingDetailScreen = () => {
                   <View key={idx} style={styles.tierRow}>
                     <Text style={styles.tierLabel}>{t('listingDetail.rentFor', { days: tier.days, unit: tier.days === 1 ? t('listingDetail.day') : t('listingDetail.days') })}</Text>
                     <Text style={styles.tierValue}>
-                      ${(tier.price || 0).toFixed(2)}{' '}
-                      <Text style={styles.tierPerDay}>{t('listingDetail.perDayPrice', { price: (tier.price / tier.days || 0).toFixed(2) })}</Text>
+                      {formatCurrency(tier.price || 0, language)}{' '}
+                      <Text style={styles.tierPerDay}>{t('listingDetail.perDayPrice', { price: formatCurrency(tier.price / tier.days || 0, language) })}</Text>
                     </Text>
                   </View>
                 ))}
@@ -1575,17 +1576,17 @@ export const ListingDetailScreen = () => {
                       {/* Rental cost */}
                       <View style={styles.costRow}>
                         <Text style={styles.costLabel}>{t('listingDetail.rentalCost', { count: selectedDates.length })}</Text>
-                        <Text style={styles.costValue}>${rentalCosts.rentalCost.toFixed(2)}</Text>
+                        <Text style={styles.costValue}>{formatCurrency(rentalCosts.rentalCost, language)}</Text>
                       </View>
                       {/* Platform fee */}
                       <View style={styles.costRow}>
                         <Text style={styles.costLabel}>{t('listingDetail.platformFee')}</Text>
-                        <Text style={styles.costValue}>${rentalCosts.platformFee.toFixed(2)}</Text>
+                        <Text style={styles.costValue}>{formatCurrency(rentalCosts.platformFee, language)}</Text>
                       </View>
                       {/* Total — includes deposit silently, same as frontend-v1 */}
                       <View style={[styles.costRow, styles.costTotalRow]}>
                         <Text style={styles.costTotalLabel}>{t('listingDetail.totalPrice')}</Text>
-                        <Text style={styles.costTotalValue}>${rentalCosts.totalCost.toFixed(2)}</Text>
+                        <Text style={styles.costTotalValue}>{formatCurrency(rentalCosts.totalCost, language)}</Text>
                       </View>
                     </View>
 

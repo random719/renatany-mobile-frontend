@@ -3,6 +3,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -32,6 +33,7 @@ import { colors, typography } from '../../theme';
 import { ConditionReport, Message, RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
 import { getConditionReportRules } from '../../utils/conditionReportRules';
+import { formatCurrency } from '../../utils/formatCurrency';
 import { sortMessagesChronologically } from '../../utils/messageOrdering';
 import { parseRentalBoundaryDate } from '../../utils/rentalDates';
 
@@ -195,7 +197,7 @@ export const ChatScreen = () => {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { language, t } = useI18n();
-  const { rentalRequestId, otherUserEmail } = route.params;
+  const { rentalRequestId, otherUserEmail, itemId } = route.params;
   const locale = getLocale(language);
 
   const { user: clerkUser } = useUser();
@@ -329,7 +331,7 @@ export const ChatScreen = () => {
     }
   }, []);
 
-  const waitForVerifiedKyc = useCallback(async (attempts = 8, delayMs = 2000) => {
+  const waitForVerifiedKyc = useCallback(async (attempts = 15, delayMs = 2000) => {
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       const latestUser = await refreshBackendUser();
       const kycStatus = latestUser?.kyc_status;
@@ -340,7 +342,14 @@ export const ChatScreen = () => {
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
-    return backendUser;
+    // One final attempt with force-refresh
+    try {
+      await api.post('/idenfy/sync-status').catch(() => {});
+      const finalUser = await refreshBackendUser();
+      return finalUser;
+    } catch {
+      return backendUser;
+    }
   }, [backendUser, refreshBackendUser]);
 
   const handleStatusAction = useCallback((
@@ -518,9 +527,13 @@ export const ChatScreen = () => {
 
   const handleStartKyc = useCallback(async () => {
     if (!rental) return;
+    // Dismiss any open modals first — iDenfy SDK needs a clean view hierarchy
+    setConfirmModal(null);
     setIsStartingKyc(true);
     try {
       const idenfyReturnUrl = 'rentany://idenfy-complete';
+      // Small delay to ensure modal dismissal is processed
+      await new Promise(resolve => setTimeout(resolve, 200));
       const result = await idenfyService.startVerification({
         successUrl: idenfyReturnUrl,
         errorUrl: idenfyReturnUrl,
@@ -538,7 +551,12 @@ export const ChatScreen = () => {
           await sendSystemNote(t('chat.identityVerifiedNote') || 'Identity verified securely');
           toast.success(t('chat.identityVerified') || 'Identity Verified!');
           // Trigger backend to re-evaluate the promotion to 'approved'
-          await updateRentalRequestStatus(rental.id, 'pending_verification').catch(() => {});
+          try {
+            await updateRentalRequestStatus(rental.id, 'pending_verification');
+          } catch (statusErr: any) {
+            console.warn('[KYC] Status update failed:', statusErr);
+            // Still proceed — the webhook should handle it eventually
+          }
         }
         await loadChatData(true);
         return;
@@ -553,7 +571,11 @@ export const ChatScreen = () => {
         if (finalStatus === 'verified') {
             await sendSystemNote(t('chat.identityVerifiedNote') || 'Identity verified securely');
             toast.success(t('chat.identityVerified') || 'Identity Verified!');
-            await updateRentalRequestStatus(rental.id, 'pending_verification').catch(() => {});
+            try {
+              await updateRentalRequestStatus(rental.id, 'pending_verification');
+            } catch (statusErr: any) {
+              console.warn('[KYC] Status update failed:', statusErr);
+            }
         } else if (finalStatus === 'failed') {
             toast.error(t('chat.identityFailed') || 'Identity verification failed');
         } else {
@@ -567,7 +589,15 @@ export const ChatScreen = () => {
             if (isApproved) {
                 await sendSystemNote(t('chat.identityVerifiedNote') || 'Identity verified securely');
                 toast.success(t('chat.identityVerified') || 'Identity Verified!');
-                await updateRentalRequestStatus(rental.id, 'pending_verification').catch(() => {});
+                // Force sync status on backend before updating rental
+                try {
+                  await api.post('/idenfy/sync-status').catch(() => {});
+                } catch {}
+                try {
+                  await updateRentalRequestStatus(rental.id, 'pending_verification');
+                } catch (statusErr: any) {
+                  console.warn('[KYC] Status update after optimistic approval failed:', statusErr);
+                }
             } else {
                 toast.error(t('chat.identityFailed') || 'Identity verification failed');
             }
@@ -584,7 +614,7 @@ export const ChatScreen = () => {
     } finally {
       setIsStartingKyc(false);
     }
-  }, [rental, loadChatData, sendSystemNote, t]);
+  }, [rental, api, loadChatData, sendSystemNote, t]);
 
   const renderSummaryCard = useCallback(() => {
     if (!rental) return null;
@@ -605,12 +635,12 @@ export const ChatScreen = () => {
             {rentalEndDate.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}
           </Text>
         </View>
-        <Text style={styles.summaryAmount}>${totalPaid.toFixed(2)}</Text>
+        <Text style={styles.summaryAmount}>{formatCurrency(totalPaid, language)}</Text>
         <Text style={styles.summaryBreakdown}>
           {t('chat.paymentBreakdown', {
-            rental: rentalCost.toFixed(2),
-            fee: platformFee.toFixed(2),
-            deposit: securityDeposit.toFixed(2),
+            rental: formatCurrency(rentalCost, language),
+            fee: formatCurrency(platformFee, language),
+            deposit: formatCurrency(securityDeposit, language),
           })}
         </Text>
         {canApproveDecline || canPay || canVerify || canCancel || canCompleteRental ? (
@@ -895,6 +925,14 @@ export const ChatScreen = () => {
         <TouchableOpacity onPress={() => loadChatData(false)} style={styles.refreshBtn}>
           <MaterialCommunityIcons name="refresh" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
+        {itemId ? (
+          <TouchableOpacity
+            onPress={() => (navigation as any).navigate('ListingDetail', { listingId: itemId })}
+            style={styles.viewListingBtn}
+          >
+            <MaterialCommunityIcons name="store-outline" size={20} color={colors.textPrimary} />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <KeyboardAvoidingView
@@ -982,6 +1020,13 @@ const styles = StyleSheet.create({
   chatTitle: { fontWeight: '700', color: '#0F172A', fontSize: typography.tabLabel },
   chatSub: { color: '#64748B', fontSize: typography.small },
   refreshBtn: { padding: 6 },
+  viewListingBtn: {
+    padding: 6,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   summaryCard: {
     marginHorizontal: 16,

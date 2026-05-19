@@ -14,6 +14,7 @@ import { colors, typography } from '../../theme';
 import { Listing } from '../../types/listing';
 import { RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 const getLocale = (language: string) =>
     language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US';
@@ -48,7 +49,7 @@ export const ConversationsScreen = () => {
             const allRentals = [...asRenter, ...asOwner];
             const uniqueRentals = Array.from(new Map(allRentals.map(r => [r.id, r])).values());
             const activeRentals = uniqueRentals.filter(r => ['pending', 'approved', 'paid', 'inquiry', 'pending_verification'].includes(r.status));
-            activeRentals.sort((a, b) => new Date(b.updated_date).getTime() - new Date(a.updated_date).getTime());
+            activeRentals.sort((a, b) => (new Date(b.updated_date || b.created_date).getTime() || 0) - (new Date(a.updated_date || a.created_date).getTime() || 0));
             setConversations(activeRentals);
 
             const uniqueItemIds = [...new Set(activeRentals.map(r => r.item_id))];
@@ -187,10 +188,10 @@ export const ConversationsScreen = () => {
                                     <MaterialCommunityIcons name="currency-usd" size={13} color="#64748B" />
                                     <View>
                                         <Text style={[styles.cardInfoText, styles.cardInfoBold]}>
-                                            ${totalPaid.toFixed(2)}
+                                            {formatCurrency(totalPaid, language)}
                                         </Text>
                                         <Text style={styles.cardAmountBreakdown}>
-                                            {t('conversations.rental')} ${rentalCost.toFixed(2)} · {t('conversations.fee')} ${platformFee.toFixed(2)} · {t('conversations.deposit')} ${securityDeposit.toFixed(2)}
+                                            {t('conversations.rental')} {formatCurrency(rentalCost, language)} · {t('conversations.fee')} {formatCurrency(platformFee, language)} · {t('conversations.deposit')} {formatCurrency(securityDeposit, language)}
                                         </Text>
                                     </View>
                                 </View>

@@ -29,6 +29,7 @@ import { colors, typography } from '../../theme';
 import { RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
 import { toast } from '../../store/toastStore';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 type FilterKey = 'all' | 'as_renter' | 'as_owner' | 'completed' | 'active' | 'pending' | 'cancelled';
@@ -102,7 +103,7 @@ export const RentalHistoryScreen = () => {
       ]);
       const merged = [...asRenter, ...asOwner];
       const unique = Array.from(new Map(merged.map((rental) => [rental.id, rental])).values());
-      unique.sort((a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime());
+      unique.sort((a, b) => (new Date(b.updated_date || b.created_date).getTime() || 0) - (new Date(a.updated_date || a.created_date).getTime() || 0));
       setRentals(unique);
 
       // Fetch item details for all rentals
@@ -343,14 +344,14 @@ export const RentalHistoryScreen = () => {
 
             <View style={styles.priceRow}>
               <MaterialCommunityIcons name="currency-usd" size={14} color="#64748B" />
-              <Text style={styles.amountText}>${totalPaid.toFixed(2)}</Text>
+              <Text style={styles.amountText}>{formatCurrency(totalPaid, language)}</Text>
             </View>
 
             <Text style={styles.breakdownText} numberOfLines={1}>
               {t('rentalHistory.breakdown', {
-                rental: rentalCost.toFixed(2),
-                fee: platformFee.toFixed(2),
-                deposit: securityDeposit.toFixed(2),
+                rental: formatCurrency(rentalCost, language),
+                fee: formatCurrency(platformFee, language),
+                deposit: formatCurrency(securityDeposit, language),
               })}
             </Text>
           </View>

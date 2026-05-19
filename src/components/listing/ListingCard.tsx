@@ -6,6 +6,7 @@ import { useI18n } from '../../i18n';
 import { colors, typography } from '../../theme';
 import { Listing } from '../../types/listing';
 import { FavoriteButton } from './FavoriteButton';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 interface ListingCardProps {
   listing: Listing;
@@ -15,7 +16,7 @@ interface ListingCardProps {
 }
 
 export const ListingCard = ({ listing, onPress, onToggleLike, style }: ListingCardProps) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
 
   return (
     <TouchableOpacity style={[styles.container, style]} onPress={onPress} activeOpacity={0.8}>
@@ -48,7 +49,7 @@ export const ListingCard = ({ listing, onPress, onToggleLike, style }: ListingCa
         </View>
 
         <Text variant="titleMedium" style={styles.price}>
-          €{listing.pricePerDay}
+          {formatCurrency(listing.pricePerDay, language)}
           <Text variant="bodySmall" style={styles.perDay}>
             /day
           </Text>

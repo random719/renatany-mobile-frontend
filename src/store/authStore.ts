@@ -38,6 +38,7 @@ export const useAuthStore = create<AuthState>()(persist((set) => ({
   storage: createJSONStorage(() => AsyncStorage),
   partialize: (state) => ({
     user: state.user,
+    token: state.token,
     isAuthenticated: state.isAuthenticated,
   }),
 }));

@@ -31,6 +31,7 @@ import { useListingStore } from '../../store/listingStore';
 import { toast } from '../../store/toastStore';
 import { Dispute, RentalRequest } from '../../types/models';
 import { parseRentalBoundaryDate } from '../../utils/rentalDates';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 interface BackendUser {
   id: string;
@@ -865,13 +866,13 @@ export const ProfileScreen = () => {
                       )}
                       <View style={styles.rentalInfoRow}>
                         <MaterialCommunityIcons name="currency-usd" size={14} color="#64748B" />
-                        <Text style={styles.rentalAmountBold}>${totalPaid.toFixed(2)}</Text>
+                        <Text style={styles.rentalAmountBold}>{formatCurrency(totalPaid, language)}</Text>
                       </View>
                       <Text style={styles.rentalBreakdown}>
                         {t('rentalHistory.breakdown', {
-                          rental: rentalCost.toFixed(2),
-                          fee: platformFee.toFixed(2),
-                          deposit: securityDeposit.toFixed(2),
+                          rental: formatCurrency(rentalCost, language),
+                          fee: formatCurrency(platformFee, language),
+                          deposit: formatCurrency(securityDeposit, language),
                         })}
                       </Text>
                       <View style={styles.rentalInfoRow}>
@@ -1021,7 +1022,7 @@ export const ProfileScreen = () => {
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.walletBalanceLabel, { color: '#16A34A' }]}>{t('profile.availableForPayout')}</Text>
                       <Text style={[styles.walletBalanceBig, { color: '#15803D' }]}>
-                        ${availableForPayout.toFixed(2)}
+                        {formatCurrency(availableForPayout, language)}
                       </Text>
                       <Text style={[styles.walletBalanceSub, { color: '#16A34A' }]}>{t('profile.readyToWithdraw')}</Text>
                     </View>
@@ -1035,7 +1036,7 @@ export const ProfileScreen = () => {
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.walletBalanceLabel, { color: '#2563EB' }]}>{t('profile.lifetimeEarnings')}</Text>
                       <Text style={[styles.walletBalanceBig, { color: '#1D4ED8' }]}>
-                        ${walletData?.totalEarnings?.toFixed(2) || '0.00'}
+                        {formatCurrency(walletData?.totalEarnings || 0, language)}
                       </Text>
                       <Text style={[styles.walletBalanceSub, { color: '#2563EB' }]}>{t('profile.afterPlatformFee')}</Text>
                     </View>
@@ -1087,7 +1088,7 @@ export const ProfileScreen = () => {
                             </Text>
                           </View>
                           <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={[styles.walletTxAmount, { color: '#15803D' }]}>+${tx.amount.toFixed(2)}</Text>
+                            <Text style={[styles.walletTxAmount, { color: '#15803D' }]}>+{formatCurrency(tx.amount, language)}</Text>
                             <View style={[styles.statusBadge, styles.statusCompleted]}><Text style={styles.statusText}>{t('profile.earnedStatus')}</Text></View>
                           </View>
                         </View>
@@ -1119,7 +1120,7 @@ export const ProfileScreen = () => {
                             <Text style={styles.walletTxDate}>{t('profile.rentalInProgress')}</Text>
                           </View>
                           <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={[styles.walletTxAmount, { color: '#D97706' }]}>${tx.amount.toFixed(2)}</Text>
+                            <Text style={[styles.walletTxAmount, { color: '#D97706' }]}>{formatCurrency(tx.amount, language)}</Text>
                             <View style={[styles.statusBadge, styles.statusPending]}><Text style={styles.statusText}>{t('profile.heldStatus')}</Text></View>
                           </View>
                         </View>
@@ -1146,7 +1147,7 @@ export const ProfileScreen = () => {
                             </Text>
                           </View>
                           <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={[styles.walletTxAmount, { color: '#0F172A' }]}>-${payout.amount.toFixed(2)}</Text>
+                            <Text style={[styles.walletTxAmount, { color: '#0F172A' }]}>-{formatCurrency(payout.amount, language)}</Text>
                             <View style={[styles.statusBadge, { backgroundColor: '#F1F5F9' }]}>
                               <Text style={styles.statusText}>{payout.status}</Text>
                             </View>

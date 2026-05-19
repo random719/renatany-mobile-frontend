@@ -1,24 +1,22 @@
+import { useUser } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
-import { useUser } from '@clerk/expo';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { useI18n } from '../../i18n';
 import { createRentalRequest } from '../../services/bookingService';
-import { useAuthStore } from '../../store/authStore';
-import { colors, typography } from '../../theme';
-import { RootStackParamList } from '../../types/navigation';
 import { toast } from '../../store/toastStore';
+import { colors, typography } from '../../theme';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'BookingConfirm'>;
 
 export const BookingConfirmScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const route = useRoute<Route>();
   const { user: clerkUser } = useUser();
   const { user } = useAuthStore();

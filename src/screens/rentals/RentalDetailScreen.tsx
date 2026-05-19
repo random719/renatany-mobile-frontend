@@ -15,6 +15,7 @@ import { colors, typography } from '../../theme';
 import { ConditionReport, PublicUserProfile, RentalRequest } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
 import { parseRentalBoundaryDate } from '../../utils/rentalDates';
+import { formatCurrency } from '../../utils/formatCurrency';
 import { useI18n } from '../../i18n';
 
 type Nav = StackNavigationProp<RootStackParamList>;
@@ -160,8 +161,6 @@ const PartyCard = ({
     </TouchableOpacity>
   );
 };
-
-const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`;
 
 export const RentalDetailScreen = () => {
   const navigation = useNavigation<Nav>();
@@ -483,24 +482,24 @@ export const RentalDetailScreen = () => {
         {rental.status !== 'inquiry' ? (
           <SectionCard icon="currency-usd" title="Pricing Details">
             {itemInfo?.daily_rate !== undefined ? (
-              <DetailRow label="Daily Rate" value={`${formatCurrency(itemInfo.daily_rate)}/day`} />
+              <DetailRow label="Daily Rate" value={`${formatCurrency(itemInfo.daily_rate, language)}/day`} />
             ) : null}
             {hasDateRange ? <DetailRow label="Number of Days" value={String(totalDays)} /> : null}
-            <DetailRow label="Base Rental Cost" value={formatCurrency(rentalCost)} />
-            <DetailRow label="Platform Fee (15%)" value={formatCurrency(platformFee)} />
+            <DetailRow label="Base Rental Cost" value={formatCurrency(rentalCost, language)} />
+            <DetailRow label="Platform Fee (15%)" value={formatCurrency(platformFee, language)} />
             {securityDeposit > 0 ? (
-              <DetailRow label="Security Deposit" value={formatCurrency(securityDeposit)} />
+              <DetailRow label="Security Deposit" value={formatCurrency(securityDeposit, language)} />
             ) : null}
             <View style={styles.sectionDivider} />
             <DetailRow
               label="Total Paid by Renter"
-              value={formatCurrency(totalPaid)}
+              value={formatCurrency(totalPaid, language)}
               emphasized
               valueColor="#16A34A"
             />
             <View style={styles.ownerPayoutCard}>
               <Text style={styles.ownerPayoutText}>
-                <Text style={styles.ownerPayoutStrong}>Owner Payout:</Text> {formatCurrency(ownerPayout)}
+                <Text style={styles.ownerPayoutStrong}>Owner Payout:</Text> {formatCurrency(ownerPayout, language)}
               </Text>
               <Text style={styles.ownerPayoutSubtext}>(platform fee is paid by renter)</Text>
             </View>
