@@ -22,13 +22,14 @@ import {
 import { api } from "../../services/api";
 import { toast } from "../../store/toastStore";
 import { colors, typography } from "../../theme";
+import { formatCurrency } from "../../utils/formatCurrency";
 import { RootStackParamList } from "../../types/navigation";
 
 type Nav = StackNavigationProp<RootStackParamList>;
 
 export const AdminModerationScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [requests, setRequests] = useState<RentalRequest[]>([]);
   const [items, setItems] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -190,7 +191,7 @@ export const AdminModerationScreen = () => {
             />
             <Text style={styles.infoLabel}>{t("adminModeration.amount")}</Text>
             <Text style={[styles.infoValue, { fontWeight: "700" }]}>
-              ${item.total_amount?.toFixed(2) ?? "0.00"}
+              {formatCurrency(item.total_amount ?? 0, language)}
             </Text>
           </View>
           <View style={styles.infoRow}>

@@ -21,7 +21,7 @@ const isValidDate = (s: string) => DATE_RE.test(s) && !isNaN(new Date(s).getTime
 export const BookingScreen = () => {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { listingId, listingTitle, pricePerDay, ownerEmail } = route.params;
 
   const [startDate, setStartDate] = useState('');

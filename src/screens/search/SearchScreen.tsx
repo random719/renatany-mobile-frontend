@@ -13,6 +13,7 @@ import { toast } from '../../store/toastStore';
 import { colors, typography } from '../../theme';
 import { ListingFilter } from '../../types/listing';
 import { SearchStackParamList } from '../../types/navigation';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 type Nav = StackNavigationProp<SearchStackParamList, 'Search'>;
 

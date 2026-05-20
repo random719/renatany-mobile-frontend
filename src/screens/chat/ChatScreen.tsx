@@ -927,7 +927,7 @@ export const ChatScreen = () => {
         </TouchableOpacity>
         {itemId ? (
           <TouchableOpacity
-            onPress={() => (navigation as any).navigate('ListingDetail', { listingId: itemId })}
+            onPress={() => (navigation as any).navigate('Main', { screen: 'HomeTab', params: { screen: 'ListingDetail', params: { listingId: itemId } } })}
             style={styles.viewListingBtn}
           >
             <MaterialCommunityIcons name="store-outline" size={20} color={colors.textPrimary} />

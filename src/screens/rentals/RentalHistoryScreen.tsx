@@ -103,7 +103,7 @@ export const RentalHistoryScreen = () => {
       ]);
       const merged = [...asRenter, ...asOwner];
       const unique = Array.from(new Map(merged.map((rental) => [rental.id, rental])).values());
-      unique.sort((a, b) => (new Date(b.updated_date || b.created_date).getTime() || 0) - (new Date(a.updated_date || a.created_date).getTime() || 0));
+      unique.sort((a, b) => (new Date(b.start_date).getTime() || 0) - (new Date(a.start_date).getTime() || 0));
       setRentals(unique);
 
       // Fetch item details for all rentals

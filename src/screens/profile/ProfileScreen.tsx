@@ -160,7 +160,7 @@ export const ProfileScreen = () => {
       // Merge and deduplicate
       const all = [...data, ...ownerData];
       const unique = all.filter((r, i, self) => self.findIndex((s) => s.id === r.id) === i);
-      unique.sort((a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime());
+      unique.sort((a, b) => (new Date(b.start_date).getTime() || 0) - (new Date(a.start_date).getTime() || 0));
       setRentals(unique);
 
       // Fetch item details for each rental

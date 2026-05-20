@@ -7,6 +7,7 @@ import { ActivityIndicator, Text } from 'react-native-paper';
 import { useUser } from '@clerk/expo';
 import { getConditionReports } from '../../services/conditionReportService';
 import { getListingById } from '../../services/listingService';
+import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { api } from '../../services/api';
 import { getRentalRequestById } from '../../services/rentalService';
 import { useAuthStore } from '../../store/authStore';
@@ -382,6 +383,7 @@ export const RentalDetailScreen = () => {
 
   return (
     <View style={styles.container}>
+      <GlobalHeader />
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>

@@ -15,6 +15,7 @@ import { geocodeLocation } from '../../utils/geocodeLocation';
 import { RootStackParamList } from '../../types/navigation';
 import { toast } from '../../store/toastStore';
 import { useI18n } from '../../i18n';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 const CATEGORIES = [
     { value: 'electronics', icon: 'laptop' },
@@ -766,7 +767,7 @@ export const CreateListingScreen = () => {
                                                 {formData.pricing_tiers.map((tier, idx) => (
                                                     <View key={idx} style={styles.tierItemRow}>
                                                         <Text style={styles.tierItemText}>
-                                                            {tier.days} {tier.days === 1 ? t('createListing.day') : t('createListing.days')}: ${tier.price.toFixed(2)}
+                                                            {tier.days} {tier.days === 1 ? t('createListing.day') : t('createListing.days')}: {formatCurrency(tier.price, language)}
                                                         </Text>
                                                         <TouchableOpacity onPress={() => removePricingTier(idx)}>
                                                             <MaterialCommunityIcons name="close-circle" size={20} color="#EF4444" />
@@ -996,7 +997,7 @@ export const CreateListingScreen = () => {
 
                                         <View style={styles.summaryRow}>
                                             <Text style={styles.summaryLabel}>{t('createListing.baseDailyRate')}</Text>
-                                            <Text style={styles.summaryValue}>${dailyRate.toFixed(2)}{t('createListing.perDay')}</Text>
+                                            <Text style={styles.summaryValue}>{formatCurrency(dailyRate, language)}{t('createListing.perDay')}</Text>
                                         </View>
 
                                         {formData.pricing_tiers.length > 0 && formData.pricing_tiers.map((tier, idx) => (
@@ -1004,19 +1005,19 @@ export const CreateListingScreen = () => {
                                                 <Text style={styles.summaryLabel}>
                                                     {tier.days} {tier.days === 1 ? t('createListing.day') : t('createListing.days')}:
                                                 </Text>
-                                                <Text style={styles.summaryValue}>${tier.price.toFixed(2)}</Text>
+                                                <Text style={styles.summaryValue}>{formatCurrency(tier.price, language)}</Text>
                                             </View>
                                         ))}
 
                                         <View style={styles.summaryRow}>
                                             <Text style={styles.summaryLabel}>{t('createListing.securityDepositSummary')}</Text>
-                                            <Text style={styles.summaryValue}>${depositAmount.toFixed(2)}</Text>
+                                            <Text style={styles.summaryValue}>{formatCurrency(depositAmount, language)}</Text>
                                         </View>
 
                                         {formData.delivery_options.includes('delivery') && parseFloat(formData.delivery_fee) > 0 && (
                                             <View style={styles.summaryRow}>
                                                 <Text style={styles.summaryLabel}>{t('createListing.deliveryFeeSummary')}</Text>
-                                                <Text style={styles.summaryValue}>${(parseFloat(formData.delivery_fee) || 0).toFixed(2)}</Text>
+                                                <Text style={styles.summaryValue}>{formatCurrency(parseFloat(formData.delivery_fee) || 0, language)}</Text>
                                             </View>
                                         )}
 
@@ -1025,7 +1026,7 @@ export const CreateListingScreen = () => {
                                         {formData.pricing_tiers.length === 0 && (
                                             <View style={styles.summaryRow}>
                                                 <Text style={styles.summaryLabel}>{t('createListing.weeklyEstimate')}</Text>
-                                                <Text style={styles.summaryValueBold}>${(dailyRate * 7).toFixed(2)}</Text>
+                                                <Text style={styles.summaryValueBold}>{formatCurrency(dailyRate * 7, language)}</Text>
                                             </View>
                                         )}
                                     </View>

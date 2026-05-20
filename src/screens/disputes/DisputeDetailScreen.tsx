@@ -14,6 +14,7 @@ import { uploadFile } from '../../services/listingService';
 import { toast } from '../../store/toastStore';
 import { colors, typography } from '../../theme';
 import { Dispute } from '../../types/models';
+import { formatCurrency } from '../../utils/formatCurrency';
 import { RootStackParamList } from '../../types/navigation';
 
 type Nav = StackNavigationProp<RootStackParamList>;
@@ -464,7 +465,7 @@ export const DisputeDetailScreen = () => {
                 />
                 {dispute.resolution && <Text style={styles.descText}>{dispute.resolution}</Text>}
                 {dispute.refund_to_renter !== undefined && (
-                  <InfoRow label={t('disputeDetail.refundToRenter')} value={`$${dispute.refund_to_renter?.toFixed(2)}`} />
+                  <InfoRow label={t('disputeDetail.refundToRenter')} value={formatCurrency(dispute.refund_to_renter ?? 0, language)} />
                 )}
               </View>
             )}

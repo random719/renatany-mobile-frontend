@@ -26,6 +26,7 @@ import {
 import { api } from "../../services/api";
 import { toast } from "../../store/toastStore";
 import { colors, typography } from "../../theme";
+import { formatCurrency } from "../../utils/formatCurrency";
 import { RootStackParamList } from "../../types/navigation";
 
 type Nav = StackNavigationProp<RootStackParamList>;
@@ -55,7 +56,7 @@ interface ItemInfo {
 
 export const AdminDisputesScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [rentals, setRentals] = useState<Record<string, RentalInfo>>({});
   const [items, setItems] = useState<Record<string, ItemInfo>>({});
@@ -259,7 +260,7 @@ export const AdminDisputesScreen = () => {
               {rental && (
                 <>
                   <MaterialCommunityIcons name="currency-usd" size={14} color="#94A3B8" style={{ marginLeft: 12 }} />
-                  <Text style={styles.cardMetaText}>${rental.total_amount?.toFixed(2)}</Text>
+                  <Text style={styles.cardMetaText}>{formatCurrency(rental.total_amount ?? 0, language)}</Text>
                 </>
               )}
             </View>
@@ -508,7 +509,7 @@ export const AdminDisputesScreen = () => {
                             </View>
                             <View style={styles.modalInfoRow}>
                               <Text style={styles.modalInfoLabel}>{t('adminModeration.amount')}</Text>
-                              <Text style={[styles.modalInfoValue, { fontWeight: "700" }]}>${r.total_amount?.toFixed(2)}</Text>
+                              <Text style={[styles.modalInfoValue, { fontWeight: "700" }]}>{formatCurrency(r.total_amount ?? 0, language)}</Text>
                             </View>
                             <View style={styles.modalInfoRow}>
                               <Text style={styles.modalInfoLabel}>{t('adminModeration.dates')}</Text>

@@ -8,8 +8,11 @@ import { Button, Text } from 'react-native-paper';
 import { GlobalHeader } from '../../components/common/GlobalHeader';
 import { useI18n } from '../../i18n';
 import { createRentalRequest } from '../../services/bookingService';
+import { useAuthStore } from '../../store/authStore';
 import { toast } from '../../store/toastStore';
 import { colors, typography } from '../../theme';
+import { RootStackParamList } from '../../types/navigation';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'BookingConfirm'>;
@@ -88,24 +91,24 @@ export const BookingConfirmScreen = () => {
           </View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionLabel}>{t('bookingConfirm.pricing')}</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>{t('bookingConfirm.rentalSubtotal')}</Text>
-            <Text style={styles.priceValue}>${dailyRate.toFixed(2)}</Text>
-          </View>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>{t('bookingConfirm.platformFee')}</Text>
-            <Text style={styles.priceValue}>${platformFee.toFixed(2)}</Text>
-          </View>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>{t('bookingConfirm.securityDeposit')}</Text>
-            <Text style={styles.priceValue}>${deposit.toFixed(2)}</Text>
-          </View>
+          <View style={styles.card}>
+            <Text style={styles.sectionLabel}>{t('bookingConfirm.pricing')}</Text>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>{t('bookingConfirm.rentalSubtotal')}</Text>
+              <Text style={styles.priceValue}>{formatCurrency(dailyRate, language)}</Text>
+            </View>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>{t('bookingConfirm.platformFee')}</Text>
+              <Text style={styles.priceValue}>{formatCurrency(platformFee, language)}</Text>
+            </View>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>{t('bookingConfirm.securityDeposit')}</Text>
+              <Text style={styles.priceValue}>{formatCurrency(deposit, language)}</Text>
+            </View>
           <View style={styles.divider} />
           <View style={styles.priceRow}>
             <Text style={styles.totalLabel}>{t('bookingConfirm.total')}</Text>
-            <Text style={styles.totalValue}>${totalAmount.toFixed(2)}</Text>
+            <Text style={styles.totalValue}>{formatCurrency(totalAmount, language)}</Text>
           </View>
         </View>
 

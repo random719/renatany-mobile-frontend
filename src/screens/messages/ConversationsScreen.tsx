@@ -49,7 +49,7 @@ export const ConversationsScreen = () => {
             const allRentals = [...asRenter, ...asOwner];
             const uniqueRentals = Array.from(new Map(allRentals.map(r => [r.id, r])).values());
             const activeRentals = uniqueRentals.filter(r => ['pending', 'approved', 'paid', 'inquiry', 'pending_verification'].includes(r.status));
-            activeRentals.sort((a, b) => (new Date(b.updated_date || b.created_date).getTime() || 0) - (new Date(a.updated_date || a.created_date).getTime() || 0));
+            activeRentals.sort((a, b) => (new Date(b.start_date).getTime() || 0) - (new Date(a.start_date).getTime() || 0));
             setConversations(activeRentals);
 
             const uniqueItemIds = [...new Set(activeRentals.map(r => r.item_id))];
@@ -146,7 +146,11 @@ export const ConversationsScreen = () => {
 
         return (
             <View key={conv.id} style={styles.convCard}>
-                {/* Card header: image + title/meta */}
+                {/* Card header: image + title/meta — tappable to go to listing */}
+                <TouchableOpacity
+                    onPress={() => (navigation as any).navigate('Main', { screen: 'HomeTab', params: { screen: 'ListingDetail', params: { listingId: conv.item_id } } })}
+                    activeOpacity={0.7}
+                >
                 <View style={styles.cardTop}>
                     <View style={styles.thumbContainer}>
                         {itemImage ? (
@@ -199,6 +203,7 @@ export const ConversationsScreen = () => {
                         )}
                     </View>
                 </View>
+                </TouchableOpacity>
 
                 {/* Message preview */}
                 {conv.message ? (
@@ -245,7 +250,7 @@ export const ConversationsScreen = () => {
 
                 {/* Submitted date */}
                 <Text style={styles.submittedDate}>
-                    {t('conversations.submitted', { date: new Date(conv.created_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) })}
+                    {conv.created_date ? t('conversations.submitted', { date: new Date(conv.created_date).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) }) : ''}
                 </Text>
             </View>
         );

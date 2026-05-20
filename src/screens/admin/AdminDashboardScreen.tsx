@@ -26,6 +26,7 @@ import {
   RevenuePoint,
 } from "../../types/admin";
 import { colors, iconSize, typography } from "../../theme";
+import { formatCurrency } from "../../utils/formatCurrency";
 
 const CHART_W = 320;
 const CHART_H = 170;
@@ -703,7 +704,9 @@ const RevenueByCategoryCard = ({
   itemsLabel: string;
   rentalsLabel: string;
   revenueLabel: string;
-}) => (
+}) => {
+  const { language } = useI18n();
+  return (
   <View style={styles.chartCard}>
     <View style={styles.sectionHeaderRow}>
       <MaterialCommunityIcons name="currency-usd" size={iconSize.lg} color="#16A34A" />
@@ -721,13 +724,14 @@ const RevenueByCategoryCard = ({
           </Text>
         </View>
         <View style={styles.revenueCategoryAmount}>
-          <Text style={styles.revenueCategoryValue}>${item.revenue.toFixed(2)}</Text>
+          <Text style={styles.revenueCategoryValue}>{formatCurrency(item.revenue, language)}</Text>
           <Text style={styles.revenueCategoryLabel}>{revenueLabel}</Text>
         </View>
       </View>
     ))}
   </View>
 );
+};
 
 const DailyRevenueBreakdownChart = ({
   data,
@@ -1035,13 +1039,13 @@ export const AdminDashboardScreen = () => {
           <View style={styles.metricsGrid}>
             <UsersMetricCard
               title={t("adminDashboard.totalRevenue")}
-              value={`$${dashboardData.totalRevenueAllTime.toFixed(2)}`}
+              value={formatCurrency(dashboardData.totalRevenueAllTime, language)}
               subtitle={t("adminDashboard.allTime")}
               color="#16A34A"
             />
             <UsersMetricCard
               title={t("adminDashboard.thisMonth")}
-              value={`$${dashboardData.revenueThisMonth.toFixed(2)}`}
+              value={formatCurrency(dashboardData.revenueThisMonth, language)}
               subtitle={t("adminDashboard.platformFees")}
               change={`${dashboardData.revenueGrowth > 0 ? '+' : ''}${dashboardData.revenueGrowth}% ${t("adminDashboard.vsLastMonth")}`}
               color="#10B981"
@@ -1049,13 +1053,13 @@ export const AdminDashboardScreen = () => {
             />
             <UsersMetricCard
               title={t("adminDashboard.thisWeek")}
-              value={`$${dashboardData.revenueThisWeek.toFixed(2)}`}
+              value={formatCurrency(dashboardData.revenueThisWeek, language)}
               subtitle={t("adminDashboard.last7Days")}
               color="#2563EB"
             />
             <UsersMetricCard
               title={t("adminDashboard.pendingPayouts")}
-              value={`$${dashboardData.pendingPayouts.toFixed(2)}`}
+              value={formatCurrency(dashboardData.pendingPayouts, language)}
               subtitle={t("adminDashboard.paidAmount", { amount: dashboardData.paidOutAmount.toFixed(2) })}
               color="#D97706"
             />

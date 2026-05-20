@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, Button, Chip, RadioButton } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Button, Chip, RadioButton, Text } from 'react-native-paper';
 import { useListingStore } from '../../store/listingStore';
+import { colors } from '../../theme';
 import { ListingFilter } from '../../types/listing';
-import { colors, typography } from '../../theme';
 
 const SORT_OPTIONS: { label: string; value: ListingFilter['sortBy'] }[] = [
   { label: 'Newest', value: 'newest' },

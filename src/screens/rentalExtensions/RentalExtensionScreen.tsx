@@ -23,6 +23,7 @@ import { toast } from '../../store/toastStore';
 import { colors } from '../../theme';
 import { RentalExtension } from '../../types/models';
 import { RootStackParamList } from '../../types/navigation';
+import { formatCurrency } from '../../utils/formatCurrency';
 import { parseRentalBoundaryDate } from '../../utils/rentalDates';
 
 type Nav = StackNavigationProp<RootStackParamList>;
@@ -36,7 +37,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 
 export const RentalExtensionScreen = () => {
   const navigation = useNavigation<Nav>();
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const route = useRoute<Route>();
   const { rentalRequestId, currentEndDate, dailyRate, ownerEmail, isOwner } = route.params;
   const { user: clerkUser } = useUser();
@@ -160,7 +161,7 @@ export const RentalExtensionScreen = () => {
                       </View>
                     </View>
                     <Text style={styles.extensionCost}>
-                      {t('rentalExtension.additional', { amount: ext.additional_cost.toFixed(2) })}
+                      {t('rentalExtension.additional', { amount: formatCurrency(ext.additional_cost, language) })}
                     </Text>
                     {ext.message && <Text style={styles.extensionMessage}>{ext.message}</Text>}
                     <Text style={styles.extensionMeta}>
@@ -217,7 +218,7 @@ export const RentalExtensionScreen = () => {
                   </View>
                   <View style={styles.costRow}>
                     <Text style={styles.costLabel}>{t('rentalExtension.additionalCost', { days: extraDays, rate: dailyRate })}</Text>
-                    <Text style={styles.costValueBold}>${additionalCost.toFixed(2)}</Text>
+                    <Text style={styles.costValueBold}>{formatCurrency(additionalCost, language)}</Text>
                   </View>
                 </View>
               )}
